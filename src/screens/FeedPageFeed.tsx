@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, FlatList } from 'react-native';
-import Post from './FeedPage'; // Assuming Post component is in a separate file
+import Post from './Feed'; // Assuming Post component is in a separate file
 
 // Example data for demonstration
 const posts = [
