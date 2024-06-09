@@ -48,51 +48,13 @@ function HomeStack() {
                 component={WorkoutLogScreen}
                 options={{
                     headerShown: false,
-                    presentation: 'modal',
+                    presentation: 'fullScreenModal',
                 }}
             />
         </Stack.Navigator>
     );
 }
 
-function WorkoutLogStack() {
-    return (
-        <Stack.Navigator initialRouteName='Workout'>
-            <Stack.Screen
-                name="Workout"
-                component={WorkoutLogScreen}
-                options={{
-                    headerShown: false,
-                    presentation: 'modal',  // This line enables the upward animation
-                }}
-            />
-
-        </Stack.Navigator>
-    );
-}
-
-function SaveHighlightStack() {
-    return (
-        <Stack.Navigator initialRouteName='Home'>
-            <Stack.Screen
-                name="Save Highlight"
-                component={SaveGymHighlightScreen}
-                options={({ navigation }) => ({
-                    ...screenOptions({ navigation }),
-                    title: "Save Highlight"
-                })}
-            />
-            <Stack.Screen
-                name='WorkoutLog'
-                component={WorkoutLogScreen}
-                options={{
-                    headerShown: false,
-                    presentation: 'modal',
-                }}
-            />
-        </Stack.Navigator>
-    );
-}
 
 function AccountStack() {
     return (
@@ -105,7 +67,7 @@ function AccountStack() {
                 component={WorkoutLogScreen}
                 options={{
                     headerShown: false,
-                    presentation: 'modal',
+                    presentation: 'fullScreenModal',
                 }}
             />
         </Stack.Navigator>
@@ -122,7 +84,7 @@ function ProgressStack() {
                 component={WorkoutLogScreen}
                 options={{
                     headerShown: false,
-                    presentation: 'modal',
+                    presentation: 'fullScreenModal',
                 }}
             />
         </Stack.Navigator>
@@ -139,7 +101,7 @@ function PostStack() {
                 component={WorkoutLogScreen}
                 options={{
                     headerShown: false,
-                    presentation: 'modal',
+                    presentation: 'fullScreenModal',
                 }}
             />
         </Stack.Navigator>
