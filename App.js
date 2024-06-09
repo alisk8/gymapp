@@ -13,49 +13,60 @@ import Notifications from './src/screens/Notifications';
 import PersonalDetails from './src/screens/PersonalDetails';
 import WorkoutLogScreen from './src/screens/workout-log';
 import SaveGymHighlightScreen from "./src/screens/save-gym-highlight";
+import CustomTabBar from "./src/components/CustomTabBar";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const screenOptions = ({ navigation }) => ({
-  headerRight: () => (
-    <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
-      <Ionicons name="notifications-outline" size={24} color="black" style={{ marginRight: 15 }} />
-    </TouchableOpacity>
-  ),
-  headerStyle: {
-    paddingTop: 20, 
-    height: 80,
-  },
+    headerRight: () => (
+        <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+            <Ionicons name="notifications-outline" size={24} color="black" style={{ marginRight: 15 }} />
+        </TouchableOpacity>
+    ),
+    headerStyle: {
+        paddingTop: 20,
+        height: 80,
+    },
 });
 
+
 function HomeStack() {
-  return (
-    <Stack.Navigator initialRouteName='Home'>
-      <Stack.Screen 
-        name="Home" 
-        component={Home} 
-        options={({ navigation }) => ({
-          ...screenOptions({ navigation }), 
-          title: "Feed" 
-        })}
-      />
-      <Stack.Screen name='Notifications' component={Notifications} />
-    </Stack.Navigator>
-  );
+    return (
+        <Stack.Navigator initialRouteName='Home'>
+            <Stack.Screen
+                name="Home"
+                component={Home}
+                options={({ navigation }) => ({
+                    ...screenOptions({ navigation }),
+                    title: "Feed"
+                })}
+            />
+            <Stack.Screen name='Notifications' component={Notifications} />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
+        </Stack.Navigator>
+    );
 }
 
 function WorkoutLogStack() {
     return (
-        <Stack.Navigator initialRouteName='Home'>
+        <Stack.Navigator initialRouteName='Workout'>
             <Stack.Screen
                 name="Workout"
                 component={WorkoutLogScreen}
-                options={({ navigation }) => ({
-                    ...screenOptions({ navigation }),
-                    title: "Workout"
-                })}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',  // This line enables the upward animation
+                }}
             />
+
         </Stack.Navigator>
     );
 }
@@ -71,60 +82,106 @@ function SaveHighlightStack() {
                     title: "Save Highlight"
                 })}
             />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
         </Stack.Navigator>
     );
 }
 
 function AccountStack() {
-  return (
-    <Stack.Navigator initialRouteName='Account'>
-      <Stack.Screen name='Account' component={Account} options={screenOptions} />
-      <Stack.Screen name='Notifications' component={Notifications} />
-      <Stack.Screen options={{ title: "Personal Details" }} name='PersonalDetails' component={PersonalDetails} />
-    </Stack.Navigator>
-  );
+    return (
+        <Stack.Navigator initialRouteName='Account'>
+            <Stack.Screen name='Account' component={Account} options={screenOptions} />
+            <Stack.Screen name='Notifications' component={Notifications} />
+            <Stack.Screen options={{ title: "Personal Details" }} name='PersonalDetails' component={PersonalDetails} />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
+        </Stack.Navigator>
+    );
 }
 
 function ProgressStack() {
-  return (
-    <Stack.Navigator initialRouteName='Progress'>
-      <Stack.Screen name='Progress' component={Progress} options={screenOptions} />
-      <Stack.Screen name='Notifications' component={Notifications} />
-    </Stack.Navigator>
-  );
+    return (
+        <Stack.Navigator initialRouteName='Progress'>
+            <Stack.Screen name='Progress' component={Progress} options={screenOptions} />
+            <Stack.Screen name='Notifications' component={Notifications} />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
+        </Stack.Navigator>
+    );
 }
 
 function PostStack() {
-  return (
-    <Stack.Navigator initialRouteName='Post'>
-      <Stack.Screen name='Post' component={Post} options={screenOptions} />
-      <Stack.Screen name='Notifications' component={Notifications} />
-    </Stack.Navigator>
-  );
+    return (
+        <Stack.Navigator initialRouteName='Post'>
+            <Stack.Screen name='Save Highlight' component={SaveGymHighlightScreen} options={screenOptions} />
+            <Stack.Screen name='Notifications' component={Notifications} />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
+        </Stack.Navigator>
+    );
 }
 
 function App() {
-  return (
-    <NavigationContainer>
-      <Tab.Navigator>
-        <Tab.Screen name='HomeStack' component={HomeStack} options={{ headerShown: false, title: 'Feed' }} />
-        <Tab.Screen name='PostStack' component={PostStack} options={{ headerShown: false, title: 'Post' }} />
-          <Tab.Screen name='SaveHighlightStack' component={SaveHighlightStack} options={{ headerShown: false, title: 'Save Highlight' }} />
-          <Tab.Screen name='WorkoutLogStack' component={WorkoutLogStack} options={{ headerShown: false, title: 'Workout Log' }} />
-          <Tab.Screen name='ProgressStack' component={ProgressStack} options={{ headerShown: false, title: 'Progress' }} />
-        <Tab.Screen name='AccountStack' component={AccountStack} options={{ headerShown: false, title: 'Account' }} />
-      </Tab.Navigator>
-    </NavigationContainer>
-  );
+    return (
+        <NavigationContainer>
+            <Tab.Navigator tabBar={props => <CustomTabBar {...props} />}>
+                <Tab.Screen
+                    name='HomeStack'
+                    component={HomeStack}
+                    options={{ headerShown: false, title: 'Feed', tabBarIcon: { name: 'home-outline' } }}
+                />
+                <Tab.Screen
+                    name='PostStack'
+                    component={PostStack}
+                    options={{ headerShown: false, title: 'Post', tabBarIcon: { name: 'create-outline' } }}
+                />
+                <Tab.Screen
+                    name='ProgressStack'
+                    component={ProgressStack}
+                    options={{ headerShown: false, title: 'Progress', tabBarIcon: { name: 'trending-up-outline' } }}
+                />
+                <Tab.Screen
+                    name='AccountStack'
+                    component={AccountStack}
+                    options={{ headerShown: false, title: 'Account', tabBarIcon: { name: 'person-outline' } }}
+                />
+            </Tab.Navigator>
+        </NavigationContainer>
+    );
 }
 
 export default App;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    container: {
+        flex: 1,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 });

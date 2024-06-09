@@ -17,8 +17,11 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { commonExercises } from '../../exercisesList';
 import { Checkbox } from 'react-native-paper';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { useNavigation } from '@react-navigation/native'; // Import useNavigation hook
 
-export default function WorkoutLogScreen({ onClose }) {
+export default function WorkoutLogScreen() {
+    const navigation = useNavigation();
+
     const [exercises, setExercises] = useState([
         { id: 'bicepCurls', name: 'Bicep Curls', sets: [{ key: 'set1', weight: '', reps: '' }], weightUnit: 'lbs', supersets: [] }
     ]);
@@ -399,7 +402,7 @@ export default function WorkoutLogScreen({ onClose }) {
         <View style={styles.fullScreenContainer}>
             <View style={styles.modalHeader}>
                 <Text style={styles.headerText}>Workout Log</Text>
-                <TouchableOpacity onPress={onClose} style={styles.hideButton}>
+                <TouchableOpacity onPress={navigation.goBack} style={styles.hideButton}>
                     <Text style={styles.hideButtonText}>Hide</Text>
                 </TouchableOpacity>
             </View>
@@ -616,7 +619,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
 });
-
 
 
 
