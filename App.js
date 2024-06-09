@@ -11,6 +11,8 @@ import Post from './src/screens/Post';
 import Progress from './src/screens/Progress';
 import Notifications from './src/screens/Notifications';
 import PersonalDetails from './src/screens/PersonalDetails';
+import WorkoutLogScreen from './src/screens/workout-log';
+import SaveGymHighlightScreen from "./src/screens/save-gym-highlight";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -41,6 +43,36 @@ function HomeStack() {
       <Stack.Screen name='Notifications' component={Notifications} />
     </Stack.Navigator>
   );
+}
+
+function WorkoutLogStack() {
+    return (
+        <Stack.Navigator initialRouteName='Home'>
+            <Stack.Screen
+                name="Workout"
+                component={WorkoutLogScreen}
+                options={({ navigation }) => ({
+                    ...screenOptions({ navigation }),
+                    title: "Workout"
+                })}
+            />
+        </Stack.Navigator>
+    );
+}
+
+function SaveHighlightStack() {
+    return (
+        <Stack.Navigator initialRouteName='Home'>
+            <Stack.Screen
+                name="Save Highlight"
+                component={SaveGymHighlightScreen}
+                options={({ navigation }) => ({
+                    ...screenOptions({ navigation }),
+                    title: "Save Highlight"
+                })}
+            />
+        </Stack.Navigator>
+    );
 }
 
 function AccountStack() {
@@ -77,7 +109,9 @@ function App() {
       <Tab.Navigator>
         <Tab.Screen name='HomeStack' component={HomeStack} options={{ headerShown: false, title: 'Feed' }} />
         <Tab.Screen name='PostStack' component={PostStack} options={{ headerShown: false, title: 'Post' }} />
-        <Tab.Screen name='ProgressStack' component={ProgressStack} options={{ headerShown: false, title: 'Progress' }} />
+          <Tab.Screen name='SaveHighlightStack' component={SaveHighlightStack} options={{ headerShown: false, title: 'Save Highlight' }} />
+          <Tab.Screen name='WorkoutLogStack' component={WorkoutLogStack} options={{ headerShown: false, title: 'Workout Log' }} />
+          <Tab.Screen name='ProgressStack' component={ProgressStack} options={{ headerShown: false, title: 'Progress' }} />
         <Tab.Screen name='AccountStack' component={AccountStack} options={{ headerShown: false, title: 'Account' }} />
       </Tab.Navigator>
     </NavigationContainer>
