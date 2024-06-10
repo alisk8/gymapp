@@ -9,8 +9,11 @@ import {
     TouchableOpacity,
     Keyboard,
     Pressable,
-    FlatList
+    FlatList,
+    Modal
 } from 'react-native';
+import {Picker} from '@react-native-picker/picker'
+import RNPickerSelect from 'react-native-picker-select'; // Import Picker
 import { db, firebase_auth } from '../../firebaseConfig';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { FontAwesome5 } from '@expo/vector-icons';
@@ -31,6 +34,12 @@ export default function WorkoutLogScreen() {
     const [currentSupersetIndex, setCurrentSupersetIndex] = useState(null);
     const [isTemplate, setIsTemplate] = useState(false);
     const [templateName, setTemplateName] = useState('');
+    const [timerVisible, setTimerVisible] = useState(false);
+    const [countdownMinutes, setCountdownMinutes] = useState(0); // Minutes for the timer
+    const [countdownSeconds, setCountdownSeconds] = useState(0); // Seconds for the timer
+    const [initialTime, setInitialTime] = useState(0);
+    const [timeRemaining, setTimeRemaining] = useState(null);
+    const [timerRunning, setTimerRunning] = useState(false);
 
     useEffect(() => {
         fetchUserExercises();
@@ -42,6 +51,41 @@ export default function WorkoutLogScreen() {
             keyboardDidHideListener.remove();
         };
     }, []);
+
+    useEffect(() => {
+        let timer;
+        if (timerRunning && timeRemaining > 0) {
+            timer = setInterval(() => {
+                setTimeRemaining(prevTime => prevTime - 1);
+            }, 1000);
+        } else if (timeRemaining === 0) {
+            setTimerRunning(false);
+            Alert.alert("Time's up!");
+        }
+
+        return () => clearInterval(timer);
+    }, [timerRunning, timeRemaining]);
+
+    const startTimer = () => {
+        const timeInSeconds = (parseInt(countdownMinutes) * 60) + parseInt(countdownSeconds); // convert minutes and seconds to seconds
+        setInitialTime(timeInSeconds);
+        setTimeRemaining(timeInSeconds);
+        setTimerRunning(true);
+        setTimerVisible(false);
+    };
+
+    const toggleTimer = () => {
+        setTimerRunning(prev => !prev);
+    };
+
+    const resetTimer = () => {
+        setTimeRemaining(initialTime);
+        setTimerRunning(false);
+    };
+
+    const adjustTime = (amount) => {
+        setTimeRemaining(prevTime => Math.max(0, prevTime + amount));
+    };
 
     const fetchUserExercises = async () => {
         if (!firebase_auth.currentUser) return;
@@ -398,6 +442,11 @@ export default function WorkoutLogScreen() {
         </View>
     );
 
+    // Helper function to generate picker items
+    const generatePickerItems = (range) => {
+        return Array.from({ length: range }, (_, i) => ({ label: `${i}`, value: i }));
+    };
+
     return (
         <View style={styles.fullScreenContainer}>
             <View style={styles.modalHeader}>
@@ -436,6 +485,66 @@ export default function WorkoutLogScreen() {
                 style={{ zIndex: 1 }}
                 nestedScrollEnabled={true}
             />
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={timerVisible}
+                onRequestClose={() => setTimerVisible(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Set Countdown Timer</Text>
+                        <View style={styles.pickerContainer}>
+                            <Picker
+                                selectedValue={countdownMinutes}
+                                onValueChange={(itemValue) => setCountdownMinutes(itemValue)}
+                                style={pickerSelectStyles.picker}
+                            >
+                                {generatePickerItems(60).map(item => (
+                                    <Picker.Item key={item.value} label={String(item.value)} value={item.value} />
+                                ))}
+                            </Picker>
+                            <Text style={styles.pickerSeparator}>:</Text>
+                            <Picker
+                                selectedValue={countdownSeconds}
+                                onValueChange={(itemValue) => setCountdownSeconds(itemValue)}
+                                style={pickerSelectStyles.picker}
+                            >
+                                {generatePickerItems(60).map(item => (
+                                    <Picker.Item key={item.value} label={String(item.value)} value={item.value} />
+                                ))}
+                            </Picker>
+                        </View>
+                        <Button title="Start Timer" onPress={startTimer} />
+                        <Button title="Cancel" onPress={() => setTimerVisible(false)} />
+                    </View>
+                </View>
+            </Modal>
+
+            {timeRemaining !== null && (
+                <View style={styles.timerContainer}>
+                    <TouchableOpacity style={styles.adjustTimeButton} onPress={() => adjustTime(15)}>
+                        <Text style={styles.adjustTimeButtonText}>+15</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={toggleTimer}>
+                        <Text style={styles.timerText}>
+                            {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.adjustTimeButton} onPress={() => adjustTime(-15)}>
+                        <Text style={styles.adjustTimeButtonText}>-15</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+            <View style={styles.bottomTab}>
+                <TouchableOpacity style={styles.setTimerButton} onPress={() => setTimerVisible(true)}>
+                    <Text style={styles.setTimerButtonText}>Set Timer</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.resetButton} onPress={resetTimer}>
+                    <Text style={styles.resetButtonText}>Reset</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 }
@@ -471,6 +580,7 @@ const styles = StyleSheet.create({
     },
     exercisesContainer: {
         marginBottom: 20,
+        paddingBottom: 20,
     },
     exerciseContainer: {
         marginBottom: 20,
@@ -617,6 +727,137 @@ const styles = StyleSheet.create({
     deleteButtonText: {
         color: 'white',
         fontWeight: 'bold',
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        padding: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    modalTitle: {
+        fontSize: 20,
+        marginBottom: 10,
+    },
+    modalInput: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        padding: 10,
+        width: 200,
+        textAlign: 'center',
+        marginBottom: 10,
+        borderRadius: 5,
+    },
+        pickerContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 10,
+        },
+        pickerSeparator: {
+            fontSize: 24,
+            marginHorizontal: 10,
+        },
+    timerContainer: {
+        position: 'absolute',
+        bottom: 60, // Adjust as needed
+        width: '100%',
+        backgroundColor: 'white',
+        paddingBottom: 60,
+        paddingTop: 10,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        zIndex: 5,
+        alignSelf: 'center',
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        borderRadius: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+    },
+    timerText: {
+        fontSize: 30,
+        color: 'blue',
+        fontWeight: 'bold',
+    },
+    adjustTimeButton: {
+        borderRadius: 8,
+    },
+    adjustTimeButtonText: {
+        fontSize: 18,
+        color: 'blue',
+        fontWeight: 'bold',
+        padding: 10
+    },
+    bottomTab: {
+        bottom: 0,
+        width: '100%', // Ensure full width
+        backgroundColor: '#fff',
+        padding: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#ccc',
+        flexDirection: 'row',
+        justifyContent: 'space-between', // Space between elements
+        alignItems: 'center', // Align items in the center
+        zIndex: 10,
+    },
+    setTimerButton: {
+        backgroundColor: '#007bff', // Match the color
+        paddingVertical: 12,
+        paddingHorizontal: 32,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    setTimerButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    resetButton: {
+        backgroundColor: 'red',
+        paddingVertical: 12,
+        paddingHorizontal: 32,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    resetButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+});
+
+const pickerSelectStyles = StyleSheet.create({
+    picker: {
+        width: 100,
+        height: 150,
+    },
+    inputIOS: {
+        fontSize: 18,
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 8,
+        color: 'black',
+        paddingRight: 30, // to ensure the text is never behind the icon
+    },
+    inputAndroid: {
+        fontSize: 18,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 8,
+        color: 'black',
+        paddingRight: 30, // to ensure the text is never behind the icon
     },
 });
 
