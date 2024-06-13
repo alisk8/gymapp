@@ -200,82 +200,122 @@ export default function WorkoutLogScreen() {
         setExercises(newExercises);
     };
 
-    const renderSets = (sets, exerciseIndex, supersetIndex = null) => (
-        sets.map((set, setIndex) => {
-            const weightPlaceholder = (() => {
-                const exercise = supersetIndex === null
-                    ? exercises[exerciseIndex]
-                    : exercises[exerciseIndex].supersets[supersetIndex];
-                switch (exercise.weightConfig) {
-                    case 'totalWeight':
-                        return 'Total Weight';
-                    case 'weightPerSide':
-                    case 'weightPerSideBarbell':
-                        return 'Weight Per Side';
-                    case 'bodyWeight':
-                        return 'Bodyweight';
-                    case 'extraWeightBodyWeight':
-                        return 'Extra Weight';
-                    default:
-                        return 'Weight';
+    const getTotalWeight = (exercise, weight, unit) => {
+        let totalWeight = 0;
+        switch (exercise.weightConfig) {
+            case 'weightPerSide':
+                totalWeight = weight * 2;
+                break;
+            case 'weightPerSideBarbell':
+                if (unit === 'lbs') {
+                    totalWeight = (weight * 2) + 45;
+                } else {
+                    totalWeight = (weight * 2) + 20;
                 }
-            })();
+                break;
+            default:
+                return null;
+        }
+        return totalWeight;
+    };
 
-            const repsPlaceholder = (() => {
-                const exercise = supersetIndex === null
-                    ? exercises[exerciseIndex]
-                    : exercises[exerciseIndex].supersets[supersetIndex];
-                switch (exercise.repsConfig) {
-                    case 'reps':
-                        return 'Reps';
-                    case 'time':
-                        return 'Time (seconds)';
-                    default:
-                        return 'Reps';
-                }
-            })();
+    const renderTotalWeightMessage = (exercise, sets) => {
+        const lastSet = sets[sets.length - 1];
+        const weight = parseFloat(lastSet.weight);
+        if (isNaN(weight) || exercise.weightConfig === 'totalWeight' || exercise.weightConfig === 'bodyWeight') {
+            return null;
+        }
 
-            const isWeightDisabled = (() => {
-                const exercise = supersetIndex === null
-                    ? exercises[exerciseIndex]
-                    : exercises[exerciseIndex].supersets[supersetIndex];
-                return exercise.weightConfig === 'bodyWeight';
-            })();
-
+        const totalWeight = getTotalWeight(exercise, weight, exercise.weightUnit);
+        if (totalWeight !== null) {
+            console.log("yo this is the config:");
+            console.log(exercise.weightConfig);
             return (
-                <GestureHandlerRootView key={set.key}>
-                    <Swipeable
-                        renderLeftActions={() => (
-                            <TouchableOpacity
-                                style={styles.deleteButton}
-                                onPress={() => deleteSet(exerciseIndex, setIndex, supersetIndex)}
-                            >
-                                <Text style={styles.deleteButtonText}>Delete</Text>
-                            </TouchableOpacity>
-                        )}
-                    >
-                        <View style={styles.setRow}>
-                            <TextInput
-                                placeholder={weightPlaceholder}
-                                keyboardType="numeric"
-                                style={styles.weightInput}
-                                onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'weight', supersetIndex)}
-                                value={set.weight}
-                                editable={!isWeightDisabled}
-                            />
-                            <TextInput
-                                placeholder={repsPlaceholder}
-                                keyboardType="numeric"
-                                style={styles.repsInput}
-                                onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'reps', supersetIndex)}
-                                value={set.reps}
-                            />
-                        </View>
-                    </Swipeable>
-                </GestureHandlerRootView>
+                <Text key={lastSet.key} style={styles.totalWeightMessage}>
+                    {`Lifting ${totalWeight} total ${exercise.weightUnit} for set ${sets.length}`}
+                </Text>
             );
-        })
+        }
+
+        return null;
+    };
+
+    const renderSets = (sets, exerciseIndex, supersetIndex = null) => (
+        <View>
+            {sets.map((set, setIndex) => {
+                const exercise = supersetIndex === null
+                    ? exercises[exerciseIndex]
+                    : exercises[exerciseIndex].supersets[supersetIndex];
+
+                const weightPlaceholder = (() => {
+                    switch (exercise.weightConfig) {
+                        case 'totalWeight':
+                            return 'Total Weight';
+                        case 'weightPerSide':
+                        case 'weightPerSideBarbell':
+                            return 'Weight Per Side';
+                        case 'bodyWeight':
+                            return 'Bodyweight';
+                        case 'extraWeightBodyWeight':
+                            return 'Extra Weight';
+                        default:
+                            return 'Weight';
+                    }
+                })();
+
+                const repsPlaceholder = (() => {
+                    switch (exercise.repsConfig) {
+                        case 'reps':
+                            return 'Reps';
+                        case 'time':
+                            return 'Time (seconds)';
+                        default:
+                            return 'Reps';
+                    }
+                })();
+
+                const isWeightDisabled = exercise.weightConfig === 'bodyWeight';
+
+                return (
+                    <GestureHandlerRootView key={set.key}>
+                        <Swipeable
+                            renderLeftActions={() => (
+                                <TouchableOpacity
+                                    style={styles.deleteButton}
+                                    onPress={() => deleteSet(exerciseIndex, setIndex, supersetIndex)}
+                                >
+                                    <Text style={styles.deleteButtonText}>Delete</Text>
+                                </TouchableOpacity>
+                            )}
+                        >
+                            <View style={styles.setRow}>
+                                <TextInput
+                                    placeholder={weightPlaceholder}
+                                    keyboardType="numeric"
+                                    style={styles.weightInput}
+                                    onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'weight', supersetIndex)}
+                                    value={set.weight}
+                                    editable={!isWeightDisabled}
+                                />
+                                <TextInput
+                                    placeholder={repsPlaceholder}
+                                    keyboardType="numeric"
+                                    style={styles.repsInput}
+                                    onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'reps', supersetIndex)}
+                                    value={set.reps}
+                                />
+                            </View>
+                        </Swipeable>
+                    </GestureHandlerRootView>
+                );
+            })}
+            {renderTotalWeightMessage(
+                supersetIndex === null ? exercises[exerciseIndex] : exercises[exerciseIndex].supersets[supersetIndex],
+                sets
+            )}
+        </View>
     );
+
 
     const renderSuggestions = (exerciseIndex, supersetIndex = null) => (
         suggestions.length > 0 && (
@@ -531,9 +571,13 @@ export default function WorkoutLogScreen() {
         if (editSupersetIndex === null) {
             newExercises[editExerciseIndex].weightConfig = weightConfig;
             newExercises[editExerciseIndex].repsConfig = repsConfig;
+            console.log("main set");
+            console.log(newExercises[editExerciseIndex].weightConfig)
         } else {
             newExercises[editExerciseIndex].supersets[editSupersetIndex].weightConfig = weightConfig;
             newExercises[editExerciseIndex].supersets[editSupersetIndex].repsConfig = repsConfig;
+            console.log("superset");
+            console.log(newExercises[editExerciseIndex].supersets[editSupersetIndex].weightConfig);
         }
         setExercises(newExercises);
         setEditModalVisible(false);
@@ -1065,10 +1109,7 @@ const pickerSelectStyles = StyleSheet.create({
     },
 });
 
-
-
-
-
+export default WorkoutLogScreen;
 
 
 
