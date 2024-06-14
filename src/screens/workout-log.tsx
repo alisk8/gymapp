@@ -226,23 +226,40 @@ export default function WorkoutLogScreen() {
     };
 
     const renderTotalWeightMessage = (exercise, sets) => {
-        const lastSet = sets[sets.length - 1];
-        const weight = parseFloat(lastSet.weight);
-        if (isNaN(weight) || exercise.weightConfig === 'totalWeight' || exercise.weightConfig === 'bodyWeight') {
+        // Find the last set with a filled-in weight and its index
+        let lastFilledSet = null;
+        let lastFilledIndex = null;
+
+        for (let i = sets.length - 1; i >= 0; i--) {
+            if (sets[i].weight && !isNaN(parseFloat(sets[i].weight))) {
+                lastFilledSet = sets[i];
+                lastFilledIndex = i + 1; // +1 to display human-readable index (1-based)
+                break;
+            }
+        }
+
+        if (!lastFilledSet) {
+            return null; // If no filled-in set is found, return null immediately
+        }
+
+        const weight = parseFloat(lastFilledSet.weight);
+        if (exercise.weightConfig === 'totalWeight' || exercise.weightConfig === 'bodyWeight') {
             return null;
         }
 
         const totalWeight = calculateTotalWeight(weight, exercise.weightConfig, exercise.weightUnit);
         if (totalWeight !== null) {
             return (
-                <Text key={lastSet.key} style={styles.totalWeightMessage}>
-                    {`Lifting ${totalWeight} total ${exercise.weightUnit} for set ${sets.length}`}
+                <Text key={lastFilledSet.key} style={styles.totalWeightMessage}>
+                    {`Lifting ${totalWeight} total ${exercise.weightUnit} for set ${lastFilledIndex}`}
                 </Text>
             );
         }
 
         return null;
     };
+
+
 
     const renderSets = (sets, exerciseIndex, supersetIndex = null) => (
         <View>
@@ -384,7 +401,8 @@ export default function WorkoutLogScreen() {
                     ? 'BW'
                     : ex.weightConfig === 'extraWeightBodyWeight'
                         ? `BW + ${set.weight} ${ex.weightUnit}`
-                        : `${calculateTotalWeight(parseFloat(set.weight), ex.weightConfig, ex.weightUnit)} ${ex.weightUnit}`
+                        : `${calculateTotalWeight(parseFloat(set.weight), ex.weightConfig, ex.weightUnit)} ${ex.weightUnit}`,
+                reps: ex.repsConfig === 'time' ? `${set.reps} secs` : `${set.reps} reps`
             })),
             supersets: ex.supersets.map(superset => ({
                 id: camelCase(superset.name),
@@ -395,7 +413,8 @@ export default function WorkoutLogScreen() {
                         ? 'BW'
                         : superset.weightConfig === 'extraWeightBodyWeight'
                             ? `BW + ${set.weight} ${superset.weightUnit}`
-                            : `${calculateTotalWeight(parseFloat(set.weight), superset.weightConfig, superset.weightUnit)} ${superset.weightUnit}`
+                            : `${calculateTotalWeight(parseFloat(set.weight), superset.weightConfig, superset.weightUnit)} ${superset.weightUnit}`,
+                    reps: superset.repsConfig === 'time' ? `${set.reps} secs` : `${set.reps} reps`
                 }))
             })).filter(superset => superset.sets.length > 0),
             weightConfig: ex.weightConfig,
@@ -458,6 +477,7 @@ export default function WorkoutLogScreen() {
             Alert.alert("Error", "Failed to save workouts.");
         }
     };
+
 
     const camelCase = (str) => {
         return str
