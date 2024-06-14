@@ -29,6 +29,7 @@ export default function WorkoutLogScreen() {
     ]);
     const [suggestions, setSuggestions] = useState([]);
     const [userExercises, setUserExercises] = useState([]);
+    const [exercisePresets, setExercisePresets] = useState({});
     const [currentExerciseIndex, setCurrentExerciseIndex] = useState(null);
     const [currentSupersetIndex, setCurrentSupersetIndex] = useState(null);
     const [isTemplate, setIsTemplate] = useState(false);
@@ -46,6 +47,7 @@ export default function WorkoutLogScreen() {
     const [repsConfig, setRepsConfig] = useState('reps');
 
     useEffect(() => {
+        fetchExercisePresets();
         fetchUserExercises();
         const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
             setSuggestions([]);
@@ -99,6 +101,20 @@ export default function WorkoutLogScreen() {
         const querySnapshot = await getDocs(userExercisesRef);
         const exercises = querySnapshot.docs.map(doc => doc.data().name);
         setUserExercises(exercises);
+    };
+
+    const fetchExercisePresets = async () => {
+        const exercisePresetsRef = collection(db, "exercisePresets");
+        const querySnapshot = await getDocs(exercisePresetsRef);
+        const presets = {};
+        querySnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            presets[data.name] = {
+                weightConfig: data.weightConfig,
+                repsConfig: data.repsConfig
+            };
+        });
+        setExercisePresets(presets);
     };
 
     const getSuggestions = (text) => {
@@ -259,8 +275,6 @@ export default function WorkoutLogScreen() {
         return null;
     };
 
-
-
     const renderSets = (sets, exerciseIndex, supersetIndex = null) => (
         <View>
             {sets.map((set, setIndex) => {
@@ -366,6 +380,13 @@ export default function WorkoutLogScreen() {
     const handleSuggestionSelect = (suggestion, exerciseIndex) => {
         const newExercises = [...exercises];
         newExercises[exerciseIndex].name = suggestion;
+
+        // Check if the exercise has presets and set weightConfig and repsConfig accordingly
+        if (exercisePresets[suggestion]) {
+            newExercises[exerciseIndex].weightConfig = exercisePresets[suggestion].weightConfig;
+            newExercises[exerciseIndex].repsConfig = exercisePresets[suggestion].repsConfig;
+        }
+
         setExercises(newExercises);
         setSuggestions([]);
         setCurrentExerciseIndex(null);
@@ -374,6 +395,13 @@ export default function WorkoutLogScreen() {
     const handleSupersetSuggestionSelect = (suggestion, exerciseIndex, supersetIndex) => {
         const newExercises = [...exercises];
         newExercises[exerciseIndex].supersets[supersetIndex].name = suggestion;
+
+        // Check if the exercise has presets and set weightConfig and repsConfig accordingly
+        if (exercisePresets[suggestion]) {
+            newExercises[exerciseIndex].supersets[supersetIndex].weightConfig = exercisePresets[suggestion].weightConfig;
+            newExercises[exerciseIndex].supersets[supersetIndex].repsConfig = exercisePresets[suggestion].repsConfig;
+        }
+
         setExercises(newExercises);
         setSuggestions([]);
         setCurrentExerciseIndex(null);
@@ -477,7 +505,6 @@ export default function WorkoutLogScreen() {
             Alert.alert("Error", "Failed to save workouts.");
         }
     };
-
 
     const camelCase = (str) => {
         return str
