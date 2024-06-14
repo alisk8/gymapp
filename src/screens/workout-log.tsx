@@ -200,9 +200,9 @@ export default function WorkoutLogScreen() {
         setExercises(newExercises);
     };
 
-    const getTotalWeight = (exercise, weight, unit) => {
-        let totalWeight = 0;
-        switch (exercise.weightConfig) {
+    const calculateTotalWeight = (weight, weightConfig, unit) => {
+        let totalWeight;
+        switch (weightConfig) {
             case 'weightPerSide':
                 totalWeight = weight * 2;
                 break;
@@ -213,8 +213,14 @@ export default function WorkoutLogScreen() {
                     totalWeight = (weight * 2) + 20;
                 }
                 break;
+            case 'bodyWeight':
+                totalWeight = 'BW';
+                break;
+            case 'extraWeightBodyWeight':
+                totalWeight = `BW + ${weight} ${unit}`;
+                break;
             default:
-                return null;
+                totalWeight = weight;
         }
         return totalWeight;
     };
@@ -226,10 +232,8 @@ export default function WorkoutLogScreen() {
             return null;
         }
 
-        const totalWeight = getTotalWeight(exercise, weight, exercise.weightUnit);
+        const totalWeight = calculateTotalWeight(weight, exercise.weightConfig, exercise.weightUnit);
         if (totalWeight !== null) {
-            console.log("yo this is the config:");
-            console.log(exercise.weightConfig);
             return (
                 <Text key={lastSet.key} style={styles.totalWeightMessage}>
                     {`Lifting ${totalWeight} total ${exercise.weightUnit} for set ${sets.length}`}
@@ -316,7 +320,6 @@ export default function WorkoutLogScreen() {
         </View>
     );
 
-
     const renderSuggestions = (exerciseIndex, supersetIndex = null) => (
         suggestions.length > 0 && (
             (currentExerciseIndex === exerciseIndex && currentSupersetIndex === null) ||
@@ -344,7 +347,6 @@ export default function WorkoutLogScreen() {
     );
 
     const handleSuggestionSelect = (suggestion, exerciseIndex) => {
-        console.log(`Selected suggestion: ${suggestion} for exercise index: ${exerciseIndex}`);
         const newExercises = [...exercises];
         newExercises[exerciseIndex].name = suggestion;
         setExercises(newExercises);
@@ -353,7 +355,6 @@ export default function WorkoutLogScreen() {
     };
 
     const handleSupersetSuggestionSelect = (suggestion, exerciseIndex, supersetIndex) => {
-        console.log(`Selected suggestion: ${suggestion} for superset index: ${supersetIndex}`);
         const newExercises = [...exercises];
         newExercises[exerciseIndex].supersets[supersetIndex].name = suggestion;
         setExercises(newExercises);
@@ -377,21 +378,31 @@ export default function WorkoutLogScreen() {
         const filteredExercises = exercises.map(ex => ({
             id: camelCase(ex.name),
             name: ex.name,
-            sets: ex.sets.filter(set => set.weight !== '' && set.reps !== '').map(set => ({
+            sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'bodyWeight') && set.reps !== '').map(set => ({
                 ...set,
-                weight: `${set.weight} ${ex.weightUnit}`
+                weight: ex.weightConfig === 'bodyWeight'
+                    ? 'BW'
+                    : ex.weightConfig === 'extraWeightBodyWeight'
+                        ? `BW + ${set.weight} ${ex.weightUnit}`
+                        : `${calculateTotalWeight(parseFloat(set.weight), ex.weightConfig, ex.weightUnit)} ${ex.weightUnit}`
             })),
             supersets: ex.supersets.map(superset => ({
                 id: camelCase(superset.name),
                 name: superset.name,
                 sets: superset.sets.filter(set => set.weight !== '' && set.reps !== '').map(set => ({
                     ...set,
-                    weight: `${set.weight} ${superset.weightUnit}`
+                    weight: superset.weightConfig === 'bodyWeight'
+                        ? 'BW'
+                        : superset.weightConfig === 'extraWeightBodyWeight'
+                            ? `BW + ${set.weight} ${superset.weightUnit}`
+                            : `${calculateTotalWeight(parseFloat(set.weight), superset.weightConfig, superset.weightUnit)} ${superset.weightUnit}`
                 }))
             })).filter(superset => superset.sets.length > 0),
             weightConfig: ex.weightConfig,
             repsConfig: ex.repsConfig
         })).filter(ex => ex.sets.length > 0 || ex.supersets.length > 0);
+
+        console.log(filteredExercises);
 
         if (filteredExercises.length === 0) {
             Alert.alert("Error", "Please fill in all the required fields.");
@@ -571,13 +582,9 @@ export default function WorkoutLogScreen() {
         if (editSupersetIndex === null) {
             newExercises[editExerciseIndex].weightConfig = weightConfig;
             newExercises[editExerciseIndex].repsConfig = repsConfig;
-            console.log("main set");
-            console.log(newExercises[editExerciseIndex].weightConfig)
         } else {
             newExercises[editExerciseIndex].supersets[editSupersetIndex].weightConfig = weightConfig;
             newExercises[editExerciseIndex].supersets[editSupersetIndex].repsConfig = repsConfig;
-            console.log("superset");
-            console.log(newExercises[editExerciseIndex].supersets[editSupersetIndex].weightConfig);
         }
         setExercises(newExercises);
         setEditModalVisible(false);
