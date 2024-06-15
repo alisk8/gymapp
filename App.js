@@ -1,9 +1,11 @@
+import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+
 
 import Home from './src/screens/Home';
 import Account from './src/screens/Account';
@@ -14,6 +16,7 @@ import PersonalDetails from './src/screens/PersonalDetails';
 import WorkoutLogScreen from './src/screens/workout-log';
 import SaveGymHighlightScreen from "./src/screens/save-gym-highlight";
 import CustomTabBar from "./src/components/CustomTabBar";
+import Feed from './src/screens/Feed';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -107,7 +110,22 @@ function PostStack() {
         </Stack.Navigator>
     );
 }
-
+function FeedStack() {
+    return (
+        <Stack.Navigator initialRouteName='Feed'>
+            <Stack.Screen name='Feed' component={Account} options={screenOptions} />
+            <Stack.Screen name='Feed' component={Feed} />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+        </Stack.Navigator>
+    );
+}
 function App() {
     return (
         <NavigationContainer>
@@ -131,6 +149,11 @@ function App() {
                     name='AccountStack'
                     component={AccountStack}
                     options={{ headerShown: false, title: 'Account', tabBarIcon: { name: 'person-outline' } }}
+                />
+                <Tab.Screen
+                    name='FeedStack'
+                    component={FeedStack}
+                    options={{ headerShown: false, title: 'Feed', tabBarIcon: { name: 'person-outline' } }}
                 />
             </Tab.Navigator>
         </NavigationContainer>

@@ -1,141 +1,98 @@
+import React, { useEffect, useState } from 'react';
+import { FlatList, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import firestore from '@react-native-firebase/firestore';
 
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import Video from 'react-native-video';
+const Feed = () => {
+  const [highlights, setHighlights] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-interface PostProps {
-  post: {
-    content: string | { uri: string };
-    caption?: string;
-    username: string;
-    profilePicture: string;
-    timestamp: string;
-  };
-}
+  useEffect(() => {
+    const fetchHighlights = async () => {
+      try {
+        const userProfilesSnapshot = await firestore().collection('userProfiles').get();
+        let allHighlights = [];
+        
+        const highlightsPromises = userProfilesSnapshot.docs.map(async (userProfile) => {
+          const highlightsSnapshot = await firestore()
+            .collection('userProfiles')
+            .doc(userProfile.id)
+            .collection('highlights')
+            .get();
+          
+          highlightsSnapshot.docs.forEach(doc => {
+            allHighlights.push({ id: doc.id, ...doc.data() });
+          });
+        });
 
-const Post: React.FC<PostProps> = ({ post }) => {
-  const { content, caption, username, profilePicture, timestamp } = post;
+        await Promise.all(highlightsPromises);
 
-  const handleLike = () => {
-    // Implement like functionality
-  };
+        setHighlights(allHighlights);
+      } catch (error) {
+        console.error("Error fetching highlights: ", error);
+        setError('Failed to load highlights');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleComment = () => {
-    // Implement comment functionality
-  };
+    fetchHighlights();
+  }, []);
 
-  const handleShare = () => {
-    // Implement share functionality
-  };
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
 
-  const handleSave = () => {
-    // Implement save functionality
-  };
-
-  const handleProfilePress = () => {
-    // Handle profile press
-  };
-
-  const handleContentPress = () => {
-    // Handle content press
-  };
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={handleProfilePress}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleProfilePress}>
-            <Image source={{ uri: profilePicture }} style={styles.profilePicture} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleProfilePress}>
-            <Text style={styles.username}>{username}</Text>
-          </TouchableOpacity>
-          <Text style={styles.timestamp}>{timestamp}</Text>
+    <FlatList
+      data={highlights}
+      keyExtractor={(item) => item.id}
+      renderItem={({ item }) => (
+        <View style={styles.highlightContainer}>
+          <Text style={styles.highlightText}>{item.title}</Text>
+          <Text>{item.description}</Text>
         </View>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={handleContentPress} style={styles.content}>
-        {typeof content === 'string' ? (
-          <Text>{content}</Text>
-        ) : (
-          <>
-            {content.uri && content.uri.endsWith('.mp4') ? (
-              <Video
-                source={content}
-                style={styles.videoContent}
-                resizeMode="cover"
-                controls={true}
-              />
-            ) : (
-              <Image source={{ uri: content.uri }} style={styles.imageContent} />
-            )}
-            {caption && <Text style={styles.caption}>{caption}</Text>}
-          </>
-        )}
-      </TouchableOpacity>
-      <View style={styles.actions}>
-        <TouchableOpacity onPress={handleLike}>
-          <Text>Like</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleComment}>
-          <Text>Comments</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleShare}>
-          <Text>Share</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleSave}>
-          <Text>Save</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      )}
+    />
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 10,
+  highlightContainer: {
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  profilePicture: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  username: {
+  highlightText: {
+    fontSize: 18,
     fontWeight: 'bold',
-    marginRight: 5,
   },
-  timestamp: {
-    color: '#666',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  content: {
-    marginBottom: 10,
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  imageContent: {
-    width: '100%',
-    height: 300,
-    resizeMode: 'cover',
-    borderRadius: 10,
-  },
-  videoContent: {
-    width: '100%',
-    height: 200,
-    borderRadius: 10,
-  },
-  caption: {
-    marginTop: 5,
-    color: 'black', // Set caption color to black
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  errorText: {
+    color: 'red',
+    fontSize: 16,
   },
 });
 
-export default Post;
+export default Feed;

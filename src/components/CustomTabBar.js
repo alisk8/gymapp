@@ -50,6 +50,9 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                     case 'AccountStack':
                         iconName = 'person-outline';
                         break;
+                    case 'FeedStack':
+                        iconName = 'person-outline';
+                        break;
                     default:
                         iconName = 'ellipse-outline';
                         break;
