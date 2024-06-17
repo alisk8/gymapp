@@ -443,7 +443,9 @@ export default function WorkoutLogScreen() {
                             ? `BW + ${set.weight} ${superset.weightUnit}`
                             : `${calculateTotalWeight(parseFloat(set.weight), superset.weightConfig, superset.weightUnit)} ${superset.weightUnit}`,
                     reps: superset.repsConfig === 'time' ? `${set.reps} secs` : `${set.reps} reps`
-                }))
+                })),
+                weightConfig: superset.weightConfig,
+                repsConfig: superset.repsConfig
             })).filter(superset => superset.sets.length > 0),
             weightConfig: ex.weightConfig,
             repsConfig: ex.repsConfig
