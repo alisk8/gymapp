@@ -17,9 +17,10 @@ import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { commonExercises } from '../../exercisesList';
 import { Checkbox } from 'react-native-paper';
-import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, Swipeable, PanGestureHandler} from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from "@react-native-picker/picker";
+import Animated, {useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 export default function WorkoutLogScreen() {
     const navigation = useNavigation();
@@ -34,7 +35,7 @@ export default function WorkoutLogScreen() {
     const [currentSupersetIndex, setCurrentSupersetIndex] = useState(null);
     const [isTemplate, setIsTemplate] = useState(false);
     const [templateName, setTemplateName] = useState('');
-    const [timerVisible, setTimerVisible] = useState(false);
+    const [timerModalVisible, setTimerModalVisible] = useState(false);
     const [countdownMinutes, setCountdownMinutes] = useState(0);
     const [countdownSeconds, setCountdownSeconds] = useState(0);
     const [initialTime, setInitialTime] = useState(0);
@@ -45,6 +46,9 @@ export default function WorkoutLogScreen() {
     const [editSupersetIndex, setEditSupersetIndex] = useState(null);
     const [weightConfig, setWeightConfig] = useState('totalWeight');
     const [repsConfig, setRepsConfig] = useState('reps');
+    const [timerConfigured, setTimerConfigured] = useState(false); // New state variable
+
+    const timerHeight = useSharedValue(120);
 
     useEffect(() => {
         fetchExercisePresets();
@@ -77,7 +81,8 @@ export default function WorkoutLogScreen() {
         setInitialTime(timeInSeconds);
         setTimeRemaining(timeInSeconds);
         setTimerRunning(true);
-        setTimerVisible(false);
+        setTimerModalVisible(false);
+        setTimerConfigured(true);
     };
 
     const toggleTimer = () => {
@@ -643,8 +648,23 @@ export default function WorkoutLogScreen() {
         return Array.from({ length: range }, (_, i) => ({ label: `${i}`, value: i }));
     };
 
+    const animatedStyle = useAnimatedStyle(() => {
+        return {
+            height: withTiming(timerHeight.value, { duration: 300 }),
+        };
+    });
+
+    const handleGesture = (event) => {
+        const { translationY } = event.nativeEvent;
+        if (translationY < -50) {
+            timerHeight.value = 120; // Show timer fully
+        } else if (translationY > 50) {
+            timerHeight.value = 60; // Hide timer to the bottom
+        }
+    };
+
     return (
-        <View style={styles.fullScreenContainer}>
+        <GestureHandlerRootView style={styles.fullScreenContainer}>
             <View style={styles.modalHeader}>
                 <Text style={styles.headerText}>Workout Log</Text>
                 <TouchableOpacity onPress={navigation.goBack} style={styles.hideButton}>
@@ -685,8 +705,8 @@ export default function WorkoutLogScreen() {
             <Modal
                 animationType="slide"
                 transparent={true}
-                visible={timerVisible}
-                onRequestClose={() => setTimerVisible(false)}
+                visible={timerModalVisible}
+                onRequestClose={() => setTimerModalVisible(false)}
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
@@ -713,7 +733,7 @@ export default function WorkoutLogScreen() {
                             </Picker>
                         </View>
                         <Button title="Start Timer" onPress={startTimer} />
-                        <Button title="Cancel" onPress={() => setTimerVisible(false)} />
+                        <Button title="Cancel" onPress={() => setTimerModalVisible(false)} />
                     </View>
                 </View>
             </Modal>
@@ -776,31 +796,37 @@ export default function WorkoutLogScreen() {
                     </View>
                 </View>
             </Modal>
-
             {timeRemaining !== null && (
-                <View style={styles.timerContainer}>
-                    <TouchableOpacity style={styles.adjustTimeButton} onPress={() => adjustTime(15)}>
-                        <Text style={styles.adjustTimeButtonText}>+15</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={toggleTimer}>
-                        <Text style={styles.timerText}>
-                            {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.adjustTimeButton} onPress={() => adjustTime(-15)}>
-                        <Text style={styles.adjustTimeButtonText}>-15</Text>
-                    </TouchableOpacity>
-                </View>
+                <PanGestureHandler onGestureEvent={handleGesture}>
+                    <Animated.View style={[styles.timerContainer, animatedStyle]}>
+                        <View style={styles.swipeBarContainer}>
+                            <View style={styles.swipeBar} />
+                        </View>
+                        <TouchableOpacity style={styles.adjustTimeButton} onPress={() => adjustTime(15)}>
+                            <Text style={styles.adjustTimeButtonText}>+15</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={toggleTimer}>
+                            <Text style={styles.timerText}>
+                                {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.adjustTimeButton} onPress={() => adjustTime(-15)}>
+                            <Text style={styles.adjustTimeButtonText}>-15</Text>
+                        </TouchableOpacity>
+                    </Animated.View>
+                </PanGestureHandler>
             )}
             <View style={styles.bottomTab}>
-                <TouchableOpacity style={styles.setTimerButton} onPress={() => setTimerVisible(true)}>
+                <TouchableOpacity style={styles.setTimerButton} onPress={() => setTimerModalVisible(true)}>
                     <Text style={styles.setTimerButtonText}>Set Timer</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.resetButton} onPress={resetTimer}>
-                    <Text style={styles.resetButtonText}>Reset</Text>
-                </TouchableOpacity>
+                {timerConfigured && (
+                    <TouchableOpacity style={styles.resetButton} onPress={resetTimer}>
+                        <Text style={styles.resetButtonText}>Reset</Text>
+                    </TouchableOpacity>
+                )}
             </View>
-        </View>
+        </GestureHandlerRootView>
     );
 }
 
@@ -1110,6 +1136,19 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    swipeBarContainer: {
+        position: 'absolute',
+        top: 10,
+        left: '50%',
+        zIndex: 10,
+    },
+    swipeBar: {
+        width: 50,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: '#ccc',
+        marginBottom: 10,
     },
     resetButton: {
         backgroundColor: 'red',
