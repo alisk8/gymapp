@@ -14,6 +14,7 @@ import PersonalDetails from './src/screens/PersonalDetails';
 import WorkoutLogScreen from './src/screens/workout-log';
 import SaveGymHighlightScreen from "./src/screens/save-gym-highlight";
 import CustomTabBar from "./src/components/CustomTabBar";
+import FeedPage from "./src/screens/FeedPage";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -39,7 +40,7 @@ function HomeStack() {
                 component={Home}
                 options={({ navigation }) => ({
                     ...screenOptions({ navigation }),
-                    title: "Feed"
+                    title: "Home"
                 })}
             />
             <Stack.Screen name='Notifications' component={Notifications} />
@@ -108,6 +109,22 @@ function PostStack() {
     );
 }
 
+function FeedStack() {
+    return (
+        <Stack.Navigator initialRouteName='Feed'>
+            <Stack.Screen name='Feed' component={FeedPage} />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+        </Stack.Navigator>
+    );
+}
+
 function App() {
     return (
         <NavigationContainer>
@@ -115,7 +132,7 @@ function App() {
                 <Tab.Screen
                     name='HomeStack'
                     component={HomeStack}
-                    options={{ headerShown: false, title: 'Feed', tabBarIcon: { name: 'home-outline' } }}
+                    options={{ headerShown: false, title: 'Home', tabBarIcon: { name: 'home-outline' } }}
                 />
                 <Tab.Screen
                     name='PostStack'
@@ -131,6 +148,11 @@ function App() {
                     name='AccountStack'
                     component={AccountStack}
                     options={{ headerShown: false, title: 'Account', tabBarIcon: { name: 'person-outline' } }}
+                />
+                <Tab.Screen
+                    name='FeedStack'
+                    component={FeedStack}
+                    options={{ headerShown: false, title: 'Feed', tabBarIcon: { name: 'person-outline' } }}
                 />
             </Tab.Navigator>
         </NavigationContainer>
