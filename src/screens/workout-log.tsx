@@ -10,7 +10,7 @@ import {
     Keyboard,
     Pressable,
     FlatList,
-    Modal
+    Modal, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { db, firebase_auth } from '../../firebaseConfig';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
@@ -507,6 +507,7 @@ export default function WorkoutLogScreen() {
             });
 
             Alert.alert("Success", "Workouts saved successfully!");
+            navigation.goBack();
         } catch (error) {
             console.error("Error adding document: ", error);
             Alert.alert("Error", "Failed to save workouts.");
@@ -687,6 +688,8 @@ export default function WorkoutLogScreen() {
                     />
                 )}
             </View>
+            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}
+                                style = {{}}>
             <FlatList
                 data={exercises}
                 renderItem={renderExerciseItem}
@@ -695,13 +698,14 @@ export default function WorkoutLogScreen() {
                     <View>
                         <Button title="Add Exercise" onPress={addExercise} />
                         <Button title="Save Workouts" onPress={() => saveWorkouts(isTemplate)} />
+                        <View style={{ height: 190 }} />
                     </View>
                 )}
                 keyboardShouldPersistTaps="handled"
                 style={{ zIndex: 1 }}
                 nestedScrollEnabled={true}
             />
-
+            </KeyboardAvoidingView>
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -1086,7 +1090,7 @@ const styles = StyleSheet.create({
         width: '100%',
         backgroundColor: 'white',
         paddingBottom: 60,
-        paddingTop: 10,
+        paddingTop: 20,
         paddingHorizontal: 20,
         alignItems: 'center',
         zIndex: 5,
@@ -1114,16 +1118,19 @@ const styles = StyleSheet.create({
         padding: 10
     },
     bottomTab: {
-        bottom: 0,
+        bottom: 10,
         width: '100%',
         backgroundColor: '#fff',
         padding: 20,
+        paddingBottom: 30,
         borderTopWidth: 1,
         borderTopColor: '#ccc',
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         zIndex: 10,
+        position: 'absolute',
+        alignSelf: 'center'
     },
     setTimerButton: {
         backgroundColor: '#007bff',
@@ -1174,6 +1181,18 @@ const styles = StyleSheet.create({
         color: 'blue',
         fontSize: 12,
         fontWeight: 'bold',
+    },
+    pickerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 20,
+
+    },
+    pickerSeparator: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginHorizontal: 10,
     },
 });
 
