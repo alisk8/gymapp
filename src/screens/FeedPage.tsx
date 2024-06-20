@@ -67,7 +67,7 @@ const FeedPage = () => {
             data={item.mediaUrls}
             keyExtractor={(url, index) => `${item.id}_${index}`}
             renderItem={({ item: imageUrl }) => (
-              <Image source={{ uri: imageUrl }} style={styles.image} />
+              <Image source={{ uri: "https://firebasestorage.googleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2FX1Nx52EQsHbEOz5mQyVmFum704X2_1717467425118_0?alt=media&token=ad8323af-63e0-4557-bcaa-8b56c79514fa" }} style={styles.image} />
             )}
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -84,8 +84,7 @@ const FeedPage = () => {
                 volume={1.0}
                 isMuted={false}
                 resizeMode={ResizeMode.CONTAIN}
-                shouldPlay
-                isLooping
+                useNativeControls
                 style={styles.video}
               />
             )}
