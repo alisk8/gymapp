@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { FlatList, View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { db } from '../../firebaseConfig';
 import { collection, getDocs } from '@firebase/firestore';
 
@@ -14,15 +15,18 @@ const FeedPage = () => {
         const userProfilesSnapshot = await getDocs(collection(db, 'userProfiles'));
         let allHighlights = [];
 
-        const highlightsPromises = userProfilesSnapshot.docs.map(async (userProfile) => {
+        for (const userProfile of userProfilesSnapshot.docs) {
+          const userProfileData = userProfile.data();
           const highlightsSnapshot = await getDocs(collection(db, 'userProfiles', userProfile.id, 'highlights'));
 
           highlightsSnapshot.docs.forEach(doc => {
-            allHighlights.push({ id: doc.id, ...doc.data() });
+            allHighlights.push({
+              id: doc.id,
+              ...doc.data(),
+              userName: userProfileData.name, // Assuming the user profile has a 'name' field
+            });
           });
-        });
-
-        await Promise.all(highlightsPromises);
+        }
 
         setHighlights(allHighlights);
       } catch (error) {
@@ -52,16 +56,56 @@ const FeedPage = () => {
     );
   }
 
+  const renderItem = ({ item }) => {
+    return (
+      <View style={styles.highlightContainer}>
+        <Text style={styles.userNameText}>{item.userName}</Text>
+        {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
+        {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+        {item.mediaType === 'image' && item.mediaUrls && (
+          <FlatList
+            data={item.mediaUrls}
+            keyExtractor={(url, index) => `${item.id}_${index}`}
+            renderItem={({ item: imageUrl }) => (
+              <Image source={{ uri: imageUrl }} style={styles.image} />
+            )}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          />
+        )}
+        {item.mediaType === 'video' && item.mediaUrls && (
+          <FlatList
+            data={item.mediaUrls}
+            keyExtractor={(url, index) => `${item.id}_${index}`}
+            renderItem={({ item: videoUrl }) => (
+              <Video
+                source={{ uri: videoUrl }}
+                rate={1.0}
+                volume={1.0}
+                isMuted={false}
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay
+                isLooping
+                style={styles.video}
+              />
+            )}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          />
+        )}
+        {item.timestamp && <Text style={styles.timestampText}>{item.timestamp.toDate().toString()}</Text>}
+        {item.type && <Text style={styles.typeText}>{item.type}</Text>}
+        {item.userId && <Text style={styles.userIdText}>{item.userId}</Text>}
+        {item.weight && <Text style={styles.weightText}>{item.weight}</Text>}
+      </View>
+    );
+  };
+
   return (
     <FlatList
       data={highlights}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <View style={styles.highlightContainer}>
-          <Text style={styles.highlightText}>{item.title}</Text>
-          <Text>{item.description}</Text>
-        </View>
-      )}
+      renderItem={renderItem}
     />
   );
 };
@@ -72,9 +116,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
   },
-  highlightText: {
-    fontSize: 18,
+  userNameText: {
+    fontSize: 16,
     fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  captionText: {
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  descriptionText: {
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  timestampText: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 5,
+  },
+  typeText: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 5,
+  },
+  userIdText: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 5,
+  },
+  weightText: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 5,
   },
   loadingContainer: {
     flex: 1,
@@ -89,6 +162,16 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
     fontSize: 16,
+  },
+  image: {
+    width: 200,
+    height: 200,
+    marginRight: 10,
+  },
+  video: {
+    width: 200,
+    height: 200,
+    marginRight: 10,
   },
 });
 
