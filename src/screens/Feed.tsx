@@ -1,97 +1,88 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 
 const Feed = () => {
-  const [highlights, setHighlights] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [data, setData] = useState([]);
 
   useEffect(() => {
-    const fetchHighlights = async () => {
+    const fetchData = async () => {
       try {
         const userProfilesSnapshot = await firestore().collection('userProfiles').get();
-        let allHighlights = [];
-        
-        const highlightsPromises = userProfilesSnapshot.docs.map(async (userProfile) => {
-          const highlightsSnapshot = await firestore()
-            .collection('userProfiles')
-            .doc(userProfile.id)
-            .collection('highlights')
-            .get();
-          
-          highlightsSnapshot.docs.forEach(doc => {
-            allHighlights.push({ id: doc.id, ...doc.data() });
-          });
-        });
+        const userProfilesData = [];
 
-        await Promise.all(highlightsPromises);
+        for (const doc of userProfilesSnapshot.docs) {
+          const userProfile = doc.data();
+          const highlightsSnapshot = await firestore().collection('userProfiles').doc(doc.id).collection('highlights').get();
+          const diaryEntriesSnapshot = await firestore().collection('userProfiles').doc(doc.id).collection('diaryEntries').get();
 
-        setHighlights(allHighlights);
+          const highlights = highlightsSnapshot.docs.map(highlightDoc => highlightDoc.data());
+          const diaryEntries = diaryEntriesSnapshot.docs.map(diaryEntryDoc => diaryEntryDoc.data());
+
+          userProfilesData.push({ userProfile, highlights, diaryEntries });
+        }
+
+        setData(userProfilesData);
       } catch (error) {
-        console.error("Error fetching highlights: ", error);
-        setError('Failed to load highlights');
-      } finally {
-        setLoading(false);
+        console.error("Error fetching data: ", error);
       }
     };
 
-    fetchHighlights();
+    fetchData();
   }, []);
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
-    );
-  }
-
   return (
-    <FlatList
-      data={highlights}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <View style={styles.highlightContainer}>
-          <Text style={styles.highlightText}>{item.title}</Text>
-          <Text>{item.description}</Text>
+    <ScrollView style={styles.container}>
+      {data.map((item, index) => (
+        <View key={index} style={styles.userProfileContainer}>
+          <Text style={styles.userProfileText}>User Profile: {JSON.stringify(item.userProfile)}</Text>
+          {item.highlights.length > 0 && (
+            <View style={styles.collectionContainer}>
+              <Text style={styles.collectionTitle}>Highlights:</Text>
+              {item.highlights.map((highlight, highlightIndex) => (
+                <Text key={highlightIndex} style={styles.collectionText}>{JSON.stringify(highlight)}</Text>
+              ))}
+            </View>
+          )}
+          {item.diaryEntries.length > 0 && (
+            <View style={styles.collectionContainer}>
+              <Text style={styles.collectionTitle}>Diary Entries:</Text>
+              {item.diaryEntries.map((entry, entryIndex) => (
+                <Text key={entryIndex} style={styles.collectionText}>{JSON.stringify(entry)}</Text>
+              ))}
+            </View>
+          )}
         </View>
-      )}
-    />
+      ))}
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  highlightContainer: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+  container: {
+    flex: 1,
+    padding: 16,
   },
-  highlightText: {
-    fontSize: 18,
+  userProfileContainer: {
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+  },
+  userProfileText: {
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  collectionContainer: {
+    marginTop: 8,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  collectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 8,
   },
-  errorText: {
-    color: 'red',
-    fontSize: 16,
+  collectionText: {
+    fontSize: 12,
   },
 });
 
