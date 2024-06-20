@@ -688,8 +688,7 @@ export default function WorkoutLogScreen() {
                     />
                 )}
             </View>
-            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}
-                                style = {{}}>
+            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
             <FlatList
                 data={exercises}
                 renderItem={renderExerciseItem}
