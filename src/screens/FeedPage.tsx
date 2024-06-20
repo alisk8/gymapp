@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import firestore from '@firebase/firestore';
+import { db } from '../../firebaseConfig';
+import { collection, getDocs } from '@firebase/firestore';
 
 const FeedPage = () => {
   const [highlights, setHighlights] = useState([]);
@@ -10,15 +11,11 @@ const FeedPage = () => {
   useEffect(() => {
     const fetchHighlights = async () => {
       try {
-        const userProfilesSnapshot = await firestore().collection('userProfiles').get();
+        const userProfilesSnapshot = await getDocs(collection(db, 'userProfiles'));
         let allHighlights = [];
 
         const highlightsPromises = userProfilesSnapshot.docs.map(async (userProfile) => {
-          const highlightsSnapshot = await firestore()
-              .collection('userProfiles')
-              .doc(userProfile.id)
-              .collection('highlights')
-              .get();
+          const highlightsSnapshot = await getDocs(collection(db, 'userProfiles', userProfile.id, 'highlights'));
 
           highlightsSnapshot.docs.forEach(doc => {
             allHighlights.push({ id: doc.id, ...doc.data() });
@@ -29,7 +26,7 @@ const FeedPage = () => {
 
         setHighlights(allHighlights);
       } catch (error) {
-        console.error("Error fetching highlights: ", error);
+        console.error('Error fetching highlights: ', error);
         setError('Failed to load highlights');
       } finally {
         setLoading(false);
@@ -41,31 +38,31 @@ const FeedPage = () => {
 
   if (loading) {
     return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0000ff" />
-        </View>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
     );
   }
 
   if (error) {
     return (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
     );
   }
 
   return (
-      <FlatList
-          data={highlights}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-              <View style={styles.highlightContainer}>
-                <Text style={styles.highlightText}>{item.title}</Text>
-                <Text>{item.description}</Text>
-              </View>
-          )}
-      />
+    <FlatList
+      data={highlights}
+      keyExtractor={(item) => item.id}
+      renderItem={({ item }) => (
+        <View style={styles.highlightContainer}>
+          <Text style={styles.highlightText}>{item.title}</Text>
+          <Text>{item.description}</Text>
+        </View>
+      )}
+    />
   );
 };
 
