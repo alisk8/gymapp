@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { StyleSheet, Text, View, TextInput, Button, Switch, Alert } from "react-native";
-import { db } from "../../firebaseConfig";
-import { doc, setDoc, collection } from "firebase/firestore"; // Import 'collection' along with 'doc' and 'setDoc'
+import { db, firebase_auth } from "../../firebaseConfig";
+import { doc, setDoc, collection, addDoc, getDocs } from "firebase/firestore";
+
 
 const CreateCommunity = () => {
   const [communityName, setCommunityName] = useState("");
+  const [communityDescription, setCommunityDescription] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
 
   const handleCreate = async () => {
@@ -13,10 +15,16 @@ const CreateCommunity = () => {
       return;
     }
 
+    if (!communityDescription.trim()) {
+      Alert.alert("Validation Error", "Please enter a community description.");
+      return;
+    }
+
     try {
-      const newCommunityRef = doc(collection(db, "communities")); // Correctly use 'collection' here
+      const newCommunityRef = doc(collection(db, "communities"));
       await setDoc(newCommunityRef, {
         name: communityName,
+        description: communityDescription,
         private: isPrivate,
       });
       Alert.alert("Success", "Community created successfully!");
@@ -34,6 +42,12 @@ const CreateCommunity = () => {
         placeholder="Name your community"
         value={communityName}
         onChangeText={setCommunityName}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Describe your community"
+        value={communityDescription}
+        onChangeText={setCommunityDescription}
       />
       <View style={styles.switchContainer}>
         <Text style={styles.label}>Private Community</Text>
