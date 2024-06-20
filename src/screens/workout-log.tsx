@@ -688,7 +688,10 @@ export default function WorkoutLogScreen() {
                     />
                 )}
             </View>
-            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={{ flex: 1 }}
+            >
             <FlatList
                 data={exercises}
                 renderItem={renderExerciseItem}
@@ -697,7 +700,7 @@ export default function WorkoutLogScreen() {
                     <View>
                         <Button title="Add Exercise" onPress={addExercise} />
                         <Button title="Save Workouts" onPress={() => saveWorkouts(isTemplate)} />
-                        <View style={{ height: 190 }} />
+                        <View style={{height: 200}}/>
                     </View>
                 )}
                 keyboardShouldPersistTaps="handled"
