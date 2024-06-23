@@ -21,6 +21,8 @@ import { GestureHandlerRootView, Swipeable, PanGestureHandler} from 'react-nativ
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from "@react-native-picker/picker";
 import Animated, {useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { useWorkout } from '../contexts/WorkoutContext';
+
 
 export default function WorkoutLogScreen() {
     const navigation = useNavigation();
@@ -47,6 +49,7 @@ export default function WorkoutLogScreen() {
     const [weightConfig, setWeightConfig] = useState('totalWeight');
     const [repsConfig, setRepsConfig] = useState('reps');
     const [timerConfigured, setTimerConfigured] = useState(false); // New state variable
+    const { resetWorkout } = useWorkout();
 
     const timerHeight = useSharedValue(120);
 
@@ -508,6 +511,7 @@ export default function WorkoutLogScreen() {
 
             Alert.alert("Success", "Workouts saved successfully!");
             navigation.goBack();
+            resetWorkout();
         } catch (error) {
             console.error("Error adding document: ", error);
             Alert.alert("Error", "Failed to save workouts.");

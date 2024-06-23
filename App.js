@@ -15,6 +15,9 @@ import WorkoutLogScreen from './src/screens/workout-log';
 import SaveGymHighlightScreen from "./src/screens/save-gym-highlight";
 import CustomTabBar from "./src/components/CustomTabBar";
 import FeedPage from "./src/screens/FeedPage";
+import TemplateScreen from "./src/screens/TemplateScreen";
+import { WorkoutProvider } from './src/contexts/WorkoutContext';
+
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -52,6 +55,14 @@ function HomeStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen
+                name='TemplateScreen'
+                component={TemplateScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
         </Stack.Navigator>
     );
 }
@@ -66,6 +77,14 @@ function AccountStack() {
             <Stack.Screen
                 name='WorkoutLog'
                 component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='TemplateScreen'
+                component={TemplateScreen}
                 options={{
                     headerShown: false,
                     presentation: 'fullScreenModal',
@@ -88,6 +107,14 @@ function ProgressStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen
+                name='TemplateScreen'
+                component={TemplateScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
         </Stack.Navigator>
     );
 }
@@ -100,6 +127,14 @@ function PostStack() {
             <Stack.Screen
                 name='WorkoutLog'
                 component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='TemplateScreen'
+                component={TemplateScreen}
                 options={{
                     headerShown: false,
                     presentation: 'fullScreenModal',
@@ -121,41 +156,51 @@ function FeedStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen
+                name='TemplateScreen'
+                component={TemplateScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
         </Stack.Navigator>
     );
 }
 
 function App() {
     return (
-        <NavigationContainer>
-            <Tab.Navigator tabBar={props => <CustomTabBar {...props} />}>
-                <Tab.Screen
-                    name='HomeStack'
-                    component={HomeStack}
-                    options={{ headerShown: false, title: 'Home', tabBarIcon: { name: 'home-outline' } }}
-                />
-                <Tab.Screen
-                    name='PostStack'
-                    component={PostStack}
-                    options={{ headerShown: false, title: 'Post', tabBarIcon: { name: 'create-outline' } }}
-                />
-                <Tab.Screen
-                    name='ProgressStack'
-                    component={ProgressStack}
-                    options={{ headerShown: false, title: 'Progress', tabBarIcon: { name: 'trending-up-outline' } }}
-                />
-                <Tab.Screen
-                    name='AccountStack'
-                    component={AccountStack}
-                    options={{ headerShown: false, title: 'Account', tabBarIcon: { name: 'person-outline' } }}
-                />
-                <Tab.Screen
-                    name='FeedStack'
-                    component={FeedStack}
-                    options={{ headerShown: false, title: 'Feed', tabBarIcon: { name: 'person-outline' } }}
-                />
-            </Tab.Navigator>
-        </NavigationContainer>
+        <WorkoutProvider>
+            <NavigationContainer>
+                <Tab.Navigator tabBar={props => <CustomTabBar {...props} />}>
+                    <Tab.Screen
+                        name='HomeStack'
+                        component={HomeStack}
+                        options={{ headerShown: false, title: 'Home', tabBarIcon: { name: 'home-outline' } }}
+                    />
+                    <Tab.Screen
+                        name='PostStack'
+                        component={PostStack}
+                        options={{ headerShown: false, title: 'Post', tabBarIcon: { name: 'create-outline' } }}
+                    />
+                    <Tab.Screen
+                        name='ProgressStack'
+                        component={ProgressStack}
+                        options={{ headerShown: false, title: 'Progress', tabBarIcon: { name: 'trending-up-outline' } }}
+                    />
+                    <Tab.Screen
+                        name='AccountStack'
+                        component={AccountStack}
+                        options={{ headerShown: false, title: 'Account', tabBarIcon: { name: 'person-outline' } }}
+                    />
+                    <Tab.Screen
+                        name='FeedStack'
+                        component={FeedStack}
+                        options={{ headerShown: false, title: 'Feed', tabBarIcon: { name: 'person-outline' } }}
+                    />
+                </Tab.Navigator>
+            </NavigationContainer>
+        </WorkoutProvider>
     );
 }
 
