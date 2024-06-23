@@ -24,7 +24,7 @@ import Animated, {useSharedValue, useAnimatedStyle, withTiming } from 'react-nat
 import { useWorkout } from '../contexts/WorkoutContext';
 
 
-export default function WorkoutLogScreen() {
+export default function WorkoutLogScreen({route}) {
     const navigation = useNavigation();
 
     const [exercises, setExercises] = useState([
@@ -53,6 +53,8 @@ export default function WorkoutLogScreen() {
 
     const timerHeight = useSharedValue(120);
 
+    const template = route?.params?.template;
+
     useEffect(() => {
         fetchExercisePresets();
         fetchUserExercises();
@@ -64,6 +66,20 @@ export default function WorkoutLogScreen() {
             keyboardDidHideListener.remove();
         };
     }, []);
+
+    useEffect(() => {
+        if (template) {
+            const mappedExercises = template.exercises.map(ex => ({
+                ...ex,
+                sets: Array.from({ length: ex.setsCount }, (_, index) => ({ key: `set${index + 1}`, weight: '', reps: '' })),
+                supersets: ex.supersets.map(superset => ({
+                    ...superset,
+                    sets: Array.from({ length: superset.setsCount }, (_, index) => ({ key: `set${index + 1}`, weight: '', reps: '' }))
+                }))
+            }));
+            setExercises(mappedExercises);
+        }
+    }, [template]);
 
     useEffect(() => {
         let timer;
