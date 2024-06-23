@@ -72,7 +72,7 @@ export default function WorkoutLogScreen({route}) {
             const mappedExercises = template.exercises.map(ex => ({
                 ...ex,
                 sets: Array.from({ length: ex.setsCount }, (_, index) => ({ key: `set${index + 1}`, weight: '', reps: '' })),
-                supersets: ex.supersets.map(superset => ({
+                supersets: (ex.supersets || []).map(superset => ({
                     ...superset,
                     sets: Array.from({ length: superset.setsCount }, (_, index) => ({ key: `set${index + 1}`, weight: '', reps: '' }))
                 }))
