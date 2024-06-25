@@ -75,9 +75,11 @@ export default function WorkoutLogScreen({route}) {
         if (template) {
             const mappedExercises = template.exercises.map(ex => ({
                 ...ex,
+                weightUnit: 'lbs', //can adjust to default weight unit preferred by user
                 sets: Array.from({ length: ex.setsCount }, (_, index) => ({ key: `set${index + 1}`, weight: '', reps: '' })),
                 supersets: (ex.supersets || []).map(superset => ({
                     ...superset,
+                    weightUnit: 'lbs',
                     sets: Array.from({ length: superset.setsCount }, (_, index) => ({ key: `set${index + 1}`, weight: '', reps: '' }))
                 }))
             }));
@@ -726,7 +728,7 @@ export default function WorkoutLogScreen({route}) {
                 <Text style={styles.headerText}>Workout Log</Text>
                 <TouchableOpacity onPress={() => {
                     if (previousScreen) {
-                        console.log('this is in the log', workoutState.exercises);
+                        console.log(workoutState);
                         navigation.navigate(previousScreen);
                     } else {
                         navigation.goBack();

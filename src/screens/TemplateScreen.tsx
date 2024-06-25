@@ -13,6 +13,7 @@ const TemplateScreen = ({ route }) => {
     const [items, setItems] = useState([]);
     const navigation = useNavigation();
     const [previousScreen, setPreviousScreen] = useState(null);
+    const {workoutState, setWorkoutState} = useWorkout();
 
 
     useEffect(() => {
@@ -46,6 +47,7 @@ const TemplateScreen = ({ route }) => {
     const handleLoadTemplate = () => {
         const selected = templates.find(template => template.id === selectedTemplate);
         if (selected) {
+            console.log('template loading state', workoutState);
             navigation.navigate('WorkoutLog', { template: selected, previousScreen});
         } else {
             console.log('No template selected');
