@@ -11,13 +11,15 @@ import { useWorkout } from '../contexts/WorkoutContext';
 
 const CustomTabBar = ({ state, descriptors, navigation }) => {
     const nav = useNavigation();
-    const { workout } = useWorkout();
+    const { workoutState } = useWorkout();
 
     const handleOpenWorkoutLog = () => {
-        if (workout) {
-            nav.navigate('WorkoutLog');
+        console.log('shit here');
+        console.log(workoutState);
+        if (workoutState) {
+            nav.navigate('WorkoutLog', { previousScreen: nav.getCurrentRoute().name });
         } else {
-            nav.navigate('TemplateScreen');
+            nav.navigate('TemplateScreen', { previousScreen: nav.getCurrentRoute().name });
         }
     };
 

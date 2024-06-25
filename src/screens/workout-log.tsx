@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
     Button,
     StyleSheet,
@@ -18,7 +18,8 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { commonExercises } from '../../exercisesList';
 import { Checkbox } from 'react-native-paper';
 import { GestureHandlerRootView, Swipeable, PanGestureHandler} from 'react-native-gesture-handler';
-import { useNavigation } from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from "@react-native-picker/picker";
 import Animated, {useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useWorkout } from '../contexts/WorkoutContext';
@@ -28,7 +29,7 @@ export default function WorkoutLogScreen({route}) {
     const navigation = useNavigation();
 
     const [exercises, setExercises] = useState([
-        { id: 'bicepCurls', name: 'Bicep Curls', sets: [{ key: 'set1', weight: '', reps: '' }], weightUnit: 'lbs', supersets: [], weightConfig: 'totalWeight', repsConfig: 'reps' }
+        { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '' }], weightUnit: 'lbs', supersets: [], weightConfig: 'totalWeight', repsConfig: 'reps' }
     ]);
     const [suggestions, setSuggestions] = useState([]);
     const [userExercises, setUserExercises] = useState([]);
@@ -49,11 +50,14 @@ export default function WorkoutLogScreen({route}) {
     const [weightConfig, setWeightConfig] = useState('totalWeight');
     const [repsConfig, setRepsConfig] = useState('reps');
     const [timerConfigured, setTimerConfigured] = useState(false); // New state variable
-    const { resetWorkout } = useWorkout();
+    const { workoutState, setWorkoutState, resetWorkout, startWorkoutLog, stopWorkoutLog } = useWorkout();
+    const previousScreen = route.params?.previousScreen;
 
     const timerHeight = useSharedValue(120);
 
     const template = route?.params?.template;
+    const exercisesRef = useRef(exercises);
+
 
     useEffect(() => {
         fetchExercisePresets();
@@ -502,12 +506,12 @@ export default function WorkoutLogScreen({route}) {
                     id: camelCase(ex.name),
                     name: ex.name,
                     setsCount: ex.sets.length,
-                    weightUnit: ex.weightUnit,
+                    weightConfig: ex.weightConfig,
+                    repsConfig: ex.repsConfig,
                     supersets: ex.supersets.map(superset => ({
                         id: camelCase(superset.name),
                         name: superset.name,
                         setsCount: superset.sets.length,
-                        weightUnit: superset.weightUnit,
                         weightConfig: superset.weightConfig,
                         repsConfig: superset.repsConfig
                     }))
@@ -684,11 +688,50 @@ export default function WorkoutLogScreen({route}) {
         }
     };
 
+    useEffect(() => {
+        exercisesRef.current = exercises;
+    }, [exercises]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            // Load workout state from context when screen is focused
+            if (workoutState && workoutState.exercises.length > 0) {
+                console.log("structure here", JSON.stringify(workoutState.exercises, null, 2));
+                setExercises(workoutState.exercises);
+            }
+
+            return () => {
+                // Save workout state to context when screen is unfocused
+                setWorkoutState({ exercises: exercisesRef.current });
+                console.log('sshizzy', exercisesRef.current);
+            };
+        }, [workoutState])
+    );
+
+    useEffect(() => {
+        console.log("Exercises state updated: ", JSON.stringify(exercises, null, 2));
+    }, [exercises]);
+
+    useEffect(() => {
+        startWorkoutLog();
+        return () => stopWorkoutLog();
+    }, []);
+
+
+
+
     return (
         <GestureHandlerRootView style={styles.fullScreenContainer}>
             <View style={styles.modalHeader}>
                 <Text style={styles.headerText}>Workout Log</Text>
-                <TouchableOpacity onPress={navigation.goBack} style={styles.hideButton}>
+                <TouchableOpacity onPress={() => {
+                    if (previousScreen) {
+                        console.log('this is in the log', workoutState.exercises);
+                        navigation.navigate(previousScreen);
+                    } else {
+                        navigation.goBack();
+                    }
+                }} style={styles.hideButton}>
                     <Text style={styles.hideButtonText}>Hide</Text>
                 </TouchableOpacity>
             </View>
@@ -906,7 +949,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#ccc',
         padding: 10,
-        backgroundColor: '#e9ecef',
         borderRadius: 5,
     },
     setRow: {

@@ -1,18 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Button, FlatList, StyleSheet, ScrollView } from 'react-native';
+import DropDownPicker from 'react-native-dropdown-picker';
 import { db, firebase_auth } from '../../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 import { useWorkout } from '../contexts/WorkoutContext';
 
 const TemplateScreen = ({ route }) => {
-    const { setWorkout } = useWorkout();
     const [templates, setTemplates] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
+    const [open, setOpen] = useState(false);
+    const [items, setItems] = useState([]);
     const navigation = useNavigation();
+    const [previousScreen, setPreviousScreen] = useState(null);
+
 
     useEffect(() => {
         fetchTemplates();
+        const unsubscribe = navigation.addListener('focus', () => {
+            setPreviousScreen(route.params?.previousScreen || null);
+        });
+
+        return unsubscribe;
     }, []);
 
     const fetchTemplates = async () => {
@@ -24,28 +33,20 @@ const TemplateScreen = ({ route }) => {
             const querySnapshot = await getDocs(templateRef);
             const templatesList = querySnapshot.docs.map(doc => {
                 const data = doc.data();
-                console.log('Fetched Template Data:', JSON.stringify(data, null, 2));
-                return { id: doc.id, ...data };
+                return { id: doc.id, label: data.templateName, value: doc.id, ...data };
             });
 
             setTemplates(templatesList);
+            setItems(templatesList.map(template => ({ label: template.templateName, value: template.id })));
         } catch (error) {
             console.error('Error fetching templates:', error);
         }
     };
 
     const handleLoadTemplate = () => {
-        if (selectedTemplate) {
-            console.log('Selected Template:', JSON.stringify(selectedTemplate, null, 2));
-
-            if (selectedTemplate.exercises) {
-                console.log('Exercises:', JSON.stringify(selectedTemplate.exercises, null, 2));
-            } else {
-                console.log('No exercises found in the selected template');
-            }
-
-            setWorkout({ exercises: selectedTemplate.exercises });
-            navigation.navigate('WorkoutLog', { template: selectedTemplate });
+        const selected = templates.find(template => template.id === selectedTemplate);
+        if (selected) {
+            navigation.navigate('WorkoutLog', { template: selected, previousScreen});
         } else {
             console.log('No template selected');
         }
@@ -53,43 +54,47 @@ const TemplateScreen = ({ route }) => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.content}>
-                <Text style={styles.title}>Select a Template</Text>
-                <FlatList
-                    data={templates}
-                    keyExtractor={item => item.id}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity onPress={() => setSelectedTemplate(item)}>
-                            <Text style={styles.templateItem}>{item.templateName}</Text>
-                        </TouchableOpacity>
-                    )}
-                />
-                {selectedTemplate && selectedTemplate.exercises && (
-                    <View style={styles.templatePreview}>
-                        <Text style={styles.previewTitle}>Template Preview:</Text>
-                        {selectedTemplate.exercises.map((exercise, index) => (
-                            <View key={index} style={styles.previewItem}>
-                                <Text style={styles.previewItemText}>
-                                    {exercise.name} - Sets: {exercise.setsCount}
-                                </Text>
-                                {exercise.supersets && exercise.supersets.length > 0 && (
-                                    <View style={styles.supersetContainer}>
-                                        <Text style={styles.supersetTitle}>Supersets:</Text>
-                                        {exercise.supersets.map((superset, supersetIndex) => (
-                                            <Text key={supersetIndex} style={styles.supersetItemText}>
-                                                {superset.name} - Sets: {superset.setsCount}
-                                            </Text>
-                                        ))}
-                                    </View>
-                                )}
-                            </View>
-                        ))}
-                    </View>
-                )}
-                <Button title="Load Template" onPress={handleLoadTemplate} />
-                <Button title="Start New Workout" onPress={() => navigation.navigate('WorkoutLog')} />
-                <Button title="Cancel" onPress={() => navigation.goBack()} />
-            </View>
+            <Text style={styles.title}>Select a Template</Text>
+            <DropDownPicker
+                open={open}
+                value={selectedTemplate}
+                items={items}
+                setOpen={setOpen}
+                setValue={setSelectedTemplate}
+                setItems={setItems}
+                placeholder="Select a template"
+                containerStyle={styles.dropdownContainer}
+                style={styles.dropdown}
+                dropDownStyle={styles.dropdown}
+            />
+            {selectedTemplate && (
+                <ScrollView style={styles.templatePreview}>
+                    <Text style={styles.previewTitle}>Template Preview:</Text>
+                    {templates.find(template => template.id === selectedTemplate)?.exercises.map((exercise, index) => (
+                        <View key={index} style={styles.previewItem}>
+                            <Text style={styles.exerciseName}>
+                                {exercise.name}
+                            </Text>
+                            <Text style={styles.setsCount}>
+                                Sets: {exercise.setsCount}
+                            </Text>
+                            {exercise.supersets && exercise.supersets.length > 0 && (
+                                <View style={styles.supersetContainer}>
+                                    <Text style={styles.supersetTitle}>Supersets:</Text>
+                                    {exercise.supersets.map((superset, supersetIndex) => (
+                                        <Text key={supersetIndex} style={styles.supersetItemText}>
+                                            {superset.name} - Sets: {superset.setsCount}
+                                        </Text>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    ))}
+                </ScrollView>
+            )}
+            <Button title="Load Template" onPress={handleLoadTemplate} />
+            <Button title="Start New Workout" onPress={() => navigation.navigate('WorkoutLog', {previousScreen})} />
+            <Button title="Cancel" onPress={() => navigation.goBack()} />
         </View>
     );
 };
@@ -97,38 +102,45 @@ const TemplateScreen = ({ route }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    content: {
-        backgroundColor: 'white',
         padding: 20,
-        borderRadius: 10,
-        alignItems: 'center',
+        backgroundColor: 'white',
     },
     title: {
-        fontSize: 20,
-        marginBottom: 10,
+        paddingTop: 40,
+        paddingBottom: 20,
+        fontSize: 24,
+        fontWeight: 'bold',
+        textAlign: 'center',
     },
-    templateItem: {
-        fontSize: 16,
-        padding: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#ccc',
+    dropdownContainer: {
+        marginBottom: 20,
+    },
+    dropdown: {
+        backgroundColor: '#fafafa',
     },
     templatePreview: {
         marginTop: 20,
+        maxHeight: '50%',
+        paddingHorizontal: 10,
     },
     previewTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        marginBottom: 10,
+    },
+    previewItem: {
+        marginBottom: 15,
+        backgroundColor: '#f0f0f0',
+        padding: 10,
+        borderRadius: 5,
+    },
+    exerciseName: {
         fontSize: 18,
         fontWeight: 'bold',
     },
-    previewItem: {
-        marginTop: 10,
-    },
-    previewItemText: {
+    setsCount: {
         fontSize: 16,
+        marginTop: 5,
     },
     supersetContainer: {
         marginTop: 10,
@@ -137,12 +149,14 @@ const styles = StyleSheet.create({
         borderLeftColor: '#ccc',
     },
     supersetTitle: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
     },
     supersetItemText: {
-        fontSize: 14,
+        fontSize: 16,
+        marginTop: 5,
     },
 });
 
 export default TemplateScreen;
+
