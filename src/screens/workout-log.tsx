@@ -29,7 +29,7 @@ export default function WorkoutLogScreen({route}) {
     const navigation = useNavigation();
 
     const [exercises, setExercises] = useState([
-        { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '' }], weightUnit: 'lbs', supersets: [], weightConfig: 'totalWeight', repsConfig: 'reps' }
+        { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '', dropSets: []}], weightUnit: 'lbs', supersets: [], weightConfig: 'totalWeight', repsConfig: 'reps' }
     ]);
     const [suggestions, setSuggestions] = useState([]);
     const [userExercises, setUserExercises] = useState([]);
@@ -341,6 +341,10 @@ export default function WorkoutLogScreen({route}) {
 
                 const isWeightDisabled = exercise.weightConfig === 'bodyWeight';
 
+                if (!set.dropSets) {
+                    set.dropSets = [];
+                }
+
                 return (
                     <GestureHandlerRootView key={set.key}>
                         <Swipeable
@@ -350,6 +354,15 @@ export default function WorkoutLogScreen({route}) {
                                     onPress={() => deleteSet(exerciseIndex, setIndex, supersetIndex)}
                                 >
                                     <Text style={styles.deleteButtonText}>Delete</Text>
+                                </TouchableOpacity>
+                            )}
+
+                            renderRightActions={() => (
+                                <TouchableOpacity
+                                    style={styles.deleteButton}
+                                    onPress={() => addDropSet(exerciseIndex, setIndex)}
+                                >
+                                    <Text style={styles.deleteButtonText}>Add Drop Set</Text>
                                 </TouchableOpacity>
                             )}
                         >
@@ -371,6 +384,7 @@ export default function WorkoutLogScreen({route}) {
                                 />
                             </View>
                         </Swipeable>
+                        {renderDropSets(set.dropSets, exerciseIndex, setIndex)}
                     </GestureHandlerRootView>
                 );
             })}
@@ -378,6 +392,41 @@ export default function WorkoutLogScreen({route}) {
                 supersetIndex === null ? exercises[exerciseIndex] : exercises[exerciseIndex].supersets[supersetIndex],
                 sets
             )}
+        </View>
+    );
+
+    const updateDropSetData = (text, exerciseIndex, setIndex, dropSetIndex, type) => {
+        const newExercises = [...exercises];
+        newExercises[exerciseIndex].sets[setIndex].dropSets[dropSetIndex][type] = text;
+        setExercises(newExercises);
+    };
+
+    const addDropSet = (exerciseIndex, setIndex) => {
+        const newExercises = [...exercises];
+        const newDropSet = { key: `dropset${newExercises[exerciseIndex].sets[setIndex].dropSets.length + 1}`, weight: '', reps: '' };
+        newExercises[exerciseIndex].sets[setIndex].dropSets.push(newDropSet);
+        setExercises(newExercises);
+    };
+    const renderDropSets = (dropSets, exerciseIndex, setIndex) => (
+        <View style={styles.dropSetsContainer}>
+            {dropSets.map((dropSet, dropSetIndex) => (
+                <View key={dropSet.key} style={styles.dropSetRow}>
+                    <TextInput
+                        placeholder="Drop Set Weight"
+                        keyboardType="numeric"
+                        style={styles.weightInput}
+                        onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'weight')}
+                        value={dropSet.weight}
+                    />
+                    <TextInput
+                        placeholder="Drop Set Reps"
+                        keyboardType="numeric"
+                        style={styles.repsInput}
+                        onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'reps')}
+                        value={dropSet.reps}
+                    />
+                </View>
+            ))}
         </View>
     );
 
@@ -1259,6 +1308,13 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: 'bold',
         marginHorizontal: 10,
+    },
+    dropSetsContainer: {
+        marginLeft: 20,
+    },
+    dropSetRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
     },
 });
 
