@@ -246,6 +246,12 @@ export default function WorkoutLogScreen({route}) {
         setExercises(newExercises);
     };
 
+    const deleteDropSet = (exerciseIndex, setIndex, dropSetIndex) => {
+        const newExercises = [...exercises];
+        newExercises[exerciseIndex].sets[setIndex].dropSets = newExercises[exerciseIndex].sets[setIndex].dropSets.filter((_, i) => i !== dropSetIndex);
+        setExercises(newExercises);
+    };
+
     const calculateTotalWeight = (weight, weightConfig, unit) => {
         let totalWeight;
         switch (weightConfig) {
@@ -359,7 +365,7 @@ export default function WorkoutLogScreen({route}) {
 
                             renderRightActions={() => (
                                 <TouchableOpacity
-                                    style={styles.deleteButton}
+                                    style={styles.addButton}
                                     onPress={() => addDropSet(exerciseIndex, setIndex)}
                                 >
                                     <Text style={styles.deleteButtonText}>Add Drop Set</Text>
@@ -403,32 +409,83 @@ export default function WorkoutLogScreen({route}) {
 
     const addDropSet = (exerciseIndex, setIndex) => {
         const newExercises = [...exercises];
-        const newDropSet = { key: `dropset${newExercises[exerciseIndex].sets[setIndex].dropSets.length + 1}`, weight: '', reps: '' };
+        const exercise = newExercises[exerciseIndex];
+        const newDropSet = { key: `dropset${newExercises[exerciseIndex].sets[setIndex].dropSets.length + 1}`,
+                                                       weight: '',
+                                                        reps: '',
+                                                        weightConfig: exercise.weightConfig,
+                                                        repsConfig: exercise.repsConfig};
         newExercises[exerciseIndex].sets[setIndex].dropSets.push(newDropSet);
         setExercises(newExercises);
     };
-    const renderDropSets = (dropSets, exerciseIndex, setIndex) => (
-        <View style={styles.dropSetsContainer}>
-            {dropSets.map((dropSet, dropSetIndex) => (
-                <View key={dropSet.key} style={styles.dropSetRow}>
-                    <TextInput
-                        placeholder="Drop Set Weight"
-                        keyboardType="numeric"
-                        style={styles.weightInput}
-                        onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'weight')}
-                        value={dropSet.weight}
-                    />
-                    <TextInput
-                        placeholder="Drop Set Reps"
-                        keyboardType="numeric"
-                        style={styles.repsInput}
-                        onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'reps')}
-                        value={dropSet.reps}
-                    />
-                </View>
-            ))}
-        </View>
-    );
+    const renderDropSets = (dropSets, exerciseIndex, setIndex) => {
+        const exercise = exercises[exerciseIndex];
+        const weightPlaceholder = (() => {
+            switch (exercise.weightConfig) {
+                case 'totalWeight':
+                    return 'Total Weight';
+                case 'weightPerSide':
+                case 'weightPerSideBarbell':
+                    return 'Weight Per Side';
+                case 'bodyWeight':
+                    return 'Bodyweight';
+                case 'extraWeightBodyWeight':
+                    return 'Extra Weight';
+                default:
+                    return 'Weight';
+            }
+        })();
+
+        const repsPlaceholder = (() => {
+            switch (exercise.repsConfig) {
+                case 'reps':
+                    return 'Reps';
+                case 'time':
+                    return 'Time (seconds)';
+                default:
+                    return 'Reps';
+            }
+        })();
+
+        const isWeightDisabled = exercise.weightConfig === 'bodyWeight';
+
+        return (
+            <View style={styles.dropSetsContainer}>
+                {dropSets.map((dropSet, dropSetIndex) => (
+                    <Swipeable
+                        key={dropSet.key}
+                        renderLeftActions={() => (
+                            <TouchableOpacity
+                                style={styles.deleteButton}
+                                onPress={() => deleteDropSet(exerciseIndex, setIndex, dropSetIndex)}
+                            >
+                                <Text style={styles.deleteButtonText}>Delete</Text>
+                            </TouchableOpacity>
+                        )}
+                    >
+                        <View style={styles.dropSetRow}>
+                            <TextInput
+                                placeholder={weightPlaceholder}
+                                keyboardType="numeric"
+                                style={styles.weightInput}
+                                onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'weight')}
+                                value={dropSet.weight}
+                                editable={!isWeightDisabled}
+                            />
+                            <TextInput
+                                placeholder={repsPlaceholder}
+                                keyboardType="numeric"
+                                style={styles.repsInput}
+                                onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'reps')}
+                                value={dropSet.reps}
+                            />
+                        </View>
+                    </Swipeable>
+                ))}
+            </View>
+        );
+    };
+
 
     const renderSuggestions = (exerciseIndex, supersetIndex = null) => (
         suggestions.length > 0 && (
@@ -509,7 +566,16 @@ export default function WorkoutLogScreen({route}) {
                     : ex.weightConfig === 'extraWeightBodyWeight'
                         ? `BW + ${set.weight} ${ex.weightUnit}`
                         : `${calculateTotalWeight(parseFloat(set.weight), ex.weightConfig, ex.weightUnit)} ${ex.weightUnit}`,
-                reps: ex.repsConfig === 'time' ? `${set.reps} secs` : `${set.reps} reps`
+                reps: ex.repsConfig === 'time' ? `${set.reps} secs` : `${set.reps} reps`,
+                dropSets: set.dropSets.filter(dropSet => (dropSet.weight !== '' || ex.weightConfig === 'bodyWeight') && dropSet.reps !== '').map(dropSet => ({
+                    ...dropSet,
+                    weight: dropSet.weightConfig === 'bodyWeight'
+                        ? 'BW'
+                        : dropSet.weightConfig === 'extraWeightBodyWeight'
+                            ? `BW + ${dropSet.weight} ${ex.weightUnit}`
+                            : `${calculateTotalWeight(parseFloat(dropSet.weight), dropSet.weightConfig, ex.weightUnit)} ${ex.weightUnit}`,
+                    reps: dropSet.repsConfig === 'time' ? `${dropSet.reps} secs` : `${dropSet.reps} reps`
+                }))
             })),
             supersets: ex.supersets.map(superset => ({
                 id: camelCase(superset.name),
@@ -542,6 +608,13 @@ export default function WorkoutLogScreen({route}) {
             const querySnapshot = await getDocs(templateRef);
             const existingTemplates = querySnapshot.docs.map(doc => doc.data().templateName.toLowerCase());
 
+            const mapDropSets = (sets) => {
+                return sets.map(set => ({
+                    ...set,
+                    dropSetsCount: set.dropSets.length, // Only include the count of drop sets
+                }));
+            };
+
             if (isTemplate) {
                 if (!templateName.trim()) {
                     Alert.alert("Error", "Please provide a name for the template.");
@@ -559,6 +632,7 @@ export default function WorkoutLogScreen({route}) {
                     setsCount: ex.sets.length,
                     weightConfig: ex.weightConfig,
                     repsConfig: ex.repsConfig,
+                    sets: mapDropSets(ex.sets),
                     supersets: ex.supersets.map(superset => ({
                         id: camelCase(superset.name),
                         name: superset.name,
@@ -1223,6 +1297,15 @@ const styles = StyleSheet.create({
         color: 'blue',
         fontWeight: 'bold',
     },
+    addButton: {
+        backgroundColor: 'green',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 100,
+        height: '100%',
+        borderRadius: 8,
+        marginHorizontal: 4,
+    },
     adjustTimeButton: {
         borderRadius: 8,
     },
@@ -1315,6 +1398,7 @@ const styles = StyleSheet.create({
     dropSetRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        marginBottom: 10,
     },
 });
 
