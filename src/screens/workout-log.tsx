@@ -75,12 +75,22 @@ export default function WorkoutLogScreen({route}) {
         if (template) {
             const mappedExercises = template.exercises.map(ex => ({
                 ...ex,
-                weightUnit: 'lbs', //can adjust to default weight unit preferred by user
-                sets: Array.from({ length: ex.setsCount }, (_, index) => ({ key: `set${index + 1}`, weight: '', reps: '' })),
+                weightUnit: 'lbs', // can adjust to default weight unit preferred by user
+                sets: ex.sets.map((set, index) => ({
+                    key: `set${index + 1}`,
+                    weight: '',
+                    reps: '',
+                    dropSets: Array.from({ length: set.dropSetsCount }, (_, dropIndex) => ({ key: `dropset${dropIndex + 1}`, weight: '', reps: '' }))
+                })),
                 supersets: (ex.supersets || []).map(superset => ({
                     ...superset,
                     weightUnit: 'lbs',
-                    sets: Array.from({ length: superset.setsCount }, (_, index) => ({ key: `set${index + 1}`, weight: '', reps: '' }))
+                    sets: superset.sets.map((set, index) => ({
+                        key: `set${index + 1}`,
+                        weight: '',
+                        reps: '',
+                        dropSets: Array.from({ length: set.dropSetsCount }, (_, dropIndex) => ({ key: `dropset${dropIndex + 1}`, weight: '', reps: '' }))
+                    }))
                 }))
             }));
             setExercises(mappedExercises);
@@ -610,7 +620,6 @@ export default function WorkoutLogScreen({route}) {
 
             const mapDropSets = (sets) => {
                 return sets.map(set => ({
-                    ...set,
                     dropSetsCount: set.dropSets.length, // Only include the count of drop sets
                 }));
             };
@@ -636,7 +645,7 @@ export default function WorkoutLogScreen({route}) {
                     supersets: ex.supersets.map(superset => ({
                         id: camelCase(superset.name),
                         name: superset.name,
-                        setsCount: superset.sets.length,
+                        sets: mapDropSets(superset.sets),
                         weightConfig: superset.weightConfig,
                         repsConfig: superset.repsConfig
                     }))
@@ -655,7 +664,14 @@ export default function WorkoutLogScreen({route}) {
             });
 
             Alert.alert("Success", "Workouts saved successfully!");
-            navigation.goBack();
+
+            if (previousScreen) {
+                console.log(workoutState);
+                navigation.navigate(previousScreen);
+            } else {
+                navigation.goBack();
+            }
+
             resetWorkout();
         } catch (error) {
             console.error("Error adding document: ", error);

@@ -78,15 +78,35 @@ const TemplateScreen = ({ route }) => {
                                 {exercise.name}
                             </Text>
                             <Text style={styles.setsCount}>
-                                Sets: {exercise.setsCount}
+                                Sets: {exercise.sets.length}
                             </Text>
+                            {exercise.sets.map((set, setIndex) => (
+                                <View key={setIndex}>
+                                    {set.dropSetsCount > 0 && (
+                                        <Text style={styles.setItem}>
+                                            Set {setIndex + 1} - Drop Sets: {set.dropSetsCount}
+                                        </Text>
+                                    )}
+                                </View>
+                            ))}
                             {exercise.supersets && exercise.supersets.length > 0 && (
                                 <View style={styles.supersetContainer}>
                                     <Text style={styles.supersetTitle}>Supersets:</Text>
                                     {exercise.supersets.map((superset, supersetIndex) => (
-                                        <Text key={supersetIndex} style={styles.supersetItemText}>
-                                            {superset.name} - Sets: {superset.setsCount}
-                                        </Text>
+                                        <View key={supersetIndex} style={styles.supersetItem}>
+                                            <Text style={styles.exerciseName}>
+                                                {superset.name} - Sets: {superset.sets.length}
+                                            </Text>
+                                            {superset.sets.map((set, setIndex) => (
+                                                <View key={setIndex}>
+                                                    {set.dropSetsCount > 0 && (
+                                                        <Text style={styles.setItem}>
+                                                            Set {setIndex + 1} - Drop Sets: {set.dropSetsCount}
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            ))}
+                                        </View>
                                     ))}
                                 </View>
                             )}
@@ -157,6 +177,14 @@ const styles = StyleSheet.create({
     supersetItemText: {
         fontSize: 16,
         marginTop: 5,
+    },
+    setItem: {
+        fontSize: 16,
+        marginTop: 5,
+        paddingLeft: 10,
+    },
+    supersetItem: {
+        marginTop: 10,
     },
 });
 
