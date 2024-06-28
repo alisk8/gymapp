@@ -6,7 +6,11 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
+  Modal,
+  TextInput,
+  TouchableOpacity,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import { Calendar } from "react-native-calendars";
 import { useFocusEffect } from "@react-navigation/native";
 import useMarkedDates from "../../hooks/setMarkedDates";
@@ -17,20 +21,33 @@ import {
   query,
   where,
   getDocs,
+  addDoc,
+  updateDoc,
   Timestamp,
 } from "firebase/firestore";
+import { Ionicons } from "@expo/vector-icons";
 
-const Progress = () => {
+const Progress = ({ navigation }) => {
   const [selectedDate, setSelectedDate] = useState("");
   const [highlights, setHighlights] = useState([]);
   const [templates, setTemplates] = useState([]);
+  const [diaryEntry, setDiaryEntry] = useState("");
+  const [diaryModalVisible, setDiaryModalVisible] = useState(false);
+  const [diaryEntries, setDiaryEntries] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-  const { markedDates, loadMonthData, clearMarkedDates } = useMarkedDates(); // use the custom hook
+  const [currentDiaryId, setCurrentDiaryId] = useState(null);
+  const [trackModalVisible, setTrackModalVisible] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState("");
+  const [customExercise, setCustomExercise] = useState("");
+  const [trackedExercises, setTrackedExercises] = useState([]);
+  const { markedDates, loadMonthData, clearMarkedDates, setMarkedDates } =
+    useMarkedDates();
 
   useFocusEffect(
     React.useCallback(() => {
       const currentDate = new Date();
       loadMonthData(currentDate);
+      fetchTrackedExercises();
     }, [])
   );
 
@@ -39,6 +56,15 @@ const Progress = () => {
       fetchData(selectedDate);
     }
   }, [selectedDate]);
+
+  useEffect(() => {
+    const diaryDates = diaryEntries.map((entry) => entry.date);
+    const marked = { ...markedDates };
+    diaryDates.forEach((date) => {
+      marked[date] = { selected: true, selectedColor: "green" };
+    });
+    setMarkedDates(marked);
+  }, [diaryEntries]);
 
   const onRefresh = () => {
     const currentDate = new Date();
@@ -56,7 +82,6 @@ const Progress = () => {
       const endDate = new Date(date);
       endDate.setHours(23, 59, 59, 999);
 
-      // Fetch highlights
       const highlightsRef = collection(userRef, "highlights");
       const highlightsQuery = query(
         highlightsRef,
@@ -66,7 +91,6 @@ const Progress = () => {
       const highlightsSnapshot = await getDocs(highlightsQuery);
       const highlightsData = highlightsSnapshot.docs.map((doc) => doc.data());
 
-      // Fetch templates
       const templatesRef = collection(userRef, "templates");
       const templatesQuery = query(
         templatesRef,
@@ -76,8 +100,104 @@ const Progress = () => {
       const templatesSnapshot = await getDocs(templatesQuery);
       const templatesData = templatesSnapshot.docs.map((doc) => doc.data());
 
+      const diaryRef = collection(userRef, "diaryEntries");
+      const diaryQuery = query(
+        diaryRef,
+        where("createdAt", ">=", Timestamp.fromDate(startDate)),
+        where("createdAt", "<=", Timestamp.fromDate(endDate))
+      );
+      const diarySnapshot = await getDocs(diaryQuery);
+      const diaryData = diarySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        entry: doc.data().entry,
+        date: doc.data().createdAt.toDate().toISOString().split("T")[0],
+      }));
+
       setHighlights(highlightsData);
       setTemplates(templatesData);
+      setDiaryEntries(diaryData);
+
+      const existingDiaryEntry = diaryData.find(
+        (entry) => entry.date === selectedDate
+      );
+      if (existingDiaryEntry) {
+        setDiaryEntry(existingDiaryEntry.entry);
+        setCurrentDiaryId(existingDiaryEntry.id);
+      } else {
+        setDiaryEntry("");
+        setCurrentDiaryId(null);
+      }
+    } else {
+      Alert.alert("Error", "No user is logged in");
+    }
+  };
+
+  const fetchTrackedExercises = async () => {
+    const user = firebase_auth.currentUser;
+    if (user) {
+      const uid = user.uid;
+      const userRef = doc(db, "userProfiles", uid);
+      const trackedExercisesRef = collection(userRef, "trackedExercises");
+      const snapshot = await getDocs(trackedExercisesRef);
+      const exercises = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setTrackedExercises(exercises);
+    } else {
+      Alert.alert("Error", "No user is logged in");
+    }
+  };
+
+  const saveDiaryEntry = async () => {
+    const user = firebase_auth.currentUser;
+    if (user) {
+      const uid = user.uid;
+      const userRef = doc(db, "userProfiles", uid);
+      const diaryRef = collection(userRef, "diaryEntries");
+
+      if (currentDiaryId) {
+        const diaryDocRef = doc(diaryRef, currentDiaryId);
+        await updateDoc(diaryDocRef, {
+          entry: diaryEntry,
+          createdAt: Timestamp.fromDate(new Date(selectedDate)),
+        });
+      } else {
+        await addDoc(diaryRef, {
+          entry: diaryEntry,
+          createdAt: Timestamp.fromDate(new Date(selectedDate)),
+        });
+      }
+
+      setDiaryEntry("");
+      setDiaryModalVisible(false);
+      fetchData(selectedDate);
+    } else {
+      Alert.alert("Error", "No user is logged in");
+    }
+  };
+
+  const handleTrackExercise = async () => {
+    const user = firebase_auth.currentUser;
+    if (user) {
+      const uid = user.uid;
+      const userRef = doc(db, "userProfiles", uid);
+      const trackedExercisesRef = collection(userRef, "trackedExercises");
+
+      const exercise =
+        selectedExercise === "Custom Exercise"
+          ? customExercise
+          : selectedExercise;
+
+      await addDoc(trackedExercisesRef, {
+        name: exercise,
+        createdAt: Timestamp.fromDate(new Date()),
+      });
+
+      setSelectedExercise("");
+      setCustomExercise("");
+      setTrackModalVisible(false);
+      fetchTrackedExercises();
     } else {
       Alert.alert("Error", "No user is logged in");
     }
@@ -97,6 +217,14 @@ const Progress = () => {
         }}
         markedDates={markedDates}
         onDayPress={(day) => setSelectedDate(day.dateString)}
+        theme={{
+          selectedDayBackgroundColor: "#6A0DAD",
+          todayTextColor: "#6A0DAD",
+          arrowColor: "#6A0DAD",
+          dotColor: "#6A0DAD",
+          selectedDotColor: "#ffffff",
+          monthTextColor: "#6A0DAD",
+        }}
       />
       <View style={styles.detailsContainer}>
         <Text style={styles.heading}>Selected Date: {selectedDate}</Text>
@@ -104,28 +232,177 @@ const Progress = () => {
           <>
             <Text style={styles.subHeading}>Highlights:</Text>
             {highlights.map((highlight, index) => (
-              <Text key={index} style={styles.detailText}>
-                {highlight.detail}
-              </Text>
+              <View key={index} style={styles.card}>
+                <Text style={styles.detailText}>{highlight.detail}</Text>
+              </View>
             ))}
           </>
         )}
         {templates.length > 0 && (
           <>
-            <Text style={styles.subHeading}>Templates:</Text>
+            <Text style={styles.subHeading}>Workouts:</Text>
             {templates.map((template, index) => (
-              <Text key={index} style={styles.detailText}>
-                {template.detail}
-              </Text>
+              <View key={index} style={styles.card}>
+                <Text style={styles.workoutTitle}>{template.templateName}</Text>
+                {template.exercises.map((exercise, idx) => (
+                  <View key={idx} style={styles.exerciseContainer}>
+                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                    <Text style={styles.exerciseDetail}>
+                      Sets: {exercise.setsCount}
+                    </Text>
+                    <Text style={styles.exerciseDetail}>
+                      Weight Unit: {exercise.weightUnit}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             ))}
           </>
         )}
-        {highlights.length === 0 && templates.length === 0 && (
-          <Text style={styles.detailText}>
-            No highlights or templates found for this date.
-          </Text>
+        {diaryEntries.length > 0 && (
+          <>
+            <Text style={styles.subHeading}>Diary Entries:</Text>
+            {diaryEntries.map((entry, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.card}
+                onPress={() => {
+                  setDiaryEntry(entry.entry);
+                  setCurrentDiaryId(entry.id);
+                  setDiaryModalVisible(true);
+                }}
+              >
+                <View style={styles.diaryEntryContainer}>
+                  <Text style={styles.detailText}>{entry.entry}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setDiaryEntry(entry.entry);
+                      setCurrentDiaryId(entry.id);
+                      setDiaryModalVisible(true);
+                    }}
+                  >
+                    <Ionicons name="pencil" size={20} color="gray" />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </>
         )}
+        {highlights.length === 0 &&
+          templates.length === 0 &&
+          diaryEntries.length === 0 && (
+            <Text style={styles.noEntriesText}>
+              No highlights, templates, or diary entries found for this date.
+            </Text>
+          )}
+        {diaryEntries.length === 0 && (
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setDiaryModalVisible(true)}
+          >
+            <Text style={styles.addButtonText}>Add Diary Entry</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.trackButton}
+          onPress={() => setTrackModalVisible(true)}
+        >
+          <Text style={styles.trackButtonText}>Track Analytics</Text>
+        </TouchableOpacity>
+        <Text style={styles.subHeading}>Tracked Exercises:</Text>
+        <View style={styles.trackedExercisesContainer}>
+          {trackedExercises.map((exercise, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.trackedExerciseCard}
+              onPress={() =>
+                navigation.navigate("TrackedExercise", { exercise })
+              }
+            >
+              <Text style={styles.exerciseName}>{exercise.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={diaryModalVisible}
+        onRequestClose={() => setDiaryModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalHeading}>
+              {currentDiaryId ? "Edit Diary Entry" : "Add Diary Entry"}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Write your diary entry here..."
+              value={diaryEntry}
+              onChangeText={setDiaryEntry}
+              multiline={true}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={saveDiaryEntry}
+              >
+                <Text style={styles.modalButtonText}>Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setDiaryModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={trackModalVisible}
+        onRequestClose={() => setTrackModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalHeading}>Track Exercise</Text>
+            <Picker
+              selectedValue={selectedExercise}
+              onValueChange={(itemValue) => setSelectedExercise(itemValue)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Custom Exercise" value="Custom Exercise" />
+              <Picker.Item label="Push Up" value="Push Up" />
+              <Picker.Item label="Pull Up" value="Pull Up" />
+              <Picker.Item label="Squat" value="Squat" />
+            </Picker>
+            {selectedExercise === "Custom Exercise" && (
+              <TextInput
+                style={styles.customTextInput}
+                placeholder="Enter custom exercise"
+                value={customExercise}
+                onChangeText={setCustomExercise}
+              />
+            )}
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={handleTrackExercise}
+              >
+                <Text style={styles.modalButtonText}>Track</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setTrackModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -134,24 +411,169 @@ export default Progress;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: "#fff",
   },
   detailsContainer: {
     padding: 20,
+    paddingBottom: 100,
   },
   heading: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "bold",
+    color: "#333",
     marginBottom: 10,
+    textAlign: "center",
   },
   subHeading: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
-    marginTop: 10,
+    color: "#6A0DAD",
+    marginTop: 20,
+    marginBottom: 10,
   },
   detailText: {
     fontSize: 16,
+    color: "#555",
     marginBottom: 5,
+  },
+  noEntriesText: {
+    fontSize: 16,
+    color: "#555",
+    textAlign: "center",
+    marginTop: 20,
+  },
+  workoutContainer: {
+    marginBottom: 15,
+  },
+  workoutTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#6A0DAD",
+    marginBottom: 5,
+  },
+  exerciseContainer: {
+    marginLeft: 10,
+    marginBottom: 5,
+  },
+  exerciseName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  exerciseDetail: {
+    fontSize: 14,
+    color: "#555",
+  },
+  addButton: {
+    backgroundColor: "#6A0DAD",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  addButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  trackButton: {
+    backgroundColor: "#32CD32",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  trackButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  card: {
+    backgroundColor: "#f9f9f9",
+    padding: 15,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    marginVertical: 5,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    width: 300,
+    padding: 20,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+  },
+  modalHeading: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#6A0DAD",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  textInput: {
+    height: 100,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 5,
+    textAlignVertical: "top",
+  },
+  customTextInput: {
+    height: 40,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 5,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    marginTop: 20,
+    justifyContent: "space-between",
+  },
+  modalButton: {
+    backgroundColor: "#6A0DAD",
+    padding: 10,
+    borderRadius: 5,
+    alignItems: "center",
+    width: "48%",
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  picker: {
+    height: 150, // Increase height for better usability
+    width: "100%",
+    marginBottom: 10,
+  },
+  trackedExercisesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  trackedExerciseCard: {
+    backgroundColor: "#e0f7fa",
+    padding: 10,
+    borderRadius: 10,
+    margin: 5,
+    alignItems: "center",
+    width: "45%", // Adjust width for better layout
+  },
+  diaryEntryContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 });
