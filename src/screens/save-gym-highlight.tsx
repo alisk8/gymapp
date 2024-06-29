@@ -37,10 +37,11 @@ export default function SaveGymHighlightScreen() {
         { label: 'Private', value: 'private' },
         { label: 'Public', value: 'public' }
     ];
-
     const [media, setMedia] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedMedia, setSelectedMedia] = useState(null);
+
+
 
     const handlePickMedia = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({

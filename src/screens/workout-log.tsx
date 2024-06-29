@@ -21,7 +21,7 @@ import { GestureHandlerRootView, Swipeable, PanGestureHandler} from 'react-nativ
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from "@react-native-picker/picker";
-import Animated, {useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, {useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { useWorkout } from '../contexts/WorkoutContext';
 
 
@@ -57,8 +57,7 @@ export default function WorkoutLogScreen({route}) {
 
     const template = route?.params?.template;
     const exercisesRef = useRef(exercises);
-
-
+    
     useEffect(() => {
         fetchExercisePresets();
         fetchUserExercises();
@@ -1415,6 +1414,28 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginBottom: 10,
+    },
+    previousAttemptButton: {
+        backgroundColor: 'blue',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 150,
+        height: '100%',
+    },
+    previousAttemptButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+    },
+    previousAttemptsContainer: {
+        marginTop: 10,
+        padding: 10,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 5,
+    },
+    previousAttemptRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 5,
     },
 });
 
