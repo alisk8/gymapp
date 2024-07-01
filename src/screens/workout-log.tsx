@@ -55,23 +55,28 @@ export default function WorkoutLogScreen({route}) {
     const [selectedExercise, setSelectedExercise] = useState(null);
     const { workoutState, setWorkoutState, resetWorkout, startWorkoutLog, stopWorkoutLog } = useWorkout();
     const previousScreen = route.params?.previousScreen;
+    const [showPreviousAttempts, setShowPreviousAttempts] = useState({});
+
 
     const timerHeight = useSharedValue(120);
 
     const template = route?.params?.template;
     const exercisesRef = useRef(exercises);
-
     const typingTimeoutRef = useRef(null);
 
-    const openComparisonModal = async (exercise) => {
-        const latestAttempt = await fetchLatestAttempt(exercise.name);
-        setSelectedExercise({ ...exercise, latestAttempt });
-        setComparisonModalVisible(true);
-    };
-
-    const closeComparisonModal = () => {
-        setComparisonModalVisible(false);
-        setSelectedExercise(null);
+    const togglePreviousAttempts = async (exerciseId, exerciseName) => {
+        if (showPreviousAttempts[exerciseId]) {
+            setShowPreviousAttempts(prev => ({
+                ...prev,
+                [exerciseId]: null
+            }));
+        } else {
+            const latestAttempt = await fetchLatestAttempt(exerciseName);
+            setShowPreviousAttempts(prev => ({
+                ...prev,
+                [exerciseId]: latestAttempt
+            }));
+        }
     };
 
     const fetchLatestAttempt = async (exerciseName) => {
@@ -387,6 +392,8 @@ export default function WorkoutLogScreen({route}) {
                     ? exercises[exerciseIndex]
                     : exercises[exerciseIndex].supersets[supersetIndex];
 
+                const previousSet = showPreviousAttempts[exercise.id]?.[setIndex] || {};
+
                 const weightPlaceholder = (() => {
                     switch (exercise.weightConfig) {
                         case 'totalWeight':
@@ -442,6 +449,13 @@ export default function WorkoutLogScreen({route}) {
                             )}
                         >
                             <View style={styles.setRow}>
+                                {showPreviousAttempts[exercise.id] && (
+                                    <View style={styles.previousAttemptContainer}>
+                                        <Text style={styles.previousAttemptText}>
+                                            {`${previousSet.weight || ''} x ${previousSet.reps || ''}`}
+                                        </Text>
+                                    </View>
+                                )}
                                 <TextInput
                                     placeholder={weightPlaceholder}
                                     keyboardType="numeric"
@@ -841,7 +855,7 @@ export default function WorkoutLogScreen({route}) {
             <View style={styles.buttonsRow}>
                 <Button title="+ add set" onPress={() => addSet(index)} />
                 <Button title="+ add superset" onPress={() => addSuperset(index)} />
-                <Button title="Compare" onPress={() => openComparisonModal(item)} />
+                <Button title="Compare" onPress={() => togglePreviousAttempts(item.id, item.name)} />
             </View>
             {renderSupersets(item.supersets, index)}
         </View>
@@ -921,41 +935,6 @@ export default function WorkoutLogScreen({route}) {
         startWorkoutLog();
         return () => stopWorkoutLog();
     }, []);
-
-    const ComparisonModal = () => (
-        <Modal
-            animationType="slide"
-            transparent={true}
-            visible={comparisonModalVisible}
-            onRequestClose={closeComparisonModal}
-        >
-            <View style={styles.modalContainer}>
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Previous Attempts vs Current</Text>
-                    <Text style={styles.modalSubTitle}>{selectedExercise?.name}</Text>
-                    <View style={styles.comparisonContainer}>
-                        <View style={styles.comparisonColumn}>
-                            <Text style={styles.comparisonHeader}>Previous</Text>
-                            {selectedExercise?.latestAttempt?.map((attempt, index) => (
-                                <Text key={index} style={styles.comparisonText}>
-                                    {`Set ${attempt.setNumber}: ${attempt.weight} x ${attempt.reps}`}
-                                </Text>
-                            ))}
-                        </View>
-                        <View style={styles.comparisonColumn}>
-                            <Text style={styles.comparisonHeader}>Current</Text>
-                            {selectedExercise?.sets.map((set, index) => (
-                                <Text key={index} style={styles.comparisonText}>
-                                    {`Set ${index + 1}: ${set.weight} x ${set.reps}`}
-                                </Text>
-                            ))}
-                        </View>
-                    </View>
-                    <Button title="Close" onPress={closeComparisonModal} />
-                </View>
-            </View>
-        </Modal>
-    );
 
 
 
@@ -1045,7 +1024,6 @@ export default function WorkoutLogScreen({route}) {
                     </View>
                 </View>
             </Modal>
-            <ComparisonModal></ComparisonModal>
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -1521,38 +1499,15 @@ const styles = StyleSheet.create({
         width: 150,
         height: '100%',
     },
-    previousAttemptButtonText: {
-        color: 'white',
-        fontWeight: 'bold',
-    },
-    previousAttemptsContainer: {
-        marginTop: 10,
-        padding: 10,
-        backgroundColor: '#f0f0f0',
-        borderRadius: 5,
-    },
-    previousAttemptRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 5,
-    },
-    comparisonColumn: {
+    previousAttemptContainer: {
         flex: 1,
-        marginHorizontal: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 10,
     },
-    comparisonHeader: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 10,
-    },
-    comparisonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        width: '100%',
-    },
-    comparisonText: {
+    previousAttemptText: {
         fontSize: 14,
-        marginBottom: 5,
+        color: 'gray',
     },
 });
 
