@@ -431,8 +431,31 @@ export default function WorkoutLogScreen({route}) {
         setExercises(newExercises);
     };
 
+    const loadAllPreviousAttempts = (exerciseIndex) => {
+        const exercise = exercises[exerciseIndex];
+        const previousSets = showPreviousAttempts[exercise.id];
+        if (previousSets) {
+            previousSets.forEach((previousSet, setIndex) => {
+                if (previousSet) {
+                    loadPreviousAttempt(exerciseIndex, setIndex, previousSet);
+                    previousSet.dropSets?.forEach((dropSet, dropSetIndex) => {
+                        loadPreviousAttempt(exerciseIndex, setIndex, dropSet, true, dropSetIndex);
+                    });
+                }
+            });
+        }
+    };
+
     const renderSets = (sets, exerciseIndex, supersetIndex = null) => (
         <View>
+            {showPreviousAttempts[exercises[exerciseIndex].id] && (
+                <TouchableOpacity
+                    onPress={() => loadAllPreviousAttempts(exerciseIndex)}
+                    style={styles.addAllPreviousButton}
+                >
+                    <Text style={styles.addAllPreviousButtonText}>Add All Previous</Text>
+                </TouchableOpacity>
+            )}
             {sets.map((set, setIndex) => {
                 const exercise = supersetIndex === null
                     ? exercises[exerciseIndex]
@@ -496,6 +519,7 @@ export default function WorkoutLogScreen({route}) {
                             <View style={styles.setRow}>
                                 {showPreviousAttempts[exercise.id] && (
                                     <View style={styles.previousAttemptContainer}>
+
                                         {showPreviousAttempts[exercise.id][setIndex] && (showPreviousAttempts[exercise.id][setIndex].weight || showPreviousAttempts[exercise.id][setIndex].reps) ? (
                                             <TouchableOpacity
                                                 onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, showPreviousAttempts[exercise.id][setIndex])}
@@ -1609,6 +1633,18 @@ const styles = StyleSheet.create({
     dropSetIcon: {
         marginRight: 10,
         color: 'black', // You can change the color as needed
+    },
+    addAllPreviousButton: {
+        padding: 10,
+        backgroundColor: '#e0e0e0',
+        borderRadius: 5,
+        marginBottom: 10,
+        marginLeft: 10,
+        width: '70%',
+    },
+    addAllPreviousButtonText: {
+        textAlign: 'center',
+        fontWeight: 'bold',
     },
 });
 
