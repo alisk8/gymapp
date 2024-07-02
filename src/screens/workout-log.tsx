@@ -453,7 +453,7 @@ export default function WorkoutLogScreen({route}) {
                     onPress={() => loadAllPreviousAttempts(exerciseIndex)}
                     style={styles.addAllPreviousButton}
                 >
-                    <Text style={styles.addAllPreviousButtonText}>Add All Previous</Text>
+                    <Text style={styles.addAllPreviousButtonText}>Add All</Text>
                 </TouchableOpacity>
             )}
             {sets.map((set, setIndex) => {
@@ -1635,16 +1635,17 @@ const styles = StyleSheet.create({
         color: 'black', // You can change the color as needed
     },
     addAllPreviousButton: {
-        padding: 10,
+        padding: 8,
         backgroundColor: '#e0e0e0',
         borderRadius: 5,
-        marginBottom: 10,
-        marginLeft: 10,
-        width: '70%',
+        marginBottom: 5,
+        marginLeft: 15,
+        width: '23%',
     },
     addAllPreviousButtonText: {
         textAlign: 'center',
         fontWeight: 'bold',
+        fontSize: 13,
     },
 });
 
