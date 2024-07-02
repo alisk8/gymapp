@@ -11,7 +11,7 @@ const FeedPage = () => {
   const [lastVisible, setLastVisible] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [allLoaded, setAllLoaded] = useState(false);
-  const batchSize = 10; // Number of items to load per batch
+  const batchSize = 10;
 
   useEffect(() => {
     fetchHighlights();
@@ -45,7 +45,7 @@ const FeedPage = () => {
             allHighlights.push({
               id: doc.id,
               ...highlightData,
-              userName: userProfileData.name, // Assuming the user profile has a 'name' field
+              userName: userProfileData.name,
               timestamp: highlightData.timestamp ? highlightData.timestamp.toDate() : null,
             });
           });
@@ -92,22 +92,23 @@ const FeedPage = () => {
         <Text style={styles.userNameText}>{item.userName}</Text>
         {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
         {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
-        
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaContainer}>
-          {item.mediaType === 'image' && item.mediaUrls && item.mediaUrls.map((imageUrl, index) => (
-            <Image key={`${item.id}_${index}`} source={{ uri: imageUrl }} style={styles.image} />
-          ))}
-          {item.mediaType === 'video' && item.mediaUrls && item.mediaUrls.map((videoUrl, index) => (
-            <Video
-              key={`${item.id}_${index}`}
-              source={{ uri: videoUrl }}
-              rate={1.0}
-              volume={1.0}
-              isMuted={false}
-              resizeMode={ResizeMode.CONTAIN}
-              useNativeControls
-              style={styles.video}
-            />
+          {item.mediaUrls && item.mediaUrls.map((mediaUrl, index) => (
+            item.mediaType === 'image' ? (
+              <Image key={`${item.id}_${index}`} source={{ uri: mediaUrl }} style={styles.image} />
+            ) : (
+              <Video
+                key={`${item.id}_${index}`}
+                source={{ uri: mediaUrl }}
+                rate={1.0}
+                volume={1.0}
+                isMuted={false}
+                resizeMode={ResizeMode.CONTAIN}
+                useNativeControls
+                style={styles.video}
+              />
+            )
           ))}
         </ScrollView>
 

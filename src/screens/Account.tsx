@@ -1,309 +1,223 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Text,
-  Alert,
-  KeyboardAvoidingView,
-  TouchableWithoutFeedback,
-  Keyboard,
-} from "react-native";
-import { firebase_auth, db } from "../../firebaseConfig";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  UserCredential,
-} from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import useMarkedDates from "../../hooks/setMarkedDates";
+import React, { useEffect, useState } from 'react';
+import { ScrollView, FlatList, View, Text, StyleSheet, ActivityIndicator, Image, Dimensions } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
+import { db } from '../../firebaseConfig';
+import { collection, getDocs, query, orderBy, limit, startAfter } from '@firebase/firestore';
 
-type AdditionalInfo = {
-  firstName: string;
-  lastName: string;
-  height: string;
-  weight: string;
-  age: string;
-  sex: string;
-  gym_interests: string[];
-};
+const { width: screenWidth } = Dimensions.get('window');
 
-export default function Account({ navigation }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [user, setUser] = useState<UserCredential | null>(null);
-  const [signingUp, setSigningUp] = useState(false);
-  const [additionalInfo, setAdditionalInfo] = useState<AdditionalInfo>({
-    firstName: "",
-    lastName: "",
-    height: "",
-    weight: "",
-    age: "",
-    sex: "",
-    gym_interests: [],
-  });
-
-  const { clearMarkedDates } = useMarkedDates(); // use the custom hook
-
-  const auth = firebase_auth;
+const FeedPage = () => {
+  const [highlights, setHighlights] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastVisible, setLastVisible] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [allLoaded, setAllLoaded] = useState(false);
+  const batchSize = 10;
 
   useEffect(() => {
-    if (!user) {
-      // Reset the form when user logs out
-      setAdditionalInfo({
-        firstName: "",
-        lastName: "",
-        height: "",
-        weight: "",
-        age: "",
-        sex: "",
-        gym_interests: [],
-      });
-    }
-  }, [user]);
+    fetchHighlights();
+  }, []);
 
-  const handleLogin = async () => {
+  const fetchHighlights = async (loadMore = false) => {
+    if (loadingMore || allLoaded) return;
+
+    if (loadMore) setLoadingMore(true);
+    else setLoading(true);
+
     try {
-      const response = await signInWithEmailAndPassword(
-        auth,
-        username,
-        password
-      );
-      setUser(response);
-      fetchUserData(response.user.uid);
-      Alert.alert("Success", "Logged in Successfully");
-      navigation.navigate("Feed");
-    } catch (error: any) {
-      console.error("Login Error:", error);
-      Alert.alert("Error", "User Not Found");
+      const userProfilesSnapshot = await getDocs(collection(db, 'userProfiles'));
+      let allHighlights = [];
+
+      for (const userProfile of userProfilesSnapshot.docs) {
+        const userProfileData = userProfile.data();
+        let highlightsQuery = query(collection(db, 'userProfiles', userProfile.id, 'highlights'), orderBy('timestamp', 'desc'), limit(batchSize));
+
+        if (loadMore && lastVisible) {
+          highlightsQuery = query(highlightsQuery, startAfter(lastVisible));
+        }
+
+        const highlightsSnapshot = await getDocs(highlightsQuery);
+
+        if (highlightsSnapshot.docs.length === 0) {
+          setAllLoaded(true);
+        } else {
+          highlightsSnapshot.docs.forEach(doc => {
+            const highlightData = doc.data();
+            allHighlights.push({
+              id: doc.id,
+              ...highlightData,
+              userName: userProfileData.name,
+              timestamp: highlightData.timestamp ? highlightData.timestamp.toDate() : null,
+            });
+          });
+          setLastVisible(highlightsSnapshot.docs[highlightsSnapshot.docs.length - 1]);
+        }
+      }
+
+      allHighlights.sort((a, b) => b.timestamp - a.timestamp);
+
+      if (loadMore) {
+        setHighlights(prevHighlights => [...prevHighlights, ...allHighlights]);
+        setLoadingMore(false);
+      } else {
+        setHighlights(allHighlights);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error fetching highlights: ', error);
+      setError('Failed to load highlights');
+      setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const fetchUserData = async (uid: string) => {
-    const docRef = doc(db, "userProfiles", uid);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      const data = docSnap.data() as AdditionalInfo;
-      setAdditionalInfo(data);
-    } else {
-      console.log("No such document!");
-    }
+  const calculateMediaHeight = (width, height) => {
+    return (screenWidth / width) * height;
   };
 
-  const signUp = async () => {
-    try {
-      const response = await createUserWithEmailAndPassword(
-        auth,
-        username,
-        password
-      );
-      setUser(response);
-      const userProfileRef = doc(db, "userProfiles", response.user.uid);
-      await setDoc(userProfileRef, {
-        email: username,
-        ...additionalInfo,
-      });
-      Alert.alert("Success", "Account Created");
-      navigation.navigate("Feed");
-      clearMarkedDates(); // clear marked dates upon signup
-    } catch (error: any) {
-      console.error("Signup Error:", error);
-      Alert.alert("Error", "Error creating account");
-    }
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+
+  const renderItem = ({ item }) => {
+    return (
+      <View style={styles.highlightContainer}>
+        <Text style={styles.userNameText}>{item.userName}</Text>
+        {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
+        {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaContainer}>
+          {item.mediaUrls && item.mediaUrls.map((mediaUrl, index) => (
+            item.mediaType === 'image' ? (
+              <Image 
+                key={`${item.id}_${index}`} 
+                source={{ uri: mediaUrl }} 
+                style={{ 
+                  width: screenWidth, 
+                  height: item.originalWidth && item.originalHeight 
+                    ? calculateMediaHeight(item.originalWidth, item.originalHeight) 
+                    : screenWidth // fallback if dimensions are not available
+                }} 
+              />
+            ) : (
+              <Video
+                key={`${item.id}_${index}`}
+                source={{ uri: mediaUrl }}
+                rate={1.0}
+                volume={1.0}
+                isMuted={false}
+                resizeMode={ResizeMode.CONTAIN}
+                useNativeControls
+                style={{ 
+                  width: screenWidth, 
+                  height: item.originalWidth && item.originalHeight 
+                    ? calculateMediaHeight(item.originalWidth, item.originalHeight) 
+                    : screenWidth // fallback if dimensions are not available
+                }}
+              />
+            )
+          ))}
+        </ScrollView>
+
+        {item.timestamp && <Text style={styles.timestampText}>{item.timestamp.toString()}</Text>}
+        {item.type && <Text style={styles.typeText}>{item.type}</Text>}
+        {item.userId && <Text style={styles.userIdText}>{item.userId}</Text>}
+        {item.weight && <Text style={styles.weightText}>{item.weight}</Text>}
+      </View>
+    );
   };
 
-  const handleSignOut = () => {
-    setUser(null);
-    clearMarkedDates(); // clear marked dates upon sign out
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.container}>
-          {!user ? (
-            <>
-              <Text style={styles.title}>
-                {signingUp ? "Sign Up" : "Log In"}
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your username"
-                value={username}
-                onChangeText={setUsername}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your password"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
-              {signingUp && (
-                <>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="First Name"
-                    value={additionalInfo.firstName}
-                    onChangeText={(text) =>
-                      setAdditionalInfo({ ...additionalInfo, firstName: text })
-                    }
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Last Name"
-                    value={additionalInfo.lastName}
-                    onChangeText={(text) =>
-                      setAdditionalInfo({ ...additionalInfo, lastName: text })
-                    }
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Height (e.g., 6'1\)"
-                    value={additionalInfo.height}
-                    onChangeText={(text) =>
-                      setAdditionalInfo({ ...additionalInfo, height: text })
-                    }
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Weight (lbs)"
-                    value={additionalInfo.weight}
-                    onChangeText={(text) =>
-                      setAdditionalInfo({ ...additionalInfo, weight: text })
-                    }
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Age"
-                    value={additionalInfo.age}
-                    onChangeText={(text) =>
-                      setAdditionalInfo({ ...additionalInfo, age: text })
-                    }
-                    keyboardType="numeric"
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Sex"
-                    value={additionalInfo.sex}
-                    onChangeText={(text) =>
-                      setAdditionalInfo({ ...additionalInfo, sex: text })
-                    }
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Gym Interests (comma-separated)"
-                    value={additionalInfo.gym_interests.join(", ")}
-                    onChangeText={(text) =>
-                      setAdditionalInfo({
-                        ...additionalInfo,
-                        gym_interests: text.split(", "),
-                      })
-                    }
-                  />
-                </>
-              )}
-              <TouchableOpacity
-                style={styles.button}
-                onPress={signingUp ? signUp : handleLogin}
-              >
-                <Text style={styles.buttonText}>
-                  {signingUp ? "Submit Sign Up" : "Log In"}
-                </Text>
-              </TouchableOpacity>
-              {!signingUp && (
-                <TouchableOpacity onPress={() => setSigningUp(true)}>
-                  <Text style={styles.switchText}>
-                    Don't have an account? Sign Up
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {signingUp && (
-                <TouchableOpacity onPress={() => setSigningUp(false)}>
-                  <Text style={styles.switchText}>
-                    Already have an account? Log In
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </>
-          ) : (
-            <>
-              <Text style={styles.userInfo}>
-                Welcome, {additionalInfo.firstName} {additionalInfo.lastName}
-              </Text>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={() =>
-                  navigation.navigate("PersonalDetails", { additionalInfo })
-                }
-              >
-                <Text style={styles.buttonText}>Personal Details</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.button} onPress={handleSignOut}>
-                <Text style={styles.buttonText}>Sign Out</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+    <FlatList
+      data={highlights}
+      keyExtractor={(item) => item.id}
+      renderItem={renderItem}
+      ListFooterComponent={renderFooter}
+      onEndReached={() => fetchHighlights(true)}
+      onEndReachedThreshold={0.5}
+    />
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f5f5f5",
+  highlightContainer: {
     padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: "#333",
+  userNameText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
   },
-  input: {
-    width: "100%",
-    height: 50,
-    padding: 10,
+  captionText: {
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  descriptionText: {
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  mediaContainer: {
+    flexDirection: 'row',
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "#fff",
-    borderRadius: 5,
+  },
+  timestampText: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 5,
+  },
+  typeText: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 5,
+  },
+  userIdText: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 5,
+  },
+  weightText: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 5,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: 'red',
     fontSize: 16,
-  },
-  button: {
-    width: "100%",
-    height: 50,
-    backgroundColor: "#007BFF",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  switchText: {
-    marginTop: 20,
-    color: "#007BFF",
-    fontSize: 16,
-  },
-  userInfo: {
-    fontSize: 18,
-    marginBottom: 20,
-  },
-  label: {
-    alignSelf: "stretch",
-    marginLeft: 20,
-    color: "#333",
-    fontSize: 16,
-    fontWeight: "bold",
   },
 });
+
+export default FeedPage;
