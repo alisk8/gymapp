@@ -367,6 +367,8 @@ export default function WorkoutLogScreen({route}) {
                     weight = totalWeight.replace('BW + ', '').replace(` ${targetUnit}`, '');
                 }
                 break;
+            case 'bodyWeight':
+                return '';
             default:
                 weight = totalWeight;
         }
@@ -408,25 +410,25 @@ export default function WorkoutLogScreen({route}) {
         return null;
     };
 
-    const loadPreviousAttempt = (exerciseIndex, setIndex, previousSet, previousDropSets) => {
+    const loadPreviousAttempt = (exerciseIndex, setIndex, previousSet, isDropSet = false, dropSetIndex = null) => {
         const newExercises = [...exercises];
         const exercise = newExercises[exerciseIndex];
-        newExercises[exerciseIndex].sets[setIndex].weight = reverseCalculateWeight(previousSet.weight, exercise.weightConfig, exercise.weightUnit);
-        newExercises[exerciseIndex].sets[setIndex].reps = previousSet.reps;
 
-        if (previousDropSets && previousDropSets.length > 0) {
-            previousDropSets.forEach((dropSet, dropSetIndex) => {
-                if (!newExercises[exerciseIndex].sets[setIndex].dropSets[dropSetIndex]) {
-                    newExercises[exerciseIndex].sets[setIndex].dropSets.push({ key: `dropset${dropSetIndex + 1}`, weight: '', reps: '' });
-                }
-                const { weight: dropWeight, unit: dropUnit } = reverseCalculateWeight(dropSet.weight, exercise.weightConfig, exercise.weightUnit);
-                newExercises[exerciseIndex].sets[setIndex].dropSets[dropSetIndex].weight = dropWeight;
-                newExercises[exerciseIndex].sets[setIndex].dropSets[dropSetIndex].reps = dropSet.reps;
-            });
+        if (isDropSet) {
+            const dropSetKey = `dropset${dropSetIndex + 1}`;
+            let currentSet = newExercises[exerciseIndex].sets[setIndex];
+
+            if (!currentSet.dropSets.find(d => d.key === dropSetKey)) {
+                currentSet.dropSets.push({ key: dropSetKey, weight: '', reps: '' });
+            }
+            currentSet.dropSets[dropSetIndex].weight = reverseCalculateWeight(previousSet.weight, exercise.weightConfig, exercise.weightUnit);
+            currentSet.dropSets[dropSetIndex].reps = previousSet.reps;
+        } else {
+            newExercises[exerciseIndex].sets[setIndex].weight = reverseCalculateWeight(previousSet.weight, exercise.weightConfig, exercise.weightUnit);
+            newExercises[exerciseIndex].sets[setIndex].reps = previousSet.reps;
         }
 
         setExercises(newExercises);
-
     };
 
     const renderSets = (sets, exerciseIndex, supersetIndex = null) => (
@@ -494,30 +496,32 @@ export default function WorkoutLogScreen({route}) {
                             <View style={styles.setRow}>
                                 {showPreviousAttempts[exercise.id] && (
                                     <View style={styles.previousAttemptContainer}>
-                                        <TouchableOpacity
-                                            onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, showPreviousAttempts[exercise.id][setIndex], showPreviousAttempts[exercise.id][setIndex]?.dropSets)}
-                                            style={styles.previousAttemptRow}
-                                        >
-                                            <Text>{`${showPreviousAttempts[exercise.id][setIndex]?.weight || ''} x ${showPreviousAttempts[exercise.id][setIndex]?.reps || ''}`}</Text>
-                                        </TouchableOpacity>
-                                        {showPreviousAttempts[exercise.id][setIndex]?.dropSets?.map((dropSet, dropSetIndex) => (
+                                        {showPreviousAttempts[exercise.id][setIndex] && (showPreviousAttempts[exercise.id][setIndex].weight || showPreviousAttempts[exercise.id][setIndex].reps) ? (
                                             <TouchableOpacity
-                                                key={dropSetIndex}
-                                                onPress={() => {
-                                                    const dropSetKey = `dropset${dropSetIndex + 1}`;
-                                                    let newExercises = [...exercises];
-                                                    let currentSet = newExercises[exerciseIndex].sets[setIndex];
-                                                    if (!currentSet.dropSets.find(d => d.key === dropSetKey)) {
-                                                        currentSet.dropSets.push({ key: dropSetKey, weight: '', reps: '' });
-                                                    }
-                                                    setExercises(newExercises);
-                                                    updateDropSetData(dropSet.weight, exerciseIndex, setIndex, dropSetIndex, 'weight');
-                                                    updateDropSetData(dropSet.reps, exerciseIndex, setIndex, dropSetIndex, 'reps');
-                                                }}
+                                                onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, showPreviousAttempts[exercise.id][setIndex])}
                                                 style={styles.previousAttemptRow}
                                             >
-                                                <Text>{dropSet.weight} x {dropSet.reps}</Text>
+                                                <Text>{`${showPreviousAttempts[exercise.id][setIndex]?.weight || ''} x ${showPreviousAttempts[exercise.id][setIndex]?.reps || ''}`}</Text>
                                             </TouchableOpacity>
+                                        ) : (
+                                            <View style={styles.previousAttemptRow}>
+                                                <Text style={styles.indicatorText}>-- x --</Text>
+                                            </View>
+                                        )}
+                                        {showPreviousAttempts[exercise.id][setIndex]?.dropSets?.map((dropSet, dropSetIndex) => (
+                                            (dropSet.weight || dropSet.reps) ? (
+                                                <TouchableOpacity
+                                                    key={dropSetIndex}
+                                                    onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, dropSet, true, dropSetIndex)}
+                                                    style={styles.previousAttemptRow}
+                                                >
+                                                    <Text>Dropset: {dropSet.weight} x {dropSet.reps}</Text>
+                                                </TouchableOpacity>
+                                            ) : (
+                                                <View key={dropSetIndex} style={styles.previousAttemptRow}>
+                                                    <Text style={styles.indicatorText}>Dropset: -- x --</Text>
+                                                </View>
+                                            )
                                         ))}
                                     </View>
                                 )}
@@ -612,6 +616,7 @@ export default function WorkoutLogScreen({route}) {
                         )}
                     >
                         <View style={styles.dropSetRow}>
+                            <FontAwesome5 name="arrow-down" size={16} style={styles.dropSetIcon}/>
                             <TextInput
                                 placeholder={weightPlaceholder}
                                 keyboardType="numeric"
@@ -895,7 +900,7 @@ export default function WorkoutLogScreen({route}) {
                 <FontAwesome5 name="ellipsis-h" size={20} color='black' />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => togglePreviousAttempts(item.id, item.name)} style={styles.compareButton}>
-                <FontAwesome5 name="balance-scale" size={20} color='black' />
+                <FontAwesome5 name="balance-scale" size={20} style={showPreviousAttempts[item.id] ? styles.blueIcon : styles.blackIcon} />
             </TouchableOpacity>
             <TextInput
                 style={styles.header}
@@ -1557,6 +1562,7 @@ const styles = StyleSheet.create({
     dropSetRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: 10,
     },
     previousAttemptButton: {
@@ -1589,6 +1595,20 @@ const styles = StyleSheet.create({
         padding: 5,
         marginVertical: 2,
         borderRadius: 5,
+    },
+    indicatorText: {
+        color: '#aaa',
+        fontStyle: 'italic',
+    },
+    blueIcon: {
+        color: 'blue',
+    },
+    blackIcon: {
+        color: 'black',
+    },
+    dropSetIcon: {
+        marginRight: 10,
+        color: 'black', // You can change the color as needed
     },
 });
 
