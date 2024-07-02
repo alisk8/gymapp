@@ -924,7 +924,7 @@ export default function WorkoutLogScreen({route}) {
                 <FontAwesome5 name="ellipsis-h" size={20} color='black' />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => togglePreviousAttempts(item.id, item.name)} style={styles.compareButton}>
-                <FontAwesome5 name="balance-scale" size={20} style={showPreviousAttempts[item.id] ? styles.blueIcon : styles.blackIcon} />
+                <Text style={showPreviousAttempts[item.id] ? styles.blueIcon : styles.blackIcon}>Previous</Text>
             </TouchableOpacity>
             <TextInput
                 style={styles.header}
@@ -1249,11 +1249,16 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         padding: 20,
         backgroundColor: '#fff',
-        borderRadius: 5,
+        borderRadius: 7,
         position: 'relative',
-        borderWidth: 1,
-        borderColor: '#ccc',
         paddingTop: 60, // Adjust padding to make space for the edit button
+        shadowColor: '#000000',
+        shadowOffset: {
+            width: 1,
+            height: 1
+        },
+        shadowRadius: 2,
+        shadowOpacity: 0.5
     },
     header: {
         fontSize: 20,
@@ -1625,10 +1630,16 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
     blueIcon: {
+        fontSize:13,
         color: 'blue',
+        fontWeight: 'bold',
+        marginVertical: 2,
     },
     blackIcon: {
+        fontSize:13,
         color: 'black',
+        fontWeight: 'bold',
+        marginVertical: 2,
     },
     dropSetIcon: {
         marginRight: 10,
