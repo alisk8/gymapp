@@ -209,12 +209,6 @@ export default function WorkoutLogScreen({route}) {
         return allExercises.filter(ex => ex.toLowerCase().includes(text.toLowerCase()));
     };
 
-    const debouncedUpdateExerciseName = debounce((text, index) => {
-        const newExercises = [...exercises];
-        newExercises[index].name = text;
-        newExercises[index].id = camelCase(text);
-        setExercises(newExercises);
-    }, 300);
 
     const handleExerciseNameChange = (text, index) => {
         setCurrentExerciseIndex(index);
@@ -351,6 +345,35 @@ export default function WorkoutLogScreen({route}) {
         return totalWeight;
     };
 
+    const reverseCalculateWeight = (totalWeight, weightConfig, targetUnit) => {
+        let weight = '';
+
+        const weightParts = totalWeight.split(' ');
+        const numericValue = parseFloat(weightParts[0]);
+        const storedUnit = weightParts[1];
+
+        const conversionFactor = storedUnit === 'lbs' && targetUnit === 'kgs' ? 0.453592 : (storedUnit === 'kgs' && targetUnit === 'lbs' ? 2.20462 : 1);
+        const convertedValue = numericValue * conversionFactor;
+
+        switch (weightConfig) {
+            case 'weightPerSide':
+                weight = (Math.floor(totalWeight / 2)).toString();
+                break;
+            case 'weightPerSideBarbell':
+                weight = targetUnit === 'lbs' ? (Math.floor((convertedValue - 45) / 2)).toString() : (Math.floor((convertedValue - 20) / 2)).toString();
+                break;
+            case 'extraWeightBodyWeight':
+                if (totalWeight.startsWith('BW + ')) {
+                    weight = totalWeight.replace('BW + ', '').replace(` ${targetUnit}`, '');
+                }
+                break;
+            default:
+                weight = totalWeight;
+        }
+
+        return weight;
+    };
+
     const renderTotalWeightMessage = (exercise, sets) => {
         // Find the last set with a filled-in weight and its index
         let lastFilledSet = null;
@@ -385,6 +408,27 @@ export default function WorkoutLogScreen({route}) {
         return null;
     };
 
+    const loadPreviousAttempt = (exerciseIndex, setIndex, previousSet, previousDropSets) => {
+        const newExercises = [...exercises];
+        const exercise = newExercises[exerciseIndex];
+        newExercises[exerciseIndex].sets[setIndex].weight = reverseCalculateWeight(previousSet.weight, exercise.weightConfig, exercise.weightUnit);
+        newExercises[exerciseIndex].sets[setIndex].reps = previousSet.reps;
+
+        if (previousDropSets && previousDropSets.length > 0) {
+            previousDropSets.forEach((dropSet, dropSetIndex) => {
+                if (!newExercises[exerciseIndex].sets[setIndex].dropSets[dropSetIndex]) {
+                    newExercises[exerciseIndex].sets[setIndex].dropSets.push({ key: `dropset${dropSetIndex + 1}`, weight: '', reps: '' });
+                }
+                const { weight: dropWeight, unit: dropUnit } = reverseCalculateWeight(dropSet.weight, exercise.weightConfig, exercise.weightUnit);
+                newExercises[exerciseIndex].sets[setIndex].dropSets[dropSetIndex].weight = dropWeight;
+                newExercises[exerciseIndex].sets[setIndex].dropSets[dropSetIndex].reps = dropSet.reps;
+            });
+        }
+
+        setExercises(newExercises);
+
+    };
+
     const renderSets = (sets, exerciseIndex, supersetIndex = null) => (
         <View>
             {sets.map((set, setIndex) => {
@@ -392,7 +436,6 @@ export default function WorkoutLogScreen({route}) {
                     ? exercises[exerciseIndex]
                     : exercises[exerciseIndex].supersets[supersetIndex];
 
-                const previousSet = showPreviousAttempts[exercise.id]?.[setIndex] || {};
 
                 const weightPlaceholder = (() => {
                     switch (exercise.weightConfig) {
@@ -451,9 +494,31 @@ export default function WorkoutLogScreen({route}) {
                             <View style={styles.setRow}>
                                 {showPreviousAttempts[exercise.id] && (
                                     <View style={styles.previousAttemptContainer}>
-                                        <Text style={styles.previousAttemptText}>
-                                            {`${previousSet.weight || ''} x ${previousSet.reps || ''}`}
-                                        </Text>
+                                        <TouchableOpacity
+                                            onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, showPreviousAttempts[exercise.id][setIndex], showPreviousAttempts[exercise.id][setIndex]?.dropSets)}
+                                            style={styles.previousAttemptRow}
+                                        >
+                                            <Text>{`${showPreviousAttempts[exercise.id][setIndex]?.weight || ''} x ${showPreviousAttempts[exercise.id][setIndex]?.reps || ''}`}</Text>
+                                        </TouchableOpacity>
+                                        {showPreviousAttempts[exercise.id][setIndex]?.dropSets?.map((dropSet, dropSetIndex) => (
+                                            <TouchableOpacity
+                                                key={dropSetIndex}
+                                                onPress={() => {
+                                                    const dropSetKey = `dropset${dropSetIndex + 1}`;
+                                                    let newExercises = [...exercises];
+                                                    let currentSet = newExercises[exerciseIndex].sets[setIndex];
+                                                    if (!currentSet.dropSets.find(d => d.key === dropSetKey)) {
+                                                        currentSet.dropSets.push({ key: dropSetKey, weight: '', reps: '' });
+                                                    }
+                                                    setExercises(newExercises);
+                                                    updateDropSetData(dropSet.weight, exerciseIndex, setIndex, dropSetIndex, 'weight');
+                                                    updateDropSetData(dropSet.reps, exerciseIndex, setIndex, dropSetIndex, 'reps');
+                                                }}
+                                                style={styles.previousAttemptRow}
+                                            >
+                                                <Text>{dropSet.weight} x {dropSet.reps}</Text>
+                                            </TouchableOpacity>
+                                        ))}
                                     </View>
                                 )}
                                 <TextInput
@@ -829,6 +894,9 @@ export default function WorkoutLogScreen({route}) {
             <TouchableOpacity onPress={() => openEditModal(index)} style={styles.editButton}>
                 <FontAwesome5 name="ellipsis-h" size={20} color='black' />
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => togglePreviousAttempts(item.id, item.name)} style={styles.compareButton}>
+                <FontAwesome5 name="balance-scale" size={20} color='black' />
+            </TouchableOpacity>
             <TextInput
                 style={styles.header}
                 onChangeText={(text) => handleExerciseNameChange(text, index)}
@@ -855,7 +923,6 @@ export default function WorkoutLogScreen({route}) {
             <View style={styles.buttonsRow}>
                 <Button title="+ add set" onPress={() => addSet(index)} />
                 <Button title="+ add superset" onPress={() => addSuperset(index)} />
-                <Button title="Compare" onPress={() => togglePreviousAttempts(item.id, item.name)} />
             </View>
             {renderSupersets(item.supersets, index)}
         </View>
@@ -1508,6 +1575,20 @@ const styles = StyleSheet.create({
     previousAttemptText: {
         fontSize: 14,
         color: 'gray',
+    },
+    compareButton: {
+        position: 'absolute',
+        top: 15, // Adjust to properly align the button
+        left: 50, // Adjust position next to ellipsis
+        padding: 10,
+        borderRadius: 5,
+        zIndex: 1, // Ensure it stays above other elements
+    },
+    previousAttemptRow: {
+        backgroundColor: '#e0e0e0',
+        padding: 5,
+        marginVertical: 2,
+        borderRadius: 5,
     },
 });
 
