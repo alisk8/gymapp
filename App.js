@@ -16,6 +16,7 @@ import SaveGymHighlightScreen from "./src/screens/save-gym-highlight";
 import CustomTabBar from "./src/components/CustomTabBar";
 import FeedPage from "./src/screens/FeedPage";
 
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 

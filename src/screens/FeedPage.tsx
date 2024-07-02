@@ -1,44 +1,74 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { ScrollView, FlatList, View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { db } from '../../firebaseConfig';
-import { collection, getDocs } from '@firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, startAfter } from '@firebase/firestore';
 
 const FeedPage = () => {
   const [highlights, setHighlights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastVisible, setLastVisible] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [allLoaded, setAllLoaded] = useState(false);
+  const batchSize = 10; // Number of items to load per batch
 
   useEffect(() => {
-    const fetchHighlights = async () => {
-      try {
-        const userProfilesSnapshot = await getDocs(collection(db, 'userProfiles'));
-        let allHighlights = [];
-
-        for (const userProfile of userProfilesSnapshot.docs) {
-          const userProfileData = userProfile.data();
-          const highlightsSnapshot = await getDocs(collection(db, 'userProfiles', userProfile.id, 'highlights'));
-
-          highlightsSnapshot.docs.forEach(doc => {
-            allHighlights.push({
-              id: doc.id,
-              ...doc.data(),
-              userName: userProfileData.name, // Assuming the user profile has a 'name' field
-            });
-          });
-        }
-
-        setHighlights(allHighlights);
-      } catch (error) {
-        console.error('Error fetching highlights: ', error);
-        setError('Failed to load highlights');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchHighlights();
   }, []);
+
+  const fetchHighlights = async (loadMore = false) => {
+    if (loadingMore || allLoaded) return;
+
+    if (loadMore) setLoadingMore(true);
+    else setLoading(true);
+
+    try {
+      const userProfilesSnapshot = await getDocs(collection(db, 'userProfiles'));
+      let allHighlights = [];
+
+      for (const userProfile of userProfilesSnapshot.docs) {
+        const userProfileData = userProfile.data();
+        let highlightsQuery = query(collection(db, 'userProfiles', userProfile.id, 'highlights'), orderBy('timestamp', 'desc'), limit(batchSize));
+
+        if (loadMore && lastVisible) {
+          highlightsQuery = query(highlightsQuery, startAfter(lastVisible));
+        }
+
+        const highlightsSnapshot = await getDocs(highlightsQuery);
+
+        if (highlightsSnapshot.docs.length === 0) {
+          setAllLoaded(true);
+        } else {
+          highlightsSnapshot.docs.forEach(doc => {
+            const highlightData = doc.data();
+            allHighlights.push({
+              id: doc.id,
+              ...highlightData,
+              userName: userProfileData.name, // Assuming the user profile has a 'name' field
+              timestamp: highlightData.timestamp ? highlightData.timestamp.toDate() : null,
+            });
+          });
+          setLastVisible(highlightsSnapshot.docs[highlightsSnapshot.docs.length - 1]);
+        }
+      }
+
+      allHighlights.sort((a, b) => b.timestamp - a.timestamp);
+
+      if (loadMore) {
+        setHighlights(prevHighlights => [...prevHighlights, ...allHighlights]);
+        setLoadingMore(false);
+      } else {
+        setHighlights(allHighlights);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error fetching highlights: ', error);
+      setError('Failed to load highlights');
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -62,40 +92,38 @@ const FeedPage = () => {
         <Text style={styles.userNameText}>{item.userName}</Text>
         {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
         {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
-        {item.mediaType === 'image' && item.mediaUrls && (
-          <FlatList
-            data={item.mediaUrls}
-            keyExtractor={(url, index) => `${item.id}_${index}`}
-            renderItem={({ item: imageUrl }) => (
-              <Image source={{ uri: "https://firebasestorage.googleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2FX1Nx52EQsHbEOz5mQyVmFum704X2_1717467425118_0?alt=media&token=ad8323af-63e0-4557-bcaa-8b56c79514fa" }} style={styles.image} />
-            )}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          />
-        )}
-        {item.mediaType === 'video' && item.mediaUrls && (
-          <FlatList
-            data={item.mediaUrls}
-            keyExtractor={(url, index) => `${item.id}_${index}`}
-            renderItem={({ item: videoUrl }) => (
-              <Video
-                source={{ uri: videoUrl }}
-                rate={1.0}
-                volume={1.0}
-                isMuted={false}
-                resizeMode={ResizeMode.CONTAIN}
-                useNativeControls
-                style={styles.video}
-              />
-            )}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          />
-        )}
-        {item.timestamp && <Text style={styles.timestampText}>{item.timestamp.toDate().toString()}</Text>}
+        
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaContainer}>
+          {item.mediaType === 'image' && item.mediaUrls && item.mediaUrls.map((imageUrl, index) => (
+            <Image key={`${item.id}_${index}`} source={{ uri: imageUrl }} style={styles.image} />
+          ))}
+          {item.mediaType === 'video' && item.mediaUrls && item.mediaUrls.map((videoUrl, index) => (
+            <Video
+              key={`${item.id}_${index}`}
+              source={{ uri: videoUrl }}
+              rate={1.0}
+              volume={1.0}
+              isMuted={false}
+              resizeMode={ResizeMode.CONTAIN}
+              useNativeControls
+              style={styles.video}
+            />
+          ))}
+        </ScrollView>
+
+        {item.timestamp && <Text style={styles.timestampText}>{item.timestamp.toString()}</Text>}
         {item.type && <Text style={styles.typeText}>{item.type}</Text>}
         {item.userId && <Text style={styles.userIdText}>{item.userId}</Text>}
         {item.weight && <Text style={styles.weightText}>{item.weight}</Text>}
+      </View>
+    );
+  };
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
       </View>
     );
   };
@@ -105,6 +133,9 @@ const FeedPage = () => {
       data={highlights}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
+      ListFooterComponent={renderFooter}
+      onEndReached={() => fetchHighlights(true)}
+      onEndReachedThreshold={0.5}
     />
   );
 };
@@ -127,6 +158,20 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 14,
     marginBottom: 5,
+  },
+  mediaContainer: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  image: {
+    width: 200,
+    height: 200,
+    marginRight: 10,
+  },
+  video: {
+    width: 200,
+    height: 200,
+    marginRight: 10,
   },
   timestampText: {
     fontSize: 12,
@@ -161,16 +206,6 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
     fontSize: 16,
-  },
-  image: {
-    width: 200,
-    height: 200,
-    marginRight: 10,
-  },
-  video: {
-    width: 200,
-    height: 200,
-    marginRight: 10,
   },
 });
 
