@@ -93,8 +93,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                 onPress={() => handleOpenWorkoutLog()}
                 style={{ justifyContent: 'center', alignItems: 'center', padding: 10 }}
             >
-                <Ionicons name="barbell-outline" size={24} color="#222" />
-                <Text style={{ color: '#222' }}>Workout Log</Text>
+                <Ionicons name="barbell-outline" size={24} color={workoutState ? 'blue' : 'black'} />
+                <Text style={workoutState ? {color: 'blue'} : {color: 'black'}}>Workout Log</Text>
             </TouchableOpacity>
         </View>
     );
