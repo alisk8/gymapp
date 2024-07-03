@@ -100,43 +100,36 @@ const FeedPage = () => {
         {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
         {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
 
-        <View style={styles.imageContainer}>
-          <Swiper style={styles.swiper}>
-            {item.mediaUrls && item.mediaUrls.map((mediaUrl, index) => {
-              const mediaType = item.mediaType || 'photo';
-              return (
-                mediaType === 'photo' ? (
-                  <Image 
-                    key={`${item.id}_${index}`} 
-                    source={{ uri: mediaUrl }} 
-                    style={{ 
-                      width: screenWidth, 
-                      height: item.originalWidth && item.originalHeight 
-                        ? calculateMediaHeight(item.originalWidth, item.originalHeight) 
-                        : screenWidth // fallback if dimensions are not available
-                    }} 
-                  />
-                ) : (
-                  <Video
-                    key={`${item.id}_${index}`}
-                    source={{ uri: mediaUrl }}
-                    rate={1.0}
-                    volume={1.0}
-                    isMuted={false}
-                    resizeMode={ResizeMode.CONTAIN}
-                    useNativeControls
-                    style={{ 
-                      width: screenWidth, 
-                      height: item.originalWidth && item.originalHeight 
-                        ? calculateMediaHeight(item.originalWidth, item.originalHeight) 
-                        : screenWidth // fallback if dimensions are not available
-                    }}
-                  />
-                )
-              );
-            })}
-          </Swiper>
-        </View>
+        {item.mediaUrls && item.mediaUrls.length > 0 ? (
+          <View style={styles.imageContainer}>
+            <Swiper style={styles.swiper} showsPagination={true}>
+              {item.mediaUrls.map((mediaUrl, index) => {
+                const mediaType = item.mediaType || 'photo';
+                return (
+                  mediaType === 'photo' ? (
+                    <Image 
+                      key={`${item.id}_${index}`} 
+                      source={{ uri: mediaUrl }} 
+                      style={styles.media} 
+                      resizeMode='cover'
+                    />
+                  ) : (
+                    <Video
+                      key={`${item.id}_${index}`}
+                      source={{ uri: mediaUrl }}
+                      rate={1.0}
+                      volume={1.0}
+                      isMuted={false}
+                      resizeMode={ResizeMode.COVER}
+                      useNativeControls
+                      style={styles.media}
+                    />
+                  )
+                );
+              })}
+            </Swiper>
+          </View>
+        ) : null}
 
         {item.timestamp && <Text style={styles.timestampText}>{item.timestamp.toString()}</Text>}
         {item.type && <Text style={styles.typeText}>{item.type}</Text>}
@@ -169,7 +162,7 @@ const FeedPage = () => {
 
 const styles = StyleSheet.create({
   highlightContainer: {
-    padding: 20,
+    padding: 0, // Remove padding
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
   },
@@ -191,6 +184,11 @@ const styles = StyleSheet.create({
   },
   swiper: {
     height: screenWidth,
+  },
+  media: {
+    width: '100%', // Ensure media covers 100% width
+    height: undefined, // Ensure aspect ratio is maintained
+    aspectRatio: 1, // Adjust as needed to ensure proper aspect ratio
   },
   timestampText: {
     fontSize: 12,
