@@ -1,8 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView, FlatList, View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { ScrollView, FlatList, View, Text, StyleSheet, ActivityIndicator, Image, Dimensions, Alert } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
+import Swiper from 'react-native-swiper';
+import { Ionicons } from '@expo/vector-icons';
 import { db } from '../../firebaseConfig';
 import { collection, getDocs, query, orderBy, limit, startAfter } from '@firebase/firestore';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 const FeedPage = () => {
   const [highlights, setHighlights] = useState([]);
@@ -70,6 +74,10 @@ const FeedPage = () => {
     }
   };
 
+  const calculateMediaHeight = (width, height) => {
+    return (screenWidth / width) * height;
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -93,24 +101,44 @@ const FeedPage = () => {
         {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
         {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaContainer}>
-          {item.mediaUrls && item.mediaUrls.map((mediaUrl, index) => (
-            item.mediaType === 'image' ? (
-              <Image key={`${item.id}_${index}`} source={{ uri: mediaUrl }} style={styles.image} />
-            ) : (
-              <Video
-                key={`${item.id}_${index}`}
-                source={{ uri: mediaUrl }}
-                rate={1.0}
-                volume={1.0}
-                isMuted={false}
-                resizeMode={ResizeMode.CONTAIN}
-                useNativeControls
-                style={styles.video}
-              />
-            )
-          ))}
-        </ScrollView>
+        <View style={styles.imageContainer}>
+          <Swiper style={styles.swiper}>
+            {item.mediaUrls && item.mediaUrls.map((mediaUrl, index) => {
+              console.log('Rendering media:', mediaUrl);
+              const mediaType = item.mediaType || 'image'; // Default to image if mediaType is not specified
+              return (
+                mediaType === 'image' ? (
+                  <Image 
+                    key={`${item.id}_${index}`} 
+                    source={{ uri: mediaUrl }} 
+                    style={{ 
+                      width: screenWidth, 
+                      height: item.originalWidth && item.originalHeight 
+                        ? calculateMediaHeight(item.originalWidth, item.originalHeight) 
+                        : screenWidth // fallback if dimensions are not available
+                    }} 
+                  />
+                ) : (
+                  <Video
+                    key={`${item.id}_${index}`}
+                    source={{ uri: mediaUrl }}
+                    rate={1.0}
+                    volume={1.0}
+                    isMuted={false}
+                    resizeMode={ResizeMode.CONTAIN}
+                    useNativeControls
+                    style={{ 
+                      width: screenWidth, 
+                      height: item.originalWidth && item.originalHeight 
+                        ? calculateMediaHeight(item.originalWidth, item.originalHeight) 
+                        : screenWidth // fallback if dimensions are not available
+                    }}
+                  />
+                )
+              );
+            })}
+          </Swiper>
+        </View>
 
         {item.timestamp && <Text style={styles.timestampText}>{item.timestamp.toString()}</Text>}
         {item.type && <Text style={styles.typeText}>{item.type}</Text>}
@@ -160,19 +188,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 5,
   },
-  mediaContainer: {
-    flexDirection: 'row',
-    marginBottom: 10,
+  imageContainer: {
+    position: 'relative',
   },
-  image: {
-    width: 200,
-    height: 200,
-    marginRight: 10,
-  },
-  video: {
-    width: 200,
-    height: 200,
-    marginRight: 10,
+  swiper: {
+    height: screenWidth,
   },
   timestampText: {
     fontSize: 12,
