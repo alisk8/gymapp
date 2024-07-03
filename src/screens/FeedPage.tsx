@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { ScrollView, FlatList, View, Text, StyleSheet, ActivityIndicator, Image, Dimensions, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { FlatList, View, Text, StyleSheet, ActivityIndicator, Image, Dimensions } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import Swiper from 'react-native-swiper';
-import { Ionicons } from '@expo/vector-icons';
 import { db } from '../../firebaseConfig';
 import { collection, getDocs, query, orderBy, limit, startAfter } from '@firebase/firestore';
 
@@ -104,10 +103,9 @@ const FeedPage = () => {
         <View style={styles.imageContainer}>
           <Swiper style={styles.swiper}>
             {item.mediaUrls && item.mediaUrls.map((mediaUrl, index) => {
-              console.log('Rendering media:', mediaUrl);
-              const mediaType = item.mediaType || 'image'; // Default to image if mediaType is not specified
+              const mediaType = item.mediaType || 'photo';
               return (
-                mediaType === 'image' ? (
+                mediaType === 'photo' ? (
                   <Image 
                     key={`${item.id}_${index}`} 
                     source={{ uri: mediaUrl }} 
