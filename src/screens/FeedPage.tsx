@@ -77,6 +77,37 @@ const FeedPage = () => {
     return (screenWidth / width) * height;
   };
 
+  const timeSince = (date) => {
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    let interval = Math.floor(seconds / 31536000);
+
+    if (interval > 1) {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    interval = Math.floor(seconds / 2592000);
+    if (interval > 1) {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    interval = Math.floor(seconds / 604800);
+    if (interval >= 1) {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    interval = Math.floor(seconds / 86400);
+    if (interval > 1) {
+      return `${interval} days ago`;
+    }
+    interval = Math.floor(seconds / 3600);
+    if (interval > 1) {
+      return `${interval} hours ago`;
+    }
+    interval = Math.floor(seconds / 60);
+    if (interval > 1) {
+      return `${interval} minutes ago`;
+    }
+    return `just now`;
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -131,8 +162,8 @@ const FeedPage = () => {
           </View>
         ) : null}
 
-        {item.timestamp && <Text style={styles.timestampText}>{item.timestamp.toString()}</Text>}
-        {item.type && <Text style={styles.typeText}>{item.type}</Text>}
+        {item.timestamp && <Text style={styles.timestampText}>{timeSince(item.timestamp)}</Text>}
+        {/*item.type && <Text style={styles.typeText}>{item.type}</Text>*/}
         {item.userId && <Text style={styles.userIdText}>{item.userId}</Text>}
         {item.weight && <Text style={styles.weightText}>{item.weight}</Text>}
       </View>
