@@ -15,10 +15,12 @@ import Notifications from './src/screens/Notifications';
 import PersonalDetails from './src/screens/PersonalDetails';
 import WorkoutLogScreen from './src/screens/workout-log';
 import SaveGymHighlightScreen from "./src/screens/save-gym-highlight";
+import CustomTabBar from "./src/components/CustomTabBar";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+<<<<<<< HEAD
 const screenOptions = ({ navigation, iconType }) => ({
   headerRight: () => {
     let icon = null;
@@ -42,10 +44,23 @@ const screenOptions = ({ navigation, iconType }) => ({
     paddingTop: 20,
     height: 80,
   },
+=======
+const screenOptions = ({ navigation }) => ({
+    headerRight: () => (
+        <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+            <Ionicons name="notifications-outline" size={24} color="black" style={{ marginRight: 15 }} />
+        </TouchableOpacity>
+    ),
+    headerStyle: {
+        paddingTop: 20,
+        height: 80,
+    },
+>>>>>>> 9215a71 (edits)
 });
 
 
 function HomeStack() {
+<<<<<<< HEAD
   return (
     <Stack.Navigator initialRouteName='Home'>
       <Stack.Screen 
@@ -59,20 +74,44 @@ function HomeStack() {
       <Stack.Screen name='Notifications' component={Notifications} />
     </Stack.Navigator>
   );
+=======
+    return (
+        <Stack.Navigator initialRouteName='Home'>
+            <Stack.Screen
+                name="Home"
+                component={Home}
+                options={({ navigation }) => ({
+                    ...screenOptions({ navigation }),
+                    title: "Feed"
+                })}
+            />
+            <Stack.Screen name='Notifications' component={Notifications} />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
+        </Stack.Navigator>
+    );
+>>>>>>> 9215a71 (edits)
 }
 
 
 function WorkoutLogStack() {
     return (
-        <Stack.Navigator initialRouteName='Home'>
+        <Stack.Navigator initialRouteName='Workout'>
             <Stack.Screen
                 name="Workout"
                 component={WorkoutLogScreen}
-                options={({ navigation }) => ({
-                    ...screenOptions({ navigation }),
-                    title: "Workout"
-                })}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',  // This line enables the upward animation
+                }}
             />
+
         </Stack.Navigator>
     );
 }
@@ -88,11 +127,20 @@ function SaveHighlightStack() {
                     title: "Save Highlight"
                 })}
             />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
         </Stack.Navigator>
     );
 }
 
 function AccountStack() {
+<<<<<<< HEAD
   return (
     <Stack.Navigator initialRouteName='Account'>
       <Stack.Screen 
@@ -115,10 +163,28 @@ function AccountStack() {
       />
     </Stack.Navigator>
   );
+=======
+    return (
+        <Stack.Navigator initialRouteName='Account'>
+            <Stack.Screen name='Account' component={Account} options={screenOptions} />
+            <Stack.Screen name='Notifications' component={Notifications} />
+            <Stack.Screen options={{ title: "Personal Details" }} name='PersonalDetails' component={PersonalDetails} />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
+        </Stack.Navigator>
+    );
+>>>>>>> 9215a71 (edits)
 }
 
 
 function ProgressStack() {
+<<<<<<< HEAD
   return (
     <Stack.Navigator initialRouteName='Progress'>
       <Stack.Screen 
@@ -157,6 +223,39 @@ function CommunitiesStack() {
       />
     </Stack.Navigator>
   );
+=======
+    return (
+        <Stack.Navigator initialRouteName='Progress'>
+            <Stack.Screen name='Progress' component={Progress} options={screenOptions} />
+            <Stack.Screen name='Notifications' component={Notifications} />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
+        </Stack.Navigator>
+    );
+}
+
+function PostStack() {
+    return (
+        <Stack.Navigator initialRouteName='Post'>
+            <Stack.Screen name='Save Highlight' component={SaveGymHighlightScreen} options={screenOptions} />
+            <Stack.Screen name='Notifications' component={Notifications} />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
+        </Stack.Navigator>
+    );
+>>>>>>> 9215a71 (edits)
 }
 
 
@@ -182,6 +281,7 @@ function PostStack() {
 
 
 function App() {
+<<<<<<< HEAD
   return (
     <NavigationContainer>
       <Tab.Navigator>
@@ -195,15 +295,43 @@ function App() {
       </Tab.Navigator>
     </NavigationContainer>
   );
+=======
+    return (
+        <NavigationContainer>
+            <Tab.Navigator tabBar={props => <CustomTabBar {...props} />}>
+                <Tab.Screen
+                    name='HomeStack'
+                    component={HomeStack}
+                    options={{ headerShown: false, title: 'Feed', tabBarIcon: { name: 'home-outline' } }}
+                />
+                <Tab.Screen
+                    name='PostStack'
+                    component={PostStack}
+                    options={{ headerShown: false, title: 'Post', tabBarIcon: { name: 'create-outline' } }}
+                />
+                <Tab.Screen
+                    name='ProgressStack'
+                    component={ProgressStack}
+                    options={{ headerShown: false, title: 'Progress', tabBarIcon: { name: 'trending-up-outline' } }}
+                />
+                <Tab.Screen
+                    name='AccountStack'
+                    component={AccountStack}
+                    options={{ headerShown: false, title: 'Account', tabBarIcon: { name: 'person-outline' } }}
+                />
+            </Tab.Navigator>
+        </NavigationContainer>
+    );
+>>>>>>> 9215a71 (edits)
 }
 
 export default App;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    container: {
+        flex: 1,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 });
