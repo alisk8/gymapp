@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, View, Text, StyleSheet, ActivityIndicator, Image, Dimensions } from 'react-native';
+import { FlatList, View, Text, StyleSheet, ActivityIndicator, Image, Dimensions, TouchableOpacity } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import Swiper from 'react-native-swiper';
 import { db } from '../../firebaseConfig';
 import { collection, getDocs, query, orderBy, limit, startAfter } from '@firebase/firestore';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: screenWidth } = Dimensions.get('window');
+const defaultProfilePicture = 'https://firebasestorage.googleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2Fpfp.jpeg?alt=media&token=dd124ee9-6c61-48ad-b41c-97f3acc3350c'; // URL to a default profile picture
 
-const FeedPage = () => {
+const FeedPage = ({ navigation }) => {
   const [highlights, setHighlights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,7 +50,9 @@ const FeedPage = () => {
             allHighlights.push({
               id: doc.id,
               ...highlightData,
-              userName: userProfileData.name,
+              firstName: userProfileData.firstName,
+              lastName: userProfileData.lastName,
+              profilePicture: userProfileData.profilePicture || defaultProfilePicture,
               timestamp: highlightData.timestamp ? highlightData.timestamp.toDate() : null,
             });
           });
@@ -108,6 +112,10 @@ const FeedPage = () => {
     return `just now`;
   };
 
+  const handleProfilePress = (userId) => {
+    navigation.navigate('UserProfile', { userId });
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -127,7 +135,14 @@ const FeedPage = () => {
   const renderItem = ({ item }) => {
     return (
       <View style={styles.highlightContainer}>
-        <Text style={styles.userNameText}>{item.userName}</Text>
+        <View style={styles.userInfoContainer}>
+          <TouchableOpacity onPress={() => handleProfilePress(item.userId)}>
+            <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleProfilePress(item.userId)}>
+            <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+          </TouchableOpacity>
+        </View>
         {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
         {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
 
@@ -142,7 +157,7 @@ const FeedPage = () => {
                       key={`${item.id}_${index}`} 
                       source={{ uri: mediaUrl }} 
                       style={styles.media} 
-                      resizeMode='cover'
+                      resizeMode='contain' // Changed from 'cover' to 'contain'
                     />
                   ) : (
                     <Video
@@ -151,7 +166,7 @@ const FeedPage = () => {
                       rate={1.0}
                       volume={1.0}
                       isMuted={false}
-                      resizeMode={ResizeMode.COVER}
+                      resizeMode={ResizeMode.CONTAIN} // Changed from 'cover' to 'contain'
                       useNativeControls
                       style={styles.media}
                     />
@@ -159,12 +174,24 @@ const FeedPage = () => {
                 );
               })}
             </Swiper>
+            <View style={styles.actionButtonsContainer}>
+              <TouchableOpacity style={styles.actionButton}>
+                <Ionicons name="heart-outline" size={24} color="black" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
+                <Ionicons name="chatbubble-outline" size={24} color="black" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
+                <Ionicons name="share-outline" size={24} color="black" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
+                <Ionicons name="bookmark-outline" size={24} color="black" />
+              </TouchableOpacity>
+            </View>
           </View>
         ) : null}
 
         {item.timestamp && <Text style={styles.timestampText}>{timeSince(item.timestamp)}</Text>}
-        {/*item.type && <Text style={styles.typeText}>{item.type}</Text>*/}
-        {item.userId && <Text style={styles.userIdText}>{item.userId}</Text>}
         {item.weight && <Text style={styles.weightText}>{item.weight}</Text>}
       </View>
     );
@@ -196,19 +223,34 @@ const styles = StyleSheet.create({
     padding: 0, // Remove padding
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
+    marginBottom: 10,
+  },
+  userInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+  },
+  profilePicture: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
   },
   userNameText: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
   },
   captionText: {
     fontSize: 14,
     marginBottom: 5,
+    paddingHorizontal: 10,
   },
   descriptionText: {
     fontSize: 14,
     marginBottom: 5,
+    paddingHorizontal: 10,
   },
   imageContainer: {
     position: 'relative',
@@ -221,20 +263,21 @@ const styles = StyleSheet.create({
     height: undefined, // Ensure aspect ratio is maintained
     aspectRatio: 1, // Adjust as needed to ensure proper aspect ratio
   },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#ccc',
+  },
+  actionButton: {
+    paddingHorizontal: 15,
+  },
   timestampText: {
     fontSize: 12,
     color: '#888',
     marginBottom: 5,
-  },
-  typeText: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 5,
-  },
-  userIdText: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 5,
+    paddingHorizontal: 10,
   },
   weightText: {
     fontSize: 12,
