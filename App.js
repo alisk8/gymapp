@@ -18,6 +18,7 @@ import Settings from './src/screens/Settings';
 import UserList from './src/screens/UserList';
 import PostDetails from './src/screens/PostDetails';
 import TrackedExercise from './src/screens/TrackedExercise';
+import FeedPage from './src/screens/FeedPage';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -45,6 +46,7 @@ function HomeStack() {
           title: "Feed" 
         })}
       />
+      <Stack.Screen name='FeedPage' component={FeedPage} options={{ title: 'Feed Page' }} />
       <Stack.Screen name='Notifications' component={Notifications} />
       <Stack.Screen name="UserDetails" component={UserDetails} options={{ title: "User Details" }} />
       <Stack.Screen name="PostDetails" component={PostDetails} />
@@ -108,10 +110,61 @@ function App() {
     <NavigationContainer>
       {user ? (
         <Tab.Navigator>
-          <Tab.Screen name='HomeStack' component={HomeStack} options={{ headerShown: false, title: 'Feed' }} />
-          <Tab.Screen name='PostStack' component={PostStack} options={{ headerShown: false, title: 'Post' }} />
-          <Tab.Screen name='ProgressStack' component={ProgressStack} options={{ headerShown: false, title: 'Progress' }} />
-          <Tab.Screen name='AccountStack' component={AccountStack} options={{ headerShown: false, title: 'Account' }} />
+          <Tab.Screen 
+            name='HomeStack' 
+            component={HomeStack} 
+            options={{ 
+              headerShown: false, 
+              title: 'Home', 
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="home-outline" color={color} size={size} />
+              ) 
+            }} 
+          />
+          <Tab.Screen 
+            name='FeedPage' 
+            component={FeedPage} 
+            options={{ 
+              headerShown: false, 
+              title: 'Feed', 
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="list-outline" color={color} size={size} />
+              ) 
+            }} 
+          />
+          <Tab.Screen 
+            name='PostStack' 
+            component={PostStack} 
+            options={{ 
+              headerShown: false, 
+              title: 'Post', 
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="create-outline" color={color} size={size} />
+              ) 
+            }} 
+          />
+          <Tab.Screen 
+            name='ProgressStack' 
+            component={ProgressStack} 
+            options={{ 
+              headerShown: false, 
+              title: 'Progress', 
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="bar-chart-outline" color={color} size={size} />
+              ) 
+            }} 
+          />
+          <Tab.Screen 
+            name='AccountStack' 
+            component={AccountStack} 
+            options={{ 
+              headerShown: false, 
+              title: 'Account', 
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="person-outline" color={color} size={size} />
+              ) 
+            }} 
+          />
         </Tab.Navigator>
       ) : (
         <Stack.Navigator initialRouteName='Account'>
