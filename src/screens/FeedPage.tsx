@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, View, Text, StyleSheet, ActivityIndicator, Image, Dimensions, TouchableOpacity } from 'react-native';
+import { FlatList, View, Text, StyleSheet, ActivityIndicator, Image, Dimensions, TouchableOpacity, RefreshControl } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import Swiper from 'react-native-swiper';
 import { db, firebase_auth } from '../../firebaseConfig';
-import { collection, getDocs, query, orderBy, limit, startAfter, doc, getDoc } from '@firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, getDoc } from '@firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -12,10 +12,8 @@ const defaultProfilePicture = 'https://firebasestorage.googleapis.com/v0/b/gym-a
 const FeedPage = ({ navigation }) => {
   const [highlights, setHighlights] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [lastVisible, setLastVisible] = useState(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [allLoaded, setAllLoaded] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const batchSize = 10;
 
@@ -49,18 +47,13 @@ const FeedPage = ({ navigation }) => {
     }
   };
 
-  const fetchHighlights = async (loadMore = false) => {
-    if (loadingMore || allLoaded) return;
-
-    if (loadMore) setLoadingMore(true);
-    else setLoading(true);
+  const fetchHighlights = async () => {
+    setLoading(true);
 
     try {
       const following = userProfile.following || [];
       if (following.length === 0) {
-        setAllLoaded(true);
         setLoading(false);
-        setLoadingMore(false);
         return;
       }
 
@@ -77,10 +70,6 @@ const FeedPage = ({ navigation }) => {
           limit(batchSize)
         );
 
-        if (loadMore && lastVisible) {
-          highlightsQuery = query(highlightsQuery, startAfter(lastVisible));
-        }
-
         const highlightsSnapshot = await getDocs(highlightsQuery);
 
         if (highlightsSnapshot.docs.length > 0) {
@@ -96,26 +85,23 @@ const FeedPage = ({ navigation }) => {
               timestamp: highlightData.timestamp ? highlightData.timestamp.toDate() : null,
             });
           });
-
-          setLastVisible(highlightsSnapshot.docs[highlightsSnapshot.docs.length - 1]);
         }
       }
 
       allHighlights.sort((a, b) => b.timestamp - a.timestamp);
-
-      if (loadMore) {
-        setHighlights(prevHighlights => [...prevHighlights, ...allHighlights]);
-        setLoadingMore(false);
-      } else {
-        setHighlights(allHighlights);
-        setLoading(false);
-      }
+      setHighlights(allHighlights);
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching highlights: ', error);
       setError('Failed to load highlights');
       setLoading(false);
-      setLoadingMore(false);
     }
+  };
+
+  const refreshHighlights = async () => {
+    setRefreshing(true);
+    await fetchHighlights();
+    setRefreshing(false);
   };
 
   const calculateMediaHeight = (width, height) => {
@@ -157,7 +143,7 @@ const FeedPage = ({ navigation }) => {
     navigation.navigate('UserDetails', { user });
   };
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
@@ -238,23 +224,17 @@ const FeedPage = ({ navigation }) => {
     );
   };
 
-  const renderFooter = () => {
-    if (!loadingMore) return null;
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
-    );
-  };
-
   return (
     <FlatList
       data={highlights}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
-      ListFooterComponent={renderFooter}
-      onEndReached={() => fetchHighlights(true)}
-      onEndReachedThreshold={0.5}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refreshHighlights}
+        />
+      }
     />
   );
 };
