@@ -78,7 +78,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                         style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
                     >
                         <Ionicons
-                            name={options.tabBarIcon?.name || 'ios-home'}
+                            name={options.tabBarIcon?.name}
                             size={24}
                             color={isFocused ? '#673ab7' : '#222'}
                         />
