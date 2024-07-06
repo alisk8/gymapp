@@ -1,12 +1,27 @@
 // src/components/CustomTabBar.js
 
-import React from 'react';
+import React, {useState} from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useWorkout } from '../contexts/WorkoutContext';
+
+
+
 
 const CustomTabBar = ({ state, descriptors, navigation }) => {
     const nav = useNavigation();
+    const { workoutState } = useWorkout();
+
+    const handleOpenWorkoutLog = () => {
+        console.log('shit here');
+        console.log(workoutState);
+        if (workoutState) {
+            nav.navigate('WorkoutLog', { previousScreen: nav.getCurrentRoute().name });
+        } else {
+            nav.navigate('TemplateScreen', { previousScreen: nav.getCurrentRoute().name });
+        }
+    };
 
     return (
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', height: 60 }}>
@@ -63,7 +78,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                         style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
                     >
                         <Ionicons
-                            name={options.tabBarIcon?.name || 'ios-home'}
+                            name={options.tabBarIcon?.name}
                             size={24}
                             color={isFocused ? '#673ab7' : '#222'}
                         />
@@ -75,11 +90,11 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
             })}
             {/* Custom Workout Log Button */}
             <TouchableOpacity
-                onPress={() => nav.navigate('WorkoutLog')}
+                onPress={() => handleOpenWorkoutLog()}
                 style={{ justifyContent: 'center', alignItems: 'center', padding: 10 }}
             >
-                <Ionicons name="barbell-outline" size={24} color="#222" />
-                <Text style={{ color: '#222' }}>Workout Log</Text>
+                <Ionicons name="barbell-outline" size={24} color={workoutState ? 'blue' : 'black'} />
+                <Text style={workoutState ? {color: 'blue'} : {color: 'black'}}>Workout Log</Text>
             </TouchableOpacity>
         </View>
     );
