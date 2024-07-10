@@ -25,49 +25,99 @@ const PostDetails = ({ route }) => {
   const scrollViewRef = useRef(null);
   const postHeight = 400; // Adjust this value to the height of each post container
   const [expandedPosts, setExpandedPosts] = useState({});
+  const [localPosts, setLocalPosts] = useState([]);
+
+  useEffect(() => {
+    const currentUser = firebase_auth.currentUser;
+    if (!currentUser) {
+      console.error("User not authenticated");
+      return;
+    }
+
+    const userUid = currentUser.uid;
+    const updatedPosts = posts.map((post) => ({
+      ...post,
+      liked: post.likes ? post.likes.includes(userUid) : false,
+      saved: post.savedBy ? post.savedBy.includes(userUid) : false,
+    }));
+    setLocalPosts(updatedPosts);
+  }, [posts]);
 
   useEffect(() => {
     setTimeout(() => {
       if (scrollViewRef.current) {
         scrollViewRef.current.scrollTo({
-          y: postIndex * postHeight,
+          y: postIndex * (postHeight + 100),
           animated: true,
         });
       }
     }, 100);
   }, [postIndex]);
 
-  const handleLike = async (postId, collection) => {
+  const handleLike = async (postId, collection, index) => {
     const postRef = doc(db, "userProfiles", userId, collection, postId);
+    const currentUser = firebase_auth.currentUser;
+
+    if (!currentUser) {
+      console.error("User not authenticated");
+      return;
+    }
+
+    const userUid = currentUser.uid;
+
     try {
       const postDoc = await getDoc(postRef);
       if (postDoc.exists()) {
-        const postData = postDoc.data();
-        if (!postData.likes) {
-          await updateDoc(postRef, { likes: 1 });
-        } else {
-          await updateDoc(postRef, {
-            likes: postData.likes + 1,
-          });
-        }
+        await updateDoc(postRef, {
+          likes: arrayUnion(userUid),
+        });
+
+        setLocalPosts((prevPosts) => {
+          const updatedPosts = [...prevPosts];
+          updatedPosts[index] = {
+            ...updatedPosts[index],
+            likes: [...(updatedPosts[index].likes || []), userUid],
+            liked: true,
+          };
+          return updatedPosts;
+        });
+      } else {
+        console.error("Post does not exist");
       }
     } catch (error) {
       console.error("Error liking post: ", error);
-      Alert.alert("Error", "Error liking post. Please try again.");
     }
   };
 
-  const handleUnlike = async (postId, collection) => {
+  const handleUnlike = async (postId, collection, index) => {
     const postRef = doc(db, "userProfiles", userId, collection, postId);
+    const currentUser = firebase_auth.currentUser;
+
+    if (!currentUser) {
+      console.error("User not authenticated");
+      return;
+    }
+
+    const userUid = currentUser.uid;
+
     try {
       const postDoc = await getDoc(postRef);
       if (postDoc.exists()) {
-        const postData = postDoc.data();
-        if (postData.likes && postData.likes > 0) {
-          await updateDoc(postRef, {
-            likes: postData.likes - 1,
-          });
-        }
+        await updateDoc(postRef, {
+          likes: arrayRemove(userUid),
+        });
+
+        setLocalPosts((prevPosts) => {
+          const updatedPosts = [...prevPosts];
+          updatedPosts[index] = {
+            ...updatedPosts[index],
+            likes: updatedPosts[index].likes.filter((uid) => uid !== userUid),
+            liked: false,
+          };
+          return updatedPosts;
+        });
+      } else {
+        console.error("Post does not exist");
       }
     } catch (error) {
       console.error("Error unliking post: ", error);
@@ -75,57 +125,75 @@ const PostDetails = ({ route }) => {
     }
   };
 
-  const handleSave = async (postId, collection) => {
+  const handleSave = async (postId, collection, index) => {
     const currentUser = firebase_auth.currentUser;
-    if (currentUser) {
-      const userRef = doc(db, "userProfiles", currentUser.uid);
-      try {
-        const userDoc = await getDoc(userRef);
-        const userData = userDoc.exists() ? userDoc.data() : {}; // Extract data from the document
+    if (!currentUser) {
+      console.error("User not authenticated");
+      return;
+    }
 
-        const savedPost = { postId, collection };
+    const userUid = currentUser.uid;
+    const postRef = doc(db, "userProfiles", userId, collection, postId);
 
-        if (!userData.savedPosts) {
-          await updateDoc(userRef, { savedPosts: [savedPost] });
-        } else if (
-          !userData.savedPosts.some(
-            (post) => post.postId === postId && post.collection === collection
-          )
-        ) {
-          await updateDoc(userRef, {
-            savedPosts: arrayUnion(savedPost),
-          });
-        }
-      } catch (error) {
-        console.error("Error saving post: ", error);
-        Alert.alert("Error", "Error saving post. Please try again.");
+    try {
+      const postDoc = await getDoc(postRef);
+      if (postDoc.exists()) {
+        await updateDoc(postRef, {
+          savedBy: arrayUnion(userUid),
+        });
+
+        setLocalPosts((prevPosts) => {
+          const updatedPosts = [...prevPosts];
+          updatedPosts[index] = {
+            ...updatedPosts[index],
+            savedBy: [...(updatedPosts[index].savedBy || []), userUid],
+            saved: true,
+          };
+          return updatedPosts;
+        });
+      } else {
+        console.error("Post does not exist");
       }
-    } else {
-      Alert.alert("Error", "No user is logged in");
+    } catch (error) {
+      console.error("Error saving post: ", error);
+      Alert.alert("Error", "Error saving post. Please try again.");
     }
   };
 
-  const handleUnsave = async (postId, collection) => {
+  const handleUnsave = async (postId, collection, index) => {
     const currentUser = firebase_auth.currentUser;
-    if (currentUser) {
-      const userRef = doc(db, "userProfiles", currentUser.uid);
-      try {
-        const userDoc = await getDoc(userRef);
-        const userData = userDoc.exists() ? userDoc.data() : {};
+    if (!currentUser) {
+      console.error("User not authenticated");
+      return;
+    }
 
-        const savedPost = { postId, collection };
+    const userUid = currentUser.uid;
+    const postRef = doc(db, "userProfiles", userId, collection, postId);
 
-        if (userData.savedPosts) {
-          await updateDoc(userRef, {
-            savedPosts: arrayRemove(savedPost),
-          });
-        }
-      } catch (error) {
-        console.error("Error unsaving post: ", error);
-        Alert.alert("Error", "Error unsaving post. Please try again.");
+    try {
+      const postDoc = await getDoc(postRef);
+      if (postDoc.exists()) {
+        await updateDoc(postRef, {
+          savedBy: arrayRemove(userUid),
+        });
+
+        setLocalPosts((prevPosts) => {
+          const updatedPosts = [...prevPosts];
+          updatedPosts[index] = {
+            ...updatedPosts[index],
+            savedBy: updatedPosts[index].savedBy.filter(
+              (uid) => uid !== userUid
+            ),
+            saved: false,
+          };
+          return updatedPosts;
+        });
+      } else {
+        console.error("Post does not exist");
       }
-    } else {
-      Alert.alert("Error", "No user is logged in");
+    } catch (error) {
+      console.error("Error unsaving post: ", error);
+      Alert.alert("Error", "Error unsaving post. Please try again.");
     }
   };
 
@@ -169,8 +237,8 @@ const PostDetails = ({ route }) => {
 
   return (
     <ScrollView style={styles.container} ref={scrollViewRef}>
-      {posts &&
-        posts.map((post, index) => (
+      {localPosts &&
+        localPosts.map((post, index) => (
           <View key={index} style={styles.postContainer}>
             <View style={styles.imageContainer}>
               <Swiper style={styles.swiper}>
@@ -208,8 +276,8 @@ const PostDetails = ({ route }) => {
                   onPress={async () => {
                     try {
                       post.liked
-                        ? await handleUnlike(post.id, post.collection)
-                        : await handleLike(post.id, post.collection);
+                        ? await handleUnlike(post.id, post.collection, index)
+                        : await handleLike(post.id, post.collection, index);
                     } catch (error) {
                       console.error("Error handling like/unlike: ", error);
                     }
@@ -221,25 +289,27 @@ const PostDetails = ({ route }) => {
                     color="black"
                   />
                   <Text style={styles.likesDisplayed}>
-                    {post.likes || 0} likes
+                    {post.likes ? post.likes.length : 0} likes
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={async () => {
                     try {
                       post.saved
-                        ? await handleUnsave(post.id, post.collection)
-                        : await handleSave(post.id, post.collection);
+                        ? await handleUnsave(post.id, post.collection, index)
+                        : await handleSave(post.id, post.collection, index);
                     } catch (error) {
                       console.error("Error handling save/unsave: ", error);
                     }
                   }}
+                  style={styles.savedDisplayed}
                 >
                   <Ionicons
                     name={post.saved ? "bookmark" : "bookmark-outline"}
                     size={24}
                     color="black"
                   />
+                  <Text>{post.savedBy ? post.savedBy.length : 0} saved</Text>
                 </TouchableOpacity>
               </View>
               {post.exercises &&
@@ -424,6 +494,12 @@ const styles = StyleSheet.create({
   },
   likesDisplayed: {
     marginLeft: 3,
+  },
+  savedDisplayed: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
   },
   contentContainer: {
     paddingBottom: 10,
