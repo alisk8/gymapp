@@ -104,10 +104,6 @@ const FeedPage = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  const calculateMediaHeight = (width, height) => {
-    return (screenWidth / width) * height;
-  };
-
   const timeSince = (date) => {
     const now = new Date();
     const seconds = Math.floor((now - date) / 1000);
@@ -183,8 +179,7 @@ const FeedPage = ({ navigation }) => {
                     <Image 
                       key={`${item.id}_${index}`} 
                       source={{ uri: mediaUrl }} 
-                      style={styles.media} 
-                      resizeMode='contain' 
+                      style={styles.postImage} 
                     />
                   ) : (
                     <Video
@@ -195,7 +190,7 @@ const FeedPage = ({ navigation }) => {
                       isMuted={false}
                       resizeMode={ResizeMode.CONTAIN} 
                       useNativeControls
-                      style={styles.media}
+                      style={styles.postImage}
                     />
                   )
                 );
@@ -277,12 +272,12 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   swiper: {
-    height: screenWidth,
+    height: 300,
   },
-  media: {
+  postImage: {
     width: '100%',
-    height: undefined,
-    aspectRatio: 1,
+    height: 300,
+    borderRadius: 10,
   },
   actionButtonsContainer: {
     flexDirection: 'row',
