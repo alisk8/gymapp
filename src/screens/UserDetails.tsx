@@ -80,14 +80,14 @@ const UserDetails = ({ route, navigation }) => {
       collection: "highlights",
     }));
 
-    const workoutsRef = collection(userRef, "templates");
+    const workoutsRef = collection(userRef, "workouts");
     const workoutsSnapshot = await getDocs(workoutsRef);
     const workoutsData = workoutsSnapshot.docs.map((doc) => ({
       ...doc.data(),
       id: doc.id,
       timestamp: doc.data().timestamp?.toDate().getTime() || Date.now(),
       type: "workout",
-      collection: "templates",
+      collection: "workouts",
     }));
 
     const combinedData = [...highlightsData, ...workoutsData].sort(
@@ -231,9 +231,7 @@ const UserDetails = ({ route, navigation }) => {
                         style={styles.postImage}
                       />
                       <View style={styles.overlay}>
-                        <Text style={styles.workoutTitle}>
-                          {post.templateName}
-                        </Text>
+                        <Text style={styles.workoutTitle}>Workout</Text>
                       </View>
                     </View>
                   ) : post.mediaUrls ? (

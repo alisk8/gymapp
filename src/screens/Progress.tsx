@@ -9,8 +9,8 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
+  FlatList,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import { Calendar } from "react-native-calendars";
 import { useFocusEffect } from "@react-navigation/native";
 import useMarkedDates from "../../hooks/setMarkedDates";
@@ -37,9 +37,12 @@ const Progress = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [currentDiaryId, setCurrentDiaryId] = useState(null);
   const [trackModalVisible, setTrackModalVisible] = useState(false);
-  const [selectedExercise, setSelectedExercise] = useState("");
+  const [customExerciseModalVisible, setCustomExerciseModalVisible] =
+    useState(false);
   const [customExercise, setCustomExercise] = useState("");
   const [trackedExercises, setTrackedExercises] = useState([]);
+  const [exercisePresets, setExercisePresets] = useState([]);
+  const [searchText, setSearchText] = useState("");
   const { markedDates, loadMonthData, clearMarkedDates, setMarkedDates } =
     useMarkedDates();
 
@@ -48,6 +51,7 @@ const Progress = ({ navigation }) => {
       const currentDate = new Date();
       loadMonthData(currentDate);
       fetchTrackedExercises();
+      fetchExercisePresets();
     }, [])
   );
 
@@ -149,6 +153,13 @@ const Progress = ({ navigation }) => {
     }
   };
 
+  const fetchExercisePresets = async () => {
+    const presetsRef = collection(db, "exercisePresets");
+    const snapshot = await getDocs(presetsRef);
+    const exercises = snapshot.docs.map((doc) => doc.data());
+    setExercisePresets(exercises);
+  };
+
   const saveDiaryEntry = async () => {
     const user = firebase_auth.currentUser;
     if (user) {
@@ -177,31 +188,28 @@ const Progress = ({ navigation }) => {
     }
   };
 
-  const handleTrackExercise = async () => {
+  const handleTrackExercise = async (exercise) => {
     const user = firebase_auth.currentUser;
     if (user) {
       const uid = user.uid;
       const userRef = doc(db, "userProfiles", uid);
       const trackedExercisesRef = collection(userRef, "trackedExercises");
 
-      const exercise =
-        selectedExercise === "Custom Exercise"
-          ? customExercise
-          : selectedExercise;
-
       await addDoc(trackedExercisesRef, {
-        name: exercise,
+        name: exercise.name,
         createdAt: Timestamp.fromDate(new Date()),
       });
 
-      setSelectedExercise("");
-      setCustomExercise("");
       setTrackModalVisible(false);
       fetchTrackedExercises();
     } else {
       Alert.alert("Error", "No user is logged in");
     }
   };
+
+  const filteredExercises = exercisePresets.filter((exercise) =>
+    exercise.name.toLowerCase().includes(searchText.toLowerCase())
+  );
 
   return (
     <ScrollView
@@ -367,35 +375,93 @@ const Progress = ({ navigation }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalHeading}>Track Exercise</Text>
-            <Picker
-              selectedValue={selectedExercise}
-              onValueChange={(itemValue) => setSelectedExercise(itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item label="Custom Exercise" value="Custom Exercise" />
-              <Picker.Item label="Push Up" value="Push Up" />
-              <Picker.Item label="Pull Up" value="Pull Up" />
-              <Picker.Item label="Squat" value="Squat" />
-            </Picker>
-            {selectedExercise === "Custom Exercise" && (
-              <TextInput
-                style={styles.customTextInput}
-                placeholder="Enter custom exercise"
-                value={customExercise}
-                onChangeText={setCustomExercise}
-              />
-            )}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalHeading}>Track Exercise</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setTrackModalVisible(false);
+                  setCustomExerciseModalVisible(true);
+                }}
+              >
+                <Ionicons name="add" size={30} color="#6A0DAD" />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Search for exercises..."
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+            <FlatList
+              data={filteredExercises}
+              keyExtractor={(item) => item.name}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.exerciseItem}
+                  onPress={() => handleTrackExercise(item)}
+                >
+                  <Text style={styles.exerciseName}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalButton}
-                onPress={handleTrackExercise}
+                onPress={() => setTrackModalVisible(false)}
               >
-                <Text style={styles.modalButtonText}>Track</Text>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={customExerciseModalVisible}
+        onRequestClose={() => setCustomExerciseModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalHeading}>Add Custom Exercise</Text>
+            <TextInput
+              style={styles.customTextInput}
+              placeholder="Enter custom exercise"
+              value={customExercise}
+              onChangeText={setCustomExercise}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={async () => {
+                  const user = firebase_auth.currentUser;
+                  if (user) {
+                    const uid = user.uid;
+                    const userRef = doc(db, "userProfiles", uid);
+                    const trackedExercisesRef = collection(
+                      userRef,
+                      "trackedExercises"
+                    );
+
+                    await addDoc(trackedExercisesRef, {
+                      name: customExercise,
+                      createdAt: Timestamp.fromDate(new Date()),
+                    });
+
+                    setCustomExercise("");
+                    setCustomExerciseModalVisible(false);
+                    setTrackModalVisible(false);
+                    fetchTrackedExercises();
+                  } else {
+                    Alert.alert("Error", "No user is logged in");
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonText}>Add</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalButton}
-                onPress={() => setTrackModalVisible(false)}
+                onPress={() => setCustomExerciseModalVisible(false)}
               >
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -512,6 +578,13 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#fff",
     borderRadius: 10,
+    maxHeight: "80%",
+    height: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   modalHeading: {
     fontSize: 18,
@@ -521,13 +594,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   textInput: {
-    height: 100,
+    height: 40,
     borderColor: "#ccc",
     borderWidth: 1,
     marginBottom: 10,
     padding: 10,
     borderRadius: 5,
-    textAlignVertical: "top",
   },
   customTextInput: {
     height: 40,
@@ -554,11 +626,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  picker: {
-    height: 150, // Increase height for better usability
-    width: "100%",
-    marginBottom: 10,
-  },
   trackedExercisesContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -576,4 +643,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  exerciseItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
 });
+
+//       const uid = "X1Nx52EQsHbEOz5mQyVmFum704X2";
