@@ -19,6 +19,7 @@ import TemplateScreen from "./src/screens/TemplateScreen";
 import { WorkoutProvider } from './src/contexts/WorkoutContext';
 import Communities from './src/screens/CommunityFeed';
 import NewCommunity from './src/screens/new-community';
+import WorkoutSummaryScreen from './src/screens/WorkoutSummary';
 
 
 const Stack = createNativeStackNavigator();
@@ -79,6 +80,14 @@ function HomeStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen
+                name='WorkoutSummaryScreen'
+                component={WorkoutSummaryScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
         </Stack.Navigator>
     );
 }
@@ -101,6 +110,14 @@ function AccountStack() {
             <Stack.Screen
                 name='TemplateScreen'
                 component={TemplateScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='WorkoutSummaryScreen'
+                component={WorkoutSummaryScreen}
                 options={{
                     headerShown: false,
                     presentation: 'fullScreenModal',
@@ -131,6 +148,14 @@ function ProgressStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen
+                name='WorkoutSummaryScreen'
+                component={WorkoutSummaryScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
         </Stack.Navigator>
     );
 }
@@ -156,6 +181,14 @@ function PostStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen
+                name='WorkoutSummaryScreen'
+                component={WorkoutSummaryScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
         </Stack.Navigator>
     );
 }
@@ -175,6 +208,14 @@ function FeedStack() {
             <Stack.Screen
                 name='TemplateScreen'
                 component={TemplateScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='WorkoutSummaryScreen'
+                component={WorkoutSummaryScreen}
                 options={{
                     headerShown: false,
                     presentation: 'fullScreenModal',
@@ -213,6 +254,14 @@ function CommunitiesStack() {
             <Stack.Screen
                 name='TemplateScreen'
                 component={TemplateScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='WorkoutSummaryScreen'
+                component={WorkoutSummaryScreen}
                 options={{
                     headerShown: false,
                     presentation: 'fullScreenModal',

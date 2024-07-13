@@ -23,11 +23,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from "@react-native-picker/picker";
 import Animated, {useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { useWorkout } from '../contexts/WorkoutContext';
-import debounce from 'lodash.debounce';
 
 
 export default function WorkoutLogScreen({route}) {
-    const navigation = useNavigation();
+    const nav = useNavigation();
 
     const [exercises, setExercises] = useState([
         { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '', dropSets: []}], weightUnit: 'lbs', supersets: [], weightConfig: 'totalWeight', repsConfig: 'reps' }
@@ -53,7 +52,7 @@ export default function WorkoutLogScreen({route}) {
     const [timerConfigured, setTimerConfigured] = useState(false); // New state variable
     const [comparisonModalVisible, setComparisonModalVisible] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState(null);
-    const { workoutState, setWorkoutState, resetWorkout, startWorkoutLog, stopWorkoutLog } = useWorkout();
+    const { workoutState, setWorkoutState, resetWorkout, startWorkoutLog, stopWorkoutLog, startTime, elapsedTime, setElapsedTime, pauseWorkoutLog, finishWorkout, workoutFinished} = useWorkout();
     const previousScreen = route.params?.previousScreen;
     const [showPreviousAttempts, setShowPreviousAttempts] = useState({});
 
@@ -77,6 +76,24 @@ export default function WorkoutLogScreen({route}) {
                 [exerciseId]: latestAttempt
             }));
         }
+    };
+
+    useEffect(() => {
+        let timer;
+        if (startTime && !workoutFinished) {
+            timer = setInterval(() => {
+                const currentTime = new Date();
+                const updatedElapsedTime = Math.floor((currentTime - startTime) / 1000);
+                setElapsedTime(updatedElapsedTime);
+            }, 1000);
+        }
+        return () => clearInterval(timer);
+    }, [startTime, workoutFinished]);
+
+    const formatTime = (seconds) => {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
 
     const fetchLatestAttempt = async (exerciseName) => {
@@ -854,6 +871,9 @@ export default function WorkoutLogScreen({route}) {
                     weightConfig: ex.weightConfig,
                     repsConfig: ex.repsConfig,
                     sets: mapDropSets(ex.sets),
+                    startTime: startTime,
+                    date: new Date(),
+                    totalWorkoutTime: elapsedTime,
                     supersets: ex.supersets.map(superset => ({
                         id: camelCase(superset.name),
                         name: superset.name,
@@ -875,16 +895,10 @@ export default function WorkoutLogScreen({route}) {
                 createdAt: new Date()
             });
 
-            Alert.alert("Success", "Workouts saved successfully!");
+            finishWorkout();
 
-            if (previousScreen) {
-                console.log(workoutState);
-                navigation.navigate(previousScreen);
-            } else {
-                navigation.goBack();
-            }
+            nav.navigate('WorkoutSummaryScreen', {previousScreen});
 
-            resetWorkout();
         } catch (error) {
             console.error("Error adding document: ", error);
             Alert.alert("Error", "Failed to save workouts.");
@@ -1056,7 +1070,6 @@ export default function WorkoutLogScreen({route}) {
             let isActive = true;
 
             if (isActive && workoutState && workoutState.exercises.length > 0) {
-                console.log("structure here", JSON.stringify(workoutState.exercises, null, 2));
                 setExercises(workoutState.exercises);
             }
 
@@ -1064,7 +1077,6 @@ export default function WorkoutLogScreen({route}) {
                 if (isActive) {
                     // Save workout state to context when screen is unfocused
                     setWorkoutState({ exercises: exercisesRef.current });
-                    console.log('sshizzy', exercisesRef.current);
                 }
                 isActive = false;
             };
@@ -1086,12 +1098,15 @@ export default function WorkoutLogScreen({route}) {
         <GestureHandlerRootView style={styles.fullScreenContainer}>
             <View style={styles.modalHeader}>
                 <Text style={styles.headerText}>Workout Log</Text>
+                <Text style={styles.timerText}>
+                    {formatTime(elapsedTime)}
+                </Text>
                 <TouchableOpacity onPress={() => {
                     if (previousScreen) {
                         console.log(workoutState);
-                        navigation.navigate(previousScreen);
+                        nav.navigate(previousScreen);
                     } else {
-                        navigation.goBack();
+                        nav.goBack();
                     }
                 }} style={styles.hideButton}>
                     <Text style={styles.hideButtonText}>Hide</Text>
@@ -1737,9 +1752,6 @@ const pickerSelectStyles = StyleSheet.create({
 });
 
 export default WorkoutLogScreen;
-
-
-
 
 
 
