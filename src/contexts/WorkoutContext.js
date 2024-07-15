@@ -52,7 +52,6 @@ export const WorkoutProvider = ({ children }) => {
                 try {
                     if (workoutState.exercises.length > 0) {
                         await AsyncStorage.setItem('currentWorkout', JSON.stringify(workoutState));
-                        console.log('outside the screen', JSON.stringify(workoutState));
                     } else {
                         await AsyncStorage.removeItem('currentWorkout');
                     }

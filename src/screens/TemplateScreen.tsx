@@ -54,6 +54,28 @@ const TemplateScreen = ({ route }) => {
         }
     };
 
+    const renderExercise = (exercise, exercises) => (
+        <View key={exercise.id} style={exercise.isSuperset ? styles.supersetContainer : styles.previewItem}>
+            <Text style={styles.exerciseName}>
+                {exercise.name}
+            </Text>
+            <Text style={styles.setsCount}>
+                Sets: {exercise.sets.length}
+            </Text>
+            {exercise.sets.map((set, setIndex) => (
+                <View key={setIndex}>
+                    {set.dropSetsCount > 0 && (
+                        <Text style={styles.setItem}>
+                            Set {setIndex + 1} - Drop Sets: {set.dropSetsCount}
+                        </Text>
+                    )}
+                </View>
+            ))}
+            {exercise.supersetExercise && exercises.find(ex => ex.id === exercise.supersetExercise) &&
+                renderExercise(exercises.find(ex => ex.id === exercise.supersetExercise), exercises)}
+        </View>
+    );
+
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Select a Template</Text>
@@ -72,46 +94,12 @@ const TemplateScreen = ({ route }) => {
             {selectedTemplate && (
                 <ScrollView style={styles.templatePreview}>
                     <Text style={styles.previewTitle}>Template Preview:</Text>
-                    {templates.find(template => template.id === selectedTemplate)?.exercises.map((exercise, index) => (
-                        <View key={index} style={styles.previewItem}>
-                            <Text style={styles.exerciseName}>
-                                {exercise.name}
-                            </Text>
-                            <Text style={styles.setsCount}>
-                                Sets: {exercise.sets.length}
-                            </Text>
-                            {exercise.sets.map((set, setIndex) => (
-                                <View key={setIndex}>
-                                    {set.dropSetsCount > 0 && (
-                                        <Text style={styles.setItem}>
-                                            Set {setIndex + 1} - Drop Sets: {set.dropSetsCount}
-                                        </Text>
-                                    )}
-                                </View>
-                            ))}
-                            {exercise.supersets && exercise.supersets.length > 0 && (
-                                <View style={styles.supersetContainer}>
-                                    <Text style={styles.supersetTitle}>Supersets:</Text>
-                                    {exercise.supersets.map((superset, supersetIndex) => (
-                                        <View key={supersetIndex} style={styles.supersetItem}>
-                                            <Text style={styles.exerciseName}>
-                                                {superset.name} - Sets: {superset.sets.length}
-                                            </Text>
-                                            {superset.sets.map((set, setIndex) => (
-                                                <View key={setIndex}>
-                                                    {set.dropSetsCount > 0 && (
-                                                        <Text style={styles.setItem}>
-                                                            Set {setIndex + 1} - Drop Sets: {set.dropSetsCount}
-                                                        </Text>
-                                                    )}
-                                                </View>
-                                            ))}
-                                        </View>
-                                    ))}
-                                </View>
-                            )}
-                        </View>
-                    ))}
+                    {templates.find(template => template.id === selectedTemplate)?.exercises.map((exercise, index, exercises) => {
+                        if (!exercise.isSuperset) {
+                            return renderExercise(exercise, exercises);
+                        }
+                        return null;
+                    })}
                 </ScrollView>
             )}
             <Button title="Load Template" onPress={handleLoadTemplate} />

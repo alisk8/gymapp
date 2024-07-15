@@ -29,7 +29,7 @@ export default function WorkoutLogScreen({route}) {
     const nav = useNavigation();
 
     const [exercises, setExercises] = useState([
-        { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '', dropSets: []}], weightUnit: 'lbs', supersets: [], weightConfig: 'totalWeight', repsConfig: 'reps' }
+        { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '', dropSets: []}], weightUnit: 'lbs', supersetExercise: '', weightConfig: 'totalWeight', repsConfig: 'reps', isSuperset: false}
     ]);
     const [suggestions, setSuggestions] = useState([]);
     const [userExercises, setUserExercises] = useState([]);
@@ -46,7 +46,6 @@ export default function WorkoutLogScreen({route}) {
     const [timerRunning, setTimerRunning] = useState(false);
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editExerciseIndex, setEditExerciseIndex] = useState(null);
-    const [editSupersetIndex, setEditSupersetIndex] = useState(null);
     const [weightConfig, setWeightConfig] = useState('totalWeight');
     const [repsConfig, setRepsConfig] = useState('reps');
     const [timerConfigured, setTimerConfigured] = useState(false); // New state variable
@@ -246,14 +245,6 @@ export default function WorkoutLogScreen({route}) {
         }, 1500);
     };
 
-    const handleSupersetNameChange = (text, exerciseIndex, supersetIndex) => {
-        setCurrentExerciseIndex(exerciseIndex);
-        setCurrentSupersetIndex(supersetIndex);
-        const newExercises = [...exercises];
-        newExercises[exerciseIndex].supersets[supersetIndex].name = text;
-        setExercises(newExercises);
-        setSuggestions(getSuggestions(text));
-    };
 
     const addSet = (exerciseIndex) => {
         const newSets = [...exercises[exerciseIndex].sets, {
@@ -266,27 +257,9 @@ export default function WorkoutLogScreen({route}) {
         setExercises(newExercises);
     };
 
-    const addSuperset = (exerciseIndex) => {
+    const updateSetData = (text, exerciseIndex, setIndex, type) => {
         const newExercises = [...exercises];
-        const newSuperset = {
-            id: `superset${newExercises[exerciseIndex].supersets.length + 1}`,
-            name: 'New Superset Exercise',
-            sets: [{ key: 'set1', weight: '', reps: '' }],
-            weightUnit: 'lbs',
-            weightConfig: 'totalWeight',
-            repsConfig: 'reps'
-        };
-        newExercises[exerciseIndex].supersets.push(newSuperset);
-        setExercises(newExercises);
-    };
-
-    const updateSetData = (text, exerciseIndex, setIndex, type, supersetIndex = null) => {
-        const newExercises = [...exercises];
-        if (supersetIndex === null) {
-            newExercises[exerciseIndex].sets[setIndex][type] = text;
-        } else {
-            newExercises[exerciseIndex].supersets[supersetIndex].sets[setIndex][type] = text;
-        }
+        newExercises[exerciseIndex].sets[setIndex][type] = text;
         setExercises(newExercises);
     };
 
@@ -296,48 +269,45 @@ export default function WorkoutLogScreen({route}) {
         setExercises(newExercises);
     };
 
-    const updateWeightUnitSuperset = (exerciseIndex, supersetIndex, unit) => {
-        const newExercises = [...exercises];
-        newExercises[exerciseIndex].supersets[supersetIndex].weightUnit = unit;
-        setExercises(newExercises);
-    };
 
-    const addExercise = () => {
+    const addExercise = (parentExerciseIndex = null) => {
         const newExercise = {
             id: `exercise${exercises.length + 1}`,
             name: 'New Exercise',
             sets: [{ key: 'set1', weight: '', reps: '' }],
             weightUnit: 'lbs',
-            supersets: [],
+            supersetExercise: '',
             weightConfig: 'totalWeight',
-            repsConfig: 'reps'
+            repsConfig: 'reps',
+            isSuperset: parentExerciseIndex != null,
         };
-        setExercises([...exercises, newExercise]);
+
+        console.log('is superset', newExercise.isSuperset);
+        console.log('parent exercise index',parentExerciseIndex);
+
+        const newExercises = [...exercises];
+        if (parentExerciseIndex !== null && parentExerciseIndex >= 0 && parentExerciseIndex < newExercises.length) {
+            // It's a superset, update the parent exercise
+            newExercises[parentExerciseIndex].supersetExercise = newExercise.id;
+            newExercises.push(newExercise);
+            setExercises(newExercises);
+        } else {
+            // It's a regular exercise
+            setExercises([...exercises, newExercise]);
+        }
     };
 
-    const deleteSet = (exerciseIndex, setIndex, supersetIndex = null) => {
+    const deleteSet = (exerciseIndex, setIndex) => {
         const newExercises = [...exercises];
-        if (supersetIndex === null) {
-            newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.filter((_, i) => i !== setIndex);
-        } else {
-            newExercises[exerciseIndex].supersets[supersetIndex].sets = newExercises[exerciseIndex].supersets[supersetIndex].sets.filter((_, i) => i !== setIndex);
-        }
+        newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.filter((_, i) => i !== setIndex);
         setExercises(newExercises);
     };
 
-    const deleteSuperset = (exerciseIndex, supersetIndex) => {
-        const newExercises = [...exercises];
-        newExercises[exerciseIndex].supersets = newExercises[exerciseIndex].supersets.filter((_, i) => i !== supersetIndex);
-        setExercises(newExercises);
-    };
 
-    const deleteDropSet = (exerciseIndex, setIndex, dropSetIndex, supersetIndex = null) => {
+    const deleteDropSet = (exerciseIndex, setIndex, dropSetIndex) => {
         const newExercises = [...exercises];
-        if (supersetIndex === null) {
-            newExercises[exerciseIndex].sets[setIndex].dropSets = newExercises[exerciseIndex].sets[setIndex].dropSets.filter((_, i) => i !== dropSetIndex);
-        } else {
-            newExercises[exerciseIndex].supersets[supersetIndex].sets[setIndex].dropSets = newExercises[exerciseIndex].supersets[supersetIndex].sets[setIndex].dropSets.filter((_, i) => i !== dropSetIndex);
-        }
+        newExercises[exerciseIndex].sets[setIndex].dropSets = newExercises[exerciseIndex].sets[setIndex].dropSets.filter((_, i) => i !== dropSetIndex);
+
         setExercises(newExercises);
     };
 
@@ -431,59 +401,38 @@ export default function WorkoutLogScreen({route}) {
         return null;
     };
 
-    const loadPreviousAttempt = (exerciseIndex, setIndex, previousSet, isDropSet = false, dropSetIndex = null, supersetIndex = null) => {
+    const loadPreviousAttempt = (exerciseIndex, setIndex, previousSet, isDropSet = false, dropSetIndex = null) => {
         const newExercises = [...exercises];
 
-        if (supersetIndex === null) {
             // Handling parent exercise sets
-            const exercise = newExercises[exerciseIndex];
+        const exercise = newExercises[exerciseIndex];
 
-            if (isDropSet) {
-                const dropSetKey = `dropset${dropSetIndex + 1}`;
-                let currentSet = exercise.sets[setIndex];
+        if (isDropSet) {
+            const dropSetKey = `dropset${dropSetIndex + 1}`;
+            let currentSet = exercise.sets[setIndex];
 
-                if (!currentSet.dropSets.find(d => d.key === dropSetKey)) {
-                    currentSet.dropSets.push({ key: dropSetKey, weight: '', reps: '' });
-                }
-                currentSet.dropSets[dropSetIndex].weight = reverseCalculateWeight(previousSet.weight, exercise.weightConfig, exercise.weightUnit);
-                currentSet.dropSets[dropSetIndex].reps = previousSet.reps;
-            } else {
-                exercise.sets[setIndex].weight = reverseCalculateWeight(previousSet.weight, exercise.weightConfig, exercise.weightUnit);
-                exercise.sets[setIndex].reps = previousSet.reps;
+            if (!currentSet.dropSets.find(d => d.key === dropSetKey)) {
+                currentSet.dropSets.push({ key: dropSetKey, weight: '', reps: '' });
             }
+            currentSet.dropSets[dropSetIndex].weight = reverseCalculateWeight(previousSet.weight, exercise.weightConfig, exercise.weightUnit);
+            currentSet.dropSets[dropSetIndex].reps = previousSet.reps;
         } else {
-            // Handling superset sets
-            const superset = newExercises[exerciseIndex].supersets[supersetIndex];
-
-            if (isDropSet) {
-                const dropSetKey = `dropset${dropSetIndex + 1}`;
-                let currentSet = superset.sets[setIndex];
-
-                if (!currentSet.dropSets.find(d => d.key === dropSetKey)) {
-                    currentSet.dropSets.push({ key: dropSetKey, weight: '', reps: '' });
-                }
-                currentSet.dropSets[dropSetIndex].weight = reverseCalculateWeight(previousSet.weight, superset.weightConfig, superset.weightUnit);
-                currentSet.dropSets[dropSetIndex].reps = previousSet.reps;
-            } else {
-                superset.sets[setIndex].weight = reverseCalculateWeight(previousSet.weight, superset.weightConfig, superset.weightUnit);
-                superset.sets[setIndex].reps = previousSet.reps;
-            }
+            exercise.sets[setIndex].weight = reverseCalculateWeight(previousSet.weight, exercise.weightConfig, exercise.weightUnit);
+            exercise.sets[setIndex].reps = previousSet.reps;
         }
 
         setExercises(newExercises);
     };
-    const loadAllPreviousAttempts = (exerciseIndex, supersetIndex = null) => {
-        const exercise = supersetIndex === null
-            ? exercises[exerciseIndex]
-            : exercises[exerciseIndex].supersets[supersetIndex];
+    const loadAllPreviousAttempts = (exerciseIndex) => {
+        const exercise =  exercises[exerciseIndex];
         const previousSets = showPreviousAttempts[exercise.id];
 
         if (previousSets) {
             previousSets.forEach((previousSet, setIndex) => {
                 if (previousSet) {
-                    loadPreviousAttempt(exerciseIndex, setIndex, previousSet, false, null, supersetIndex);
+                    loadPreviousAttempt(exerciseIndex, setIndex, previousSet, false, null);
                     previousSet.dropSets?.forEach((dropSet, dropSetIndex) => {
-                        loadPreviousAttempt(exerciseIndex, setIndex, dropSet, true, dropSetIndex, supersetIndex);
+                        loadPreviousAttempt(exerciseIndex, setIndex, dropSet, true, dropSetIndex);
                     });
                 }
             });
@@ -491,18 +440,15 @@ export default function WorkoutLogScreen({route}) {
     };
 
 
-    const renderSets = (sets, exerciseIndex, supersetIndex = null) => {
-        const exercise = supersetIndex === null
-            ? exercises[exerciseIndex]
-            : exercises[exerciseIndex].supersets[supersetIndex];
-
+    const renderSets = (sets, exerciseIndex) => {
+        const exercise = exercises[exerciseIndex];
         const exerciseId = exercise.id;
 
         return (
             <View>
                 {showPreviousAttempts[exerciseId] && (
                     <TouchableOpacity
-                        onPress={() => loadAllPreviousAttempts(exerciseIndex, supersetIndex)}
+                        onPress={() => loadAllPreviousAttempts(exerciseIndex)}
                         style={styles.addAllPreviousButton}
                     >
                         <Text style={styles.addAllPreviousButtonText}>Add All</Text>
@@ -548,7 +494,7 @@ export default function WorkoutLogScreen({route}) {
                                 renderLeftActions={() => (
                                     <TouchableOpacity
                                         style={styles.deleteButton}
-                                        onPress={() => deleteSet(exerciseIndex, setIndex, supersetIndex)}
+                                        onPress={() => deleteSet(exerciseIndex, setIndex)}
                                     >
                                         <Text style={styles.deleteButtonText}>Delete</Text>
                                     </TouchableOpacity>
@@ -556,7 +502,7 @@ export default function WorkoutLogScreen({route}) {
                                 renderRightActions={() => (
                                     <TouchableOpacity
                                         style={styles.addButton}
-                                        onPress={() => addDropSet(exerciseIndex, setIndex, supersetIndex)}
+                                        onPress={() => addDropSet(exerciseIndex, setIndex)}
                                     >
                                         <Text style={styles.deleteButtonText}>Add Drop Set</Text>
                                     </TouchableOpacity>
@@ -567,7 +513,7 @@ export default function WorkoutLogScreen({route}) {
                                         <View style={styles.previousAttemptContainer}>
                                             {showPreviousAttempts[exerciseId][setIndex] && (showPreviousAttempts[exerciseId][setIndex].weight || showPreviousAttempts[exerciseId][setIndex].reps) ? (
                                                 <TouchableOpacity
-                                                    onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, showPreviousAttempts[exerciseId][setIndex], false, null, supersetIndex)}
+                                                    onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, showPreviousAttempts[exerciseId][setIndex], false, null)}
                                                     style={styles.previousAttemptRow}
                                                 >
                                                     <Text>{`${showPreviousAttempts[exerciseId][setIndex]?.weight || ''} x ${showPreviousAttempts[exerciseId][setIndex]?.reps || ''}`}</Text>
@@ -581,7 +527,7 @@ export default function WorkoutLogScreen({route}) {
                                                 (dropSet.weight || dropSet.reps) ? (
                                                     <TouchableOpacity
                                                         key={dropSetIndex}
-                                                        onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, dropSet, true, dropSetIndex, supersetIndex)}
+                                                        onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, dropSet, true, dropSetIndex)}
                                                         style={styles.previousAttemptRow}
                                                     >
                                                         <Text>Dropset: {dropSet.weight} x {dropSet.reps}</Text>
@@ -598,7 +544,7 @@ export default function WorkoutLogScreen({route}) {
                                         placeholder={weightPlaceholder}
                                         keyboardType="numeric"
                                         style={styles.weightInput}
-                                        onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'weight', supersetIndex)}
+                                        onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'weight')}
                                         value={set.weight}
                                         editable={!isWeightDisabled}
                                     />
@@ -606,12 +552,12 @@ export default function WorkoutLogScreen({route}) {
                                         placeholder={repsPlaceholder}
                                         keyboardType="numeric"
                                         style={styles.repsInput}
-                                        onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'reps', supersetIndex)}
+                                        onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'reps')}
                                         value={set.reps}
                                     />
                                 </View>
                             </Swipeable>
-                            {renderDropSets(set.dropSets, exerciseIndex, setIndex, supersetIndex)}
+                            {renderDropSets(set.dropSets, exerciseIndex, setIndex)}
                         </GestureHandlerRootView>
                     );
                 })}
@@ -620,21 +566,15 @@ export default function WorkoutLogScreen({route}) {
         );
     };
 
-    const updateDropSetData = (text, exerciseIndex, setIndex, dropSetIndex, type, supersetIndex = null) => {
+    const updateDropSetData = (text, exerciseIndex, setIndex, dropSetIndex, type) => {
         const newExercises = [...exercises];
-        if (supersetIndex === null) {
-            newExercises[exerciseIndex].sets[setIndex].dropSets[dropSetIndex][type] = text;
-        } else {
-            newExercises[exerciseIndex].supersets[supersetIndex].sets[setIndex].dropSets[dropSetIndex][type] = text;
-        }
+        newExercises[exerciseIndex].sets[setIndex].dropSets[dropSetIndex][type] = text;
         setExercises(newExercises);
     };
 
-    const addDropSet = (exerciseIndex, setIndex, supersetIndex = null) => {
+    const addDropSet = (exerciseIndex, setIndex) => {
         const newExercises = [...exercises];
-        const exercise = supersetIndex === null
-            ? newExercises[exerciseIndex]
-            : newExercises[exerciseIndex].supersets[supersetIndex];
+        const exercise =  newExercises[exerciseIndex];
 
         const newDropSet = {
             key: `dropset${exercise.sets[setIndex].dropSets.length + 1}`,
@@ -644,19 +584,12 @@ export default function WorkoutLogScreen({route}) {
             repsConfig: exercise.repsConfig
         };
 
-        if (supersetIndex === null) {
-            newExercises[exerciseIndex].sets[setIndex].dropSets.push(newDropSet);
-        } else {
-            newExercises[exerciseIndex].supersets[supersetIndex].sets[setIndex].dropSets.push(newDropSet);
-        }
-
+        newExercises[exerciseIndex].sets[setIndex].dropSets.push(newDropSet);
         setExercises(newExercises);
     };
 
-    const renderDropSets = (dropSets, exerciseIndex, setIndex, supersetIndex = null) => {
-        const exercise = supersetIndex === null
-            ? exercises[exerciseIndex]
-            : exercises[exerciseIndex].supersets[supersetIndex];
+    const renderDropSets = (dropSets, exerciseIndex, setIndex) => {
+        const exercise = exercises[exerciseIndex];
 
         const weightPlaceholder = (() => {
             switch (exercise.weightConfig) {
@@ -695,7 +628,7 @@ export default function WorkoutLogScreen({route}) {
                         renderLeftActions={() => (
                             <TouchableOpacity
                                 style={styles.deleteButton}
-                                onPress={() => deleteDropSet(exerciseIndex, setIndex, dropSetIndex, supersetIndex)}
+                                onPress={() => deleteDropSet(exerciseIndex, setIndex, dropSetIndex)}
                             >
                                 <Text style={styles.deleteButtonText}>Delete</Text>
                             </TouchableOpacity>
@@ -707,7 +640,7 @@ export default function WorkoutLogScreen({route}) {
                                 placeholder={weightPlaceholder}
                                 keyboardType="numeric"
                                 style={styles.weightInput}
-                                onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'weight', supersetIndex)}
+                                onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'weight')}
                                 value={dropSet.weight}
                                 editable={!isWeightDisabled}
                             />
@@ -715,7 +648,7 @@ export default function WorkoutLogScreen({route}) {
                                 placeholder={repsPlaceholder}
                                 keyboardType="numeric"
                                 style={styles.repsInput}
-                                onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'reps', supersetIndex)}
+                                onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'reps')}
                                 value={dropSet.reps}
                             />
                         </View>
@@ -726,21 +659,14 @@ export default function WorkoutLogScreen({route}) {
     };
 
 
-    const renderSuggestions = (exerciseIndex, supersetIndex = null) => (
-        suggestions.length > 0 && (
-            (currentExerciseIndex === exerciseIndex && currentSupersetIndex === null) ||
-            (currentExerciseIndex === exerciseIndex && currentSupersetIndex === supersetIndex)
-        ) && (
+    const renderSuggestions = (exerciseIndex) => (
+        suggestions.length > 0 && (currentExerciseIndex === exerciseIndex) && (
             <FlatList
                 data={suggestions}
                 renderItem={({ item }) => (
                     <Pressable onPress={() => {
                         Keyboard.dismiss();
-                        if (supersetIndex === null) {
-                            handleSuggestionSelect(item, exerciseIndex);
-                        } else {
-                            handleSupersetSuggestionSelect(item, exerciseIndex, supersetIndex);
-                        }
+                        handleSuggestionSelect(item, exerciseIndex);
                     }} style={styles.suggestionItem}>
                         <Text style={styles.suggestionItemText}>{item}</Text>
                     </Pressable>
@@ -767,26 +693,26 @@ export default function WorkoutLogScreen({route}) {
         setCurrentExerciseIndex(null);
     };
 
-    const handleSupersetSuggestionSelect = (suggestion, exerciseIndex, supersetIndex) => {
-        const newExercises = [...exercises];
-        newExercises[exerciseIndex].supersets[supersetIndex].name = suggestion;
-
-        // Check if the exercise has presets and set weightConfig and repsConfig accordingly
-        if (exercisePresets[suggestion]) {
-            newExercises[exerciseIndex].supersets[supersetIndex].weightConfig = exercisePresets[suggestion].weightConfig;
-            newExercises[exerciseIndex].supersets[supersetIndex].repsConfig = exercisePresets[suggestion].repsConfig;
-        }
-
-        setExercises(newExercises);
-        setSuggestions([]);
-        setCurrentExerciseIndex(null);
-        setCurrentSupersetIndex(null);
-    };
 
     const deleteExercise = (index) => {
+        // Get the ID of the exercise being deleted
+        const deletedExerciseId = exercises[index].id;
+
+        // Filter out the exercise being deleted
         const newExercises = exercises.filter((_, i) => i !== index);
-        setExercises(newExercises);
+
+        // Update exercises to reset supersetExercise property where needed
+        const updatedExercises = newExercises.map(exercise => {
+            if (exercise.supersetExercise === deletedExerciseId) {
+                return { ...exercise, supersetExercise: '' };
+            }
+            return exercise;
+        });
+
+        setExercises(updatedExercises);
     };
+
+
 
     const saveWorkouts = async (isTemplate) => {
         if (!firebase_auth.currentUser) {
@@ -816,26 +742,8 @@ export default function WorkoutLogScreen({route}) {
                     reps: dropSet.repsConfig === 'time' ? `${dropSet.reps} secs` : `${dropSet.reps} reps`
                 }))
             })),
-            supersets: ex.supersets.map(superset => ({
-                id: camelCase(superset.name),
-                name: superset.name,
-                sets: superset.sets.filter(set => set.weight !== '' && set.reps !== '').map(set => ({
-                    ...set,
-                    weight: superset.weightConfig === 'bodyWeight'
-                        ? 'BW'
-                        : superset.weightConfig === 'extraWeightBodyWeight'
-                            ? `BW + ${set.weight} ${superset.weightUnit}`
-                            : `${calculateTotalWeight(parseFloat(set.weight), superset.weightConfig, superset.weightUnit)} ${superset.weightUnit}`,
-                    reps: superset.repsConfig === 'time' ? `${set.reps} secs` : `${set.reps} reps`
-                })),
-                weightConfig: superset.weightConfig,
-                repsConfig: superset.repsConfig
-            })).filter(superset => superset.sets.length > 0),
-            weightConfig: ex.weightConfig,
-            repsConfig: ex.repsConfig
-        })).filter(ex => ex.sets.length > 0 || ex.supersets.length > 0);
-
-        console.log(filteredExercises);
+            supersetExercise: ex.supersetExercise,
+        })).filter(ex => ex.sets.length > 0);
 
         if (filteredExercises.length === 0) {
             Alert.alert("Error", "Please fill in all the required fields.");
@@ -874,13 +782,8 @@ export default function WorkoutLogScreen({route}) {
                     startTime: startTime,
                     date: new Date(),
                     totalWorkoutTime: elapsedTime,
-                    supersets: ex.supersets.map(superset => ({
-                        id: camelCase(superset.name),
-                        name: superset.name,
-                        sets: mapDropSets(superset.sets),
-                        weightConfig: superset.weightConfig,
-                        repsConfig: superset.repsConfig
-                    }))
+                    supersetExercise: ex.supersetExercise,
+                    isSuperset: ex.isSuperset,
                 }));
 
                 await addDoc(templateRef, {
@@ -916,128 +819,81 @@ export default function WorkoutLogScreen({route}) {
             });
     };
 
-    const renderSupersets = (supersets, exerciseIndex) => (
-        supersets.map((superset, supersetIndex) => (
-            <View key={superset.id} style={styles.supersetContainer}>
+
+
+    const renderExerciseItem = ({ item, index, isSuperset = false}) => {
+
+        const renderExercise = (exercise, exerciseIndex) => (
+
+            <View key={exercise.id} style={isSuperset ? styles.supersetContainer : styles.exerciseContainer}>
                 <FontAwesome5
                     name="times"
-                    onPress={() => deleteSuperset(exerciseIndex, supersetIndex)}
+                    onPress={() => deleteExercise(exerciseIndex)}
                     size={20}
                     color="black"
-                    style={styles.deleteSupersetButton}
+                    style={isSuperset ? styles.deleteSupersetButton : styles.deleteExerciseButton}
                 />
-                <TouchableOpacity onPress={() => openEditModal(exerciseIndex, supersetIndex)} style={styles.editButton}>
+                <TouchableOpacity onPress={() => openEditModal(exerciseIndex)} style={styles.editButton}>
                     <FontAwesome5 name="ellipsis-h" size={20} color="black" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => togglePreviousAttempts(superset.id, superset.name)} style={styles.compareButton}>
-                    <Text style={showPreviousAttempts[superset.id] ? styles.blueIcon : styles.blackIcon}>Previous</Text>
+                <TouchableOpacity onPress={() => togglePreviousAttempts(exercise.id, exercise.name)} style={styles.compareButton}>
+                    <Text style={showPreviousAttempts[exercise.id] ? styles.blueIcon : styles.blackIcon}>Previous</Text>
                 </TouchableOpacity>
                 <TextInput
                     style={styles.header}
-                    onChangeText={(text) => handleSupersetNameChange(text, exerciseIndex, supersetIndex)}
-                    value={superset.name}
+                    onChangeText={(text) => handleExerciseNameChange(text, exerciseIndex)}
+                    value={exercise.name}
                 />
-                {renderSuggestions(exerciseIndex, supersetIndex)}
-                {renderSets(superset.sets, exerciseIndex, supersetIndex)}
-                <View style={styles.buttonsRow}>
-                    <Button title="+ add set" onPress={() => addSetToSuperset(exerciseIndex, supersetIndex)} />
-                </View>
+                {renderSuggestions(exerciseIndex)}
+                {renderSets(exercise.sets, exerciseIndex)}
                 <View style={styles.unitButtonsContainer}>
                     <TouchableOpacity
-                        style={[styles.unitButton, superset.weightUnit === 'lbs' && styles.unitButtonSelected]}
-                        onPress={() => updateWeightUnitSuperset(exerciseIndex, supersetIndex, 'lbs')}
+                        style={[styles.unitButton, exercise.weightUnit === 'lbs' && styles.unitButtonSelected]}
+                        onPress={() => updateWeightUnit(exerciseIndex, 'lbs')}
                     >
-                        <Text
-                            style={[styles.unitButtonText, superset.weightUnit === 'lbs' ? styles.unitButtonSelectedText : styles.unitButtonUnselectedText]}>lbs</Text>
+                        <Text style={[styles.unitButtonText, exercise.weightUnit === 'lbs' ? styles.unitButtonSelectedText : styles.unitButtonUnselectedText]}>
+                            lbs
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.unitButton, superset.weightUnit === 'kgs' && styles.unitButtonSelected]}
-                        onPress={() => updateWeightUnitSuperset(exerciseIndex, supersetIndex, 'kgs')}
+                        style={[styles.unitButton, exercise.weightUnit === 'kgs' && styles.unitButtonSelected]}
+                        onPress={() => updateWeightUnit(exerciseIndex, 'kgs')}
                     >
-                        <Text
-                            style={[styles.unitButtonText, superset.weightUnit === 'kgs' ? styles.unitButtonSelectedText : styles.unitButtonUnselectedText]}>kgs</Text>
+                        <Text style={[styles.unitButtonText, exercise.weightUnit === 'kgs' ? styles.unitButtonSelectedText : styles.unitButtonUnselectedText]}>
+                            kgs
+                        </Text>
                     </TouchableOpacity>
                 </View>
-            </View>
-        ))
-    );
+                <View style={styles.buttonsRow}>
+                    <Button title="+ add set" onPress={() => addSet(exerciseIndex)} />
+                    {!item.supersetExercise && <Button title="+ add superset" onPress={() => addExercise(exerciseIndex)} />}
+                </View>
+                {item.supersetExercise && exercises.find((ex) => ex.id === item.supersetExercise) &&
+                    renderExerciseItem({ item: exercises.find((ex) => ex.id === item.supersetExercise), index: exercises.findIndex((ex) => ex.id === item.supersetExercise),isSuperset: true })}
+                    </View>
+        );
 
-    const addSetToSuperset = (exerciseIndex, supersetIndex) => {
-        const newExercises = [...exercises];
-        const newSets = [...newExercises[exerciseIndex].supersets[supersetIndex].sets, {
-            key: `set${newExercises[exerciseIndex].supersets[supersetIndex].sets.length + 1}`,
-            weight: '',
-            reps: ''
-        }];
-        newExercises[exerciseIndex].supersets[supersetIndex].sets = newSets;
-        setExercises(newExercises);
+        return (
+            <View key={item.id}>
+                {renderExercise(item, index)}
+            </View>
+        );
     };
 
-    const renderExerciseItem = ({ item, index }) => (
-        <View key={item.id} style={styles.exerciseContainer}>
-            <FontAwesome5
-                name="times"
-                onPress={() => deleteExercise(index)}
-                size={20}
-                color="black"
-                style={styles.deleteExerciseButton}
-            />
-            <TouchableOpacity onPress={() => openEditModal(index)} style={styles.editButton}>
-                <FontAwesome5 name="ellipsis-h" size={20} color='black' />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => togglePreviousAttempts(item.id, item.name)} style={styles.compareButton}>
-                <Text style={showPreviousAttempts[item.id] ? styles.blueIcon : styles.blackIcon}>Previous</Text>
-            </TouchableOpacity>
-            <TextInput
-                style={styles.header}
-                onChangeText={(text) => handleExerciseNameChange(text, index)}
-                value={item.name}
-            />
-            {renderSuggestions(index)}
-            {renderSets(item.sets, index)}
-            <View style={styles.unitButtonsContainer}>
-                <TouchableOpacity
-                    style={[styles.unitButton, item.weightUnit === 'lbs' && styles.unitButtonSelected]}
-                    onPress={() => updateWeightUnit(index, 'lbs')}
-                >
-                    <Text
-                        style={[styles.unitButtonText, item.weightUnit === 'lbs' ? styles.unitButtonSelectedText : styles.unitButtonUnselectedText]}>lbs</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.unitButton, item.weightUnit === 'kgs' && styles.unitButtonSelected]}
-                    onPress={() => updateWeightUnit(index, 'kgs')}
-                >
-                    <Text
-                        style={[styles.unitButtonText, item.weightUnit === 'kgs' ? styles.unitButtonSelectedText : styles.unitButtonUnselectedText]}>kgs</Text>
-                </TouchableOpacity>
-            </View>
-            <View style={styles.buttonsRow}>
-                <Button title="+ add set" onPress={() => addSet(index)} />
-                <Button title="+ add superset" onPress={() => addSuperset(index)} />
-            </View>
-            {renderSupersets(item.supersets, index)}
-        </View>
-    );
 
-    const openEditModal = (exerciseIndex, supersetIndex = null) => {
+    const openEditModal = (exerciseIndex) => {
         const exercise = exercises[exerciseIndex];
-        const currentConfig = supersetIndex === null ? exercise : exercise.supersets[supersetIndex];
+        const currentConfig =  exercise;
         setWeightConfig(currentConfig.weightConfig);
         setRepsConfig(currentConfig.repsConfig);
         setEditExerciseIndex(exerciseIndex);
-        setEditSupersetIndex(supersetIndex);
         setEditModalVisible(true);
     };
 
     const saveConfig = () => {
         const newExercises = [...exercises];
-        if (editSupersetIndex === null) {
-            newExercises[editExerciseIndex].weightConfig = weightConfig;
-            newExercises[editExerciseIndex].repsConfig = repsConfig;
-        } else {
-            newExercises[editExerciseIndex].supersets[editSupersetIndex].weightConfig = weightConfig;
-            newExercises[editExerciseIndex].supersets[editSupersetIndex].repsConfig = repsConfig;
-        }
+        newExercises[editExerciseIndex].weightConfig = weightConfig;
+        newExercises[editExerciseIndex].repsConfig = repsConfig;
         setExercises(newExercises);
         setEditModalVisible(false);
     };
@@ -1117,7 +973,7 @@ export default function WorkoutLogScreen({route}) {
                 style={{ flex: 1 }}
             >
                 <FlatList
-                    data={exercises}
+                    data={exercises.filter(exercise => !exercise.isSuperset)}
                     renderItem={renderExerciseItem}
                     keyExtractor={(item) => item.id}
                     ListHeaderComponent={() => (
@@ -1140,7 +996,7 @@ export default function WorkoutLogScreen({route}) {
                     )}
                     ListFooterComponent={() => (
                         <View>
-                            <Button title="Add Exercise" onPress={addExercise} />
+                            <Button title="Add Exercise" onPress={() => addExercise()} />
                             <Button title="Save Workouts" onPress={() => saveWorkouts(isTemplate)} />
                             <View style={{height: 200}}/>
                         </View>
