@@ -35,7 +35,6 @@ export default function WorkoutLogScreen({route}) {
     const [userExercises, setUserExercises] = useState([]);
     const [exercisePresets, setExercisePresets] = useState({});
     const [currentExerciseIndex, setCurrentExerciseIndex] = useState(null);
-    const [currentSupersetIndex, setCurrentSupersetIndex] = useState(null);
     const [isTemplate, setIsTemplate] = useState(false);
     const [templateName, setTemplateName] = useState('');
     const [timerModalVisible, setTimerModalVisible] = useState(false);
@@ -228,8 +227,8 @@ export default function WorkoutLogScreen({route}) {
 
     const handleExerciseNameChange = (text, index) => {
         setCurrentExerciseIndex(index);
-        setCurrentSupersetIndex(null);
         const newExercises = [...exercises];
+        const oldId = newExercises[index].id;
         newExercises[index].name = text;
         setExercises(newExercises);
         setSuggestions(getSuggestions(text));
@@ -240,7 +239,15 @@ export default function WorkoutLogScreen({route}) {
 
         typingTimeoutRef.current = setTimeout(() => {
             const updatedExercises = [...newExercises];
-            updatedExercises[index].id = camelCase(text);
+            const newId = camelCase(text);
+            updatedExercises[index].id = newId;
+
+            // Update the supersetExercise of any parent exercise referencing this exercise
+            const parentExerciseIndex = updatedExercises.findIndex(exercise => exercise.supersetExercise === oldId);
+            if (parentExerciseIndex !== -1) {
+                updatedExercises[parentExerciseIndex].supersetExercise = newId;
+            }
+
             setExercises(updatedExercises);
         }, 1500);
     };
@@ -711,25 +718,48 @@ export default function WorkoutLogScreen({route}) {
             return exercisesList;
         };
 
-        // Get the ID of the exercise being deleted
-        const deletedExerciseId = exercises[index].id;
+        // Helper function to reset supersetExercise property
+        const resetSupersetExercise = (exercisesList, deletedExerciseId) => {
+            return exercisesList.map(exercise => {
+                if (exercise.supersetExercise === deletedExerciseId) {
+                    return { ...exercise, supersetExercise: '' };
+                }
+                return exercise;
+            });
+        };
+
+        // Get the exercise being deleted
+        const deletedExercise = exercises[index];
 
         // Create a copy of the exercises array
         let newExercises = [...exercises];
 
-        // Recursively delete the exercise and its supersets
-        newExercises = deleteExerciseRecursively(deletedExerciseId, newExercises);
+        if (!deletedExercise.isSuperset) {
+            // If the exercise is not a superset, delete it recursively
+            newExercises = deleteExerciseRecursively(deletedExercise.id, newExercises);
+        } else {
+            // If the exercise is a superset, handle its deletion and connection
+            const parentExerciseIndex = newExercises.findIndex(ex => ex.supersetExercise === deletedExercise.id);
+            const childExerciseId = deletedExercise.supersetExercise;
 
-        // Update exercises to reset supersetExercise property where needed
-        const updatedExercises = newExercises.map(exercise => {
-            if (exercise.supersetExercise === deletedExerciseId) {
-                return { ...exercise, supersetExercise: '' };
+            // Remove the superset exercise
+            newExercises = newExercises.filter((_, i) => i !== index);
+
+            if (parentExerciseIndex !== -1 && childExerciseId) {
+                // Connect the parent to the child
+                newExercises[parentExerciseIndex].supersetExercise = childExerciseId;
+            } else if (parentExerciseIndex !== -1) {
+                // Reset the parent supersetExercise if no child exists
+                newExercises[parentExerciseIndex].supersetExercise = '';
             }
-            return exercise;
-        });
+        }
+
+        // Update the exercises list to reset supersetExercise property where needed
+        const updatedExercises = resetSupersetExercise(newExercises, deletedExercise.id);
 
         setExercises(updatedExercises);
     };
+
 
 
 
@@ -840,11 +870,9 @@ export default function WorkoutLogScreen({route}) {
     };
 
 
-
     const renderExerciseItem = ({ item, index, isSuperset = false}) => {
 
         const renderExercise = (exercise, exerciseIndex) => (
-
             <View key={exercise.id} style={isSuperset ? styles.supersetContainer : styles.exerciseContainer}>
                 <FontAwesome5
                     name="times"

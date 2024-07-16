@@ -17,6 +17,7 @@ export const WorkoutProvider = ({ children }) => {
                 const storedWorkout = await AsyncStorage.getItem('currentWorkout');
                 if (storedWorkout) {
                     const parsedWorkout = JSON.parse(storedWorkout);
+
                     if (parsedWorkout && parsedWorkout.exercises) {
                         setWorkoutState(parsedWorkout);
                     } else {
@@ -42,6 +43,7 @@ export const WorkoutProvider = ({ children }) => {
                 setIsLoaded(true);
             }
         };
+
 
         loadWorkout();
     }, []);
