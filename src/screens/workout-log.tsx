@@ -695,11 +695,30 @@ export default function WorkoutLogScreen({route}) {
 
 
     const deleteExercise = (index) => {
+        // Helper function to recursively delete exercises
+        const deleteExerciseRecursively = (exerciseId, exercisesList) => {
+            const exerciseIndex = exercisesList.findIndex(ex => ex.id === exerciseId);
+
+            if (exerciseIndex !== -1) {
+                const exerciseToDelete = exercisesList[exerciseIndex];
+                exercisesList = exercisesList.filter((_, i) => i !== exerciseIndex);
+
+                if (exerciseToDelete.supersetExercise) {
+                    exercisesList = deleteExerciseRecursively(exerciseToDelete.supersetExercise, exercisesList);
+                }
+            }
+
+            return exercisesList;
+        };
+
         // Get the ID of the exercise being deleted
         const deletedExerciseId = exercises[index].id;
 
-        // Filter out the exercise being deleted
-        const newExercises = exercises.filter((_, i) => i !== index);
+        // Create a copy of the exercises array
+        let newExercises = [...exercises];
+
+        // Recursively delete the exercise and its supersets
+        newExercises = deleteExerciseRecursively(deletedExerciseId, newExercises);
 
         // Update exercises to reset supersetExercise property where needed
         const updatedExercises = newExercises.map(exercise => {
@@ -711,6 +730,7 @@ export default function WorkoutLogScreen({route}) {
 
         setExercises(updatedExercises);
     };
+
 
 
 
