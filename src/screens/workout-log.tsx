@@ -29,7 +29,7 @@ export default function WorkoutLogScreen({route}) {
     const nav = useNavigation();
 
     const [exercises, setExercises] = useState([
-        { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '', dropSets: []}], weightUnit: 'lbs', supersetExercise: '', weightConfig: 'totalWeight', repsConfig: 'reps', isSuperset: false}
+        { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '', dropSets: [], isFailure: null}], weightUnit: 'lbs', supersetExercise: '', weightConfig: 'totalWeight', repsConfig: 'reps', isSuperset: false}
     ]);
     const [suggestions, setSuggestions] = useState([]);
     const [userExercises, setUserExercises] = useState([]);
@@ -74,6 +74,13 @@ export default function WorkoutLogScreen({route}) {
                 [exerciseId]: latestAttempt
             }));
         }
+    };
+
+    const toggleFailure = (exerciseIndex, setIndex) => {
+        const newExercises = [...exercises];
+        const currentFailureState = newExercises[exerciseIndex].sets[setIndex].isFailure;
+        newExercises[exerciseIndex].sets[setIndex].isFailure = currentFailureState === null ? true : null;
+        setExercises(newExercises);
     };
 
     useEffect(() => {
@@ -257,7 +264,8 @@ export default function WorkoutLogScreen({route}) {
         const newSets = [...exercises[exerciseIndex].sets, {
             key: `set${exercises[exerciseIndex].sets.length + 1}`,
             weight: '',
-            reps: ''
+            reps: '',
+            isFailure: null,
         }];
         const newExercises = [...exercises];
         newExercises[exerciseIndex].sets = newSets;
@@ -281,7 +289,7 @@ export default function WorkoutLogScreen({route}) {
         const newExercise = {
             id: `exercise${exercises.length + 1}`,
             name: 'New Exercise',
-            sets: [{ key: 'set1', weight: '', reps: '' }],
+            sets: [{ key: 'set1', weight: '', reps: '', isFailure: null}],
             weightUnit: 'lbs',
             supersetExercise: '',
             weightConfig: 'totalWeight',
@@ -562,6 +570,12 @@ export default function WorkoutLogScreen({route}) {
                                         onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'reps')}
                                         value={set.reps}
                                     />
+                                    <TouchableOpacity
+                                        style={[styles.failureButton, set.isFailure && styles.failureButtonActive]}
+                                        onPress={() => toggleFailure(exerciseIndex, setIndex)}
+                                    >
+                                        <Text style={[styles.failureButtonText, set.isFailure && styles.failureButtonTextActive]}>F</Text>
+                                    </TouchableOpacity>
                                 </View>
                             </Swipeable>
                             {renderDropSets(set.dropSets, exerciseIndex, setIndex)}
@@ -1002,7 +1016,7 @@ export default function WorkoutLogScreen({route}) {
         <GestureHandlerRootView style={styles.fullScreenContainer}>
             <View style={styles.modalHeader}>
                 <Text style={styles.headerText}>Workout Log</Text>
-                <Text style={styles.timerText}>
+                <Text style={styles.workoutTimeText}>
                     {formatTime(elapsedTime)}
                 </Text>
                 <TouchableOpacity onPress={() => {
@@ -1625,6 +1639,31 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontWeight: 'bold',
         fontSize: 13,
+    },
+    failureButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'black',
+        marginLeft: 10,
+    },
+    failureButtonActive: {
+        backgroundColor: 'red',
+    },
+    failureButtonText: {
+        color: 'black',
+        fontWeight: 'bold',
+    },
+    failureButtonTextActive: {
+        color: 'white',
+    },
+    workoutTimeText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#007bff',
     },
 });
 
