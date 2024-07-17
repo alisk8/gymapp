@@ -51,6 +51,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
             if (communityDoc.exists()) {
                 setCommunityData(communityDoc.data());
                 console.log(communityDoc.data()); // Log the data fetched
+                console.log(communityData.bannerImageUrl);
             } else {
                 console.log("No such document!");
             }
@@ -119,8 +120,8 @@ const CommunityLandingPage = ({ route, navigation }) => {
     return (
         <View style={styles.container}>
             <ScrollView>
-            {communityData.bannerImage ? (
-                <Image source={{ uri: communityData.bannerImage }} style={styles.bannerImage} />
+            {communityData.bannerImageUrl ? (
+                <Image source={{ uri: communityData.bannerImageUrl }} style={styles.bannerImage} />
             ) : (
                 <View style={styles.bannerPlaceholder} />
             )}
@@ -144,7 +145,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
                     data={posts}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => (
-                        <Card>
+                        <Card containerStyle={styles.cardContainer}>
                             <Card.Title>{item.title}</Card.Title>
                             <Card.Divider />
                             <Text>{item.content}</Text>
@@ -157,17 +158,14 @@ const CommunityLandingPage = ({ route, navigation }) => {
                                         color={item.likes && item.likes.includes(userId) ? "blue" : "gray"}
                                     />
                                 </TouchableOpacity>
-                                <Button
-                                    title="Comment"
-                                    type="clear"
-                                    onPress={() => handleComment(item.id)}
-                                />
+                                <TouchableOpacity onPress={() => handleComment(item.id)} style={styles.actionButton}>
+                                    <Icon
+                                        name="comment"
+                                        size={24}
+                                        color="gray"
+                                    />
+                                </TouchableOpacity>
                             </View>
-                            <Input
-                                placeholder="Add a comment..."
-                                value={commentText[item.id] || ""}
-                                onChangeText={(text) => setCommentText({ ...commentText, [item.id]: text })}
-                            />
                             {item.comments && item.comments.map((comment, index) => (
                                 <View key={index} style={styles.comment}>
                                     <Text style={styles.commentText}>{comment.text}</Text>
@@ -245,6 +243,14 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 200,
         marginVertical: 10,
+        borderRadius: 5,
+    },
+    cardContainer: {
+        borderRadius: 10,
+    },
+    actionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
 });
 

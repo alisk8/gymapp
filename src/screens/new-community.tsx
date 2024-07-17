@@ -24,6 +24,7 @@ const CreateCommunity = () => {
     const [isPrivate, setIsPrivate] = useState(false);
     const [communities, setCommunities] = useState([]);
     const [image, setImage] = useState(null);
+    const [bannerImage, setBannerImage] = useState(null);
     const navigation = useNavigation();
 
     const handleCreate = async () => {
@@ -59,35 +60,12 @@ const CreateCommunity = () => {
 
             let imageUrl = null;
             if (image) {
-                try {
-                    const response = await fetch(image);
-                    if (!response.ok) {
-                        throw new Error(`Network response was not ok: ${response.statusText}`);
-                    }
+                imageUrl = await uploadImage(image, 'communityProfilePics');
+            }
 
-                    const blob = await response.blob();
-                    const resizedImage = await ImageManipulator.manipulateAsync(
-                        image,
-                        [{ resize: { width: 200, height: 200 } }], // Resize to 200x200 pixels
-                        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
-                    );
-
-                    const resizedBlob = await (await fetch(resizedImage.uri)).blob();
-
-                    const uniqueFileName = generateUniqueFilename();
-
-                    // Debugging information
-                    console.log('Storage reference:', storage);
-                    console.log('Storage ref function:', storageRef);
-
-                    const storageRefInstance = storageRef(storage, `communityImages/${uniqueFileName}`);
-                    await uploadBytes(storageRefInstance, resizedBlob);
-                    imageUrl = await getDownloadURL(storageRefInstance);
-                } catch (error) {
-                    console.error("Error uploading image: ", error);
-                    Alert.alert("Image Upload Error", "Failed to upload the image. Please try again.");
-                    return;
-                }
+            let bannerImageUrl = null;
+            if (bannerImage) {
+                bannerImageUrl = await uploadImage(bannerImage, 'communityBanners');
             }
 
             await setDoc(newCommunityRef, {
@@ -96,7 +74,8 @@ const CreateCommunity = () => {
                 private: isPrivate,
                 owner: userId,
                 members: [userId],
-                imageUrl: imageUrl // Add image URL to the community document
+                imageUrl: imageUrl, // Add image URL to the community document
+                bannerImageUrl: bannerImageUrl,
             });
 
             // Add the new community ID to the user's document
@@ -127,6 +106,25 @@ const CreateCommunity = () => {
         }
     };
 
+    const pickBannerImage = async () => {
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [16, 9], // Aspect ratio for a banner image
+            quality: 1,
+        });
+
+        if (!result.canceled) {
+            const manipulatedImage = await ImageManipulator.manipulateAsync(
+                result.assets[0].uri,
+                [{ resize: { width: 1280, height: 720 } }],
+                { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+            );
+            console.log('Banner Image URI:', manipulatedImage.uri); // Log the selected image URI
+            setBannerImage(manipulatedImage.uri);
+        }
+    };
+
     const generateUniqueFilename = () => {
         const timestamp = Date.now();
         const randomNumber = Math.floor(Math.random() * 1000000);
@@ -149,6 +147,32 @@ const CreateCommunity = () => {
         }, [])
     );
 
+    const uploadImage = async (uri, folder) => {
+        try {
+            const response = await fetch(uri);
+            if (!response.ok) {
+                throw new Error(`Network response was not ok: ${response.statusText}`);
+            }
+
+            const blob = await response.blob();
+            const resizedImage = await ImageManipulator.manipulateAsync(
+                uri,
+                [{ resize: folder === 'communityImages' ? { width: 200, height: 200 } : { width: 1280, height: 720 } }], // Resize to 200x200 pixels for profile, 1280x720 for banner
+                { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+            );
+
+            const resizedBlob = await (await fetch(resizedImage.uri)).blob();
+            const uniqueFileName = generateUniqueFilename();
+            const storageRefInstance = storageRef(storage, `${folder}/${uniqueFileName}`);
+            await uploadBytes(storageRefInstance, resizedBlob);
+            return await getDownloadURL(storageRefInstance);
+        } catch (error) {
+            console.error("Error uploading image: ", error);
+            Alert.alert("Image Upload Error", "Failed to upload the image. Please try again.");
+            return null;
+        }
+    };
+
     return (
         <ScrollView style={styles.container}>
             <Text style={styles.heading}>Create a New Community</Text>
@@ -157,6 +181,13 @@ const CreateCommunity = () => {
                     <Image source={{ uri: image }} style={styles.image} />
                 ) : (
                     <Text style={styles.addImageText}>Pick an Image</Text>
+                )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.bannerPickerButton} onPress={pickBannerImage}>
+                {bannerImage ? (
+                    <Image source={{ uri: bannerImage }} style={styles.bannerImage} />
+                ) : (
+                    <Text style={styles.addImageText}>Pick a Banner Image</Text>
                 )}
             </TouchableOpacity>
             <TextInput
@@ -276,6 +307,32 @@ const styles = StyleSheet.create({
     image: {
         width: 200,
         height: 200,
+        borderRadius: 8,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+    },
+    communityImage: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        alignSelf: 'center',
+        marginBottom: 10,
+    },
+    bannerPickerButton: {
+        width: '100%',
+        height: 225, // Adjust the height to accommodate 16:9 aspect ratio
+        borderWidth: 2,
+        borderColor: '#ddd',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 8,
+        backgroundColor: '#f8f9fa',
+        marginBottom: 20,
+    },
+    bannerImage: {
+        width: '100%',
+        height: '100%',
         borderRadius: 8,
         position: 'absolute',
         top: 0,

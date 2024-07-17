@@ -34,60 +34,53 @@ const Feed: React.FC = ({navigation}) => {
           data={communities}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-              <TouchableOpacity style={styles.communityItem}
-                                onPress={() => navigation.navigate('CommunityLandingPage', {communityId: item.id})}>
+              <TouchableOpacity
+                  style={styles.communityItem}
+                  onPress={() => navigation.navigate('CommunityLandingPage', { communityId: item.id })}
+              >
                 {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.communityImage} />}
-                  <View style={styles.communityInfo}>
-                    <Text style={styles.communityName}>{item.name}</Text>
-                    <Text style={styles.communityDescription}>{item.description}</Text>
-                    <Text style={styles.communityType}>{item.private ? "(Private)" : "(Public)"}</Text>
-                  </View>
+                <View style={styles.communityInfo}>
+                  <Text style={styles.communityName}>{item.name}</Text>
+                  <Text style={styles.communityDescription}>{item.description}</Text>
+                  <Text style={styles.communityType}>{item.private ? "(Private)" : "(Public)"}</Text>
+                </View>
               </TouchableOpacity>
           )}
+          contentContainerStyle={styles.container}
       />
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: '#f7f7f7',
-  },
-  backButton: {
-    backgroundColor: '#007bff',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    alignSelf: 'center',
-    marginVertical: 10,
-  },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    paddingVertical: 10,
   },
   communityItem: {
     flexDirection: 'row',
-    backgroundColor: '#007bff',
-    padding: 10,
+    backgroundColor: '#fff',
+    padding: 15,
     marginVertical: 5,
-    borderRadius: 20,
-    width: '100%',
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
     alignItems: 'center',
-    justifyContent: 'center', // Center the content horizontally
-  },
-  communityText: {
-    color: 'white',
-    fontWeight: 'bold',
   },
   communityImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginRight: 50,
+    marginRight: 15,
   },
   communityInfo: {
-    alignItems: 'center', // Center the content within the communityInfo
+    flex: 1,
   },
   communityName: {
     fontSize: 18,
