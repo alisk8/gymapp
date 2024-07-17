@@ -4,10 +4,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-
 import Home from './src/screens/Home';
 import Account from './src/screens/Account';
-import Post from './src/screens/Post';
 import Progress from './src/screens/Progress';
 import Notifications from './src/screens/Notifications';
 import PersonalDetails from './src/screens/PersonalDetails';
@@ -20,6 +18,8 @@ import { WorkoutProvider } from './src/contexts/WorkoutContext';
 import Communities from './src/screens/CommunityFeed';
 import NewCommunity from './src/screens/new-community';
 import WorkoutSummaryScreen from './src/screens/WorkoutSummary';
+import communityLandingPage from './src/screens/CommunityLandingPage';
+import CommunityPostScreen from "./src/screens/CommunityPost";
 
 
 const Stack = createNativeStackNavigator();
@@ -217,7 +217,7 @@ function FeedStack() {
                 name='WorkoutSummaryScreen'
                 component={WorkoutSummaryScreen}
                 options={{
-                    headerShown: false,
+                    headerShown: true,
                     presentation: 'fullScreenModal',
                 }}
             />
@@ -242,6 +242,19 @@ function CommunitiesStack() {
                 name='NewCommunity'
                 component={NewCommunity}
                 options={{title: "NewCommunity"}}
+            />
+            <Stack.Screen
+                name='CommunityLandingPage'
+                component={communityLandingPage}
+                options={{title: ""}}
+            />
+            <Stack.Screen
+                name='CommunityPostScreen'
+                component={CommunityPostScreen}
+                options={{
+                    headerShown: true,
+                    presentation: 'fullScreenModal',
+                }}
             />
             <Stack.Screen
                 name='WorkoutLog'

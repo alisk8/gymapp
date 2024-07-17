@@ -10,7 +10,7 @@ import {
     Keyboard,
     Pressable,
     FlatList,
-    Modal, KeyboardAvoidingView, Platform
+    Modal, KeyboardAvoidingView, Platform, Switch
 } from 'react-native';
 import { db, firebase_auth } from '../../firebaseConfig';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
@@ -29,7 +29,7 @@ export default function WorkoutLogScreen({route}) {
     const nav = useNavigation();
 
     const [exercises, setExercises] = useState([
-        { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '', dropSets: [], isFailure: null}], weightUnit: 'lbs', supersetExercise: '', weightConfig: 'totalWeight', repsConfig: 'reps', isSuperset: false}
+        { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '', dropSets: [], isFailure: null, completed: false}], weightUnit: 'lbs', supersetExercise: '', weightConfig: 'totalWeight', repsConfig: 'reps', isSuperset: false}
     ]);
     const [suggestions, setSuggestions] = useState([]);
     const [userExercises, setUserExercises] = useState([]);
@@ -53,6 +53,8 @@ export default function WorkoutLogScreen({route}) {
     const { workoutState, setWorkoutState, resetWorkout, startWorkoutLog, stopWorkoutLog, startTime, elapsedTime, setElapsedTime, pauseWorkoutLog, finishWorkout, workoutFinished} = useWorkout();
     const previousScreen = route.params?.previousScreen;
     const [showPreviousAttempts, setShowPreviousAttempts] = useState({});
+    const [isFailureTracking, setIsFailureTracking] = useState(false);
+
 
 
     const timerHeight = useSharedValue(120);
@@ -76,6 +78,10 @@ export default function WorkoutLogScreen({route}) {
         }
     };
 
+    const toggleFailureTracking = () => {
+        setIsFailureTracking(!isFailureTracking);
+    };
+
     const toggleFailure = (exerciseIndex, setIndex) => {
         const newExercises = [...exercises];
         const currentFailureState = newExercises[exerciseIndex].sets[setIndex].isFailure;
@@ -96,9 +102,11 @@ export default function WorkoutLogScreen({route}) {
     }, [startTime, workoutFinished]);
 
     const formatTime = (seconds) => {
-        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
         const remainingSeconds = seconds % 60;
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+
+        return `${hours > 0 ? `${hours}:` : ''}${hours > 0 ? minutes.toString().padStart(2, '0') : minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
 
     const fetchLatestAttempt = async (exerciseName) => {
@@ -266,6 +274,7 @@ export default function WorkoutLogScreen({route}) {
             weight: '',
             reps: '',
             isFailure: null,
+            completed: false
         }];
         const newExercises = [...exercises];
         newExercises[exerciseIndex].sets = newSets;
@@ -503,6 +512,12 @@ export default function WorkoutLogScreen({route}) {
                         set.dropSets = [];
                     }
 
+                    const toggleCompleted = () => {
+                        const newExercises = [...exercises];
+                        newExercises[exerciseIndex].sets[setIndex].completed = !newExercises[exerciseIndex].sets[setIndex].completed;
+                        setExercises(newExercises);
+                    };
+
                     return (
                         <GestureHandlerRootView key={set.key}>
                             <Swipeable
@@ -570,11 +585,20 @@ export default function WorkoutLogScreen({route}) {
                                         onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'reps')}
                                         value={set.reps}
                                     />
-                                    <TouchableOpacity
+                                    {isFailureTracking && <TouchableOpacity
                                         style={[styles.failureButton, set.isFailure && styles.failureButtonActive]}
                                         onPress={() => toggleFailure(exerciseIndex, setIndex)}
                                     >
-                                        <Text style={[styles.failureButtonText, set.isFailure && styles.failureButtonTextActive]}>F</Text>
+                                       <Text style={[styles.failureButtonText, set.isFailure && styles.failureButtonTextActive]}>F</Text>
+                                    </TouchableOpacity>}
+                                    <TouchableOpacity onPress={toggleCompleted} style={styles.checkboxContainer}>
+                                        {set.completed ? (
+                                            <View style={styles.checkboxChecked}>
+                                                <Text style={styles.checkboxText}>✓</Text>
+                                            </View>
+                                        ) : (
+                                            <View style={styles.checkboxUnchecked} />
+                                        )}
                                     </TouchableOpacity>
                                 </View>
                             </Swipeable>
@@ -655,7 +679,7 @@ export default function WorkoutLogScreen({route}) {
                             </TouchableOpacity>
                         )}
                     >
-                        <View style={styles.dropSetRow}>
+                        <View style={[styles.dropSetRow, isFailureTracking && styles.extraMove]}>
                             <FontAwesome5 name="arrow-down" size={16} style={styles.dropSetIcon}/>
                             <TextInput
                                 placeholder={weightPlaceholder}
@@ -886,7 +910,27 @@ export default function WorkoutLogScreen({route}) {
 
     const renderExerciseItem = ({ item, index, isSuperset = false}) => {
 
-        const renderExercise = (exercise, exerciseIndex) => (
+        const renderExercise = (exercise, exerciseIndex) => {
+
+        const toggleAllCompleted = () => {
+            const newExercises = [...exercises];
+            newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.map(set => ({
+                ...set,
+                completed: !set.completed,
+            }));
+            setExercises(newExercises);
+        };
+
+        const toggleAllFailure = () => {
+            const newExercises = [...exercises];
+            newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.map(set => ({
+                ...set,
+                isFailure: !set.isFailure,
+            }));
+            setExercises(newExercises);
+        };
+
+        return(
             <View key={exercise.id} style={isSuperset ? styles.supersetContainer : styles.exerciseContainer}>
                 <FontAwesome5
                     name="times"
@@ -901,12 +945,23 @@ export default function WorkoutLogScreen({route}) {
                 <TouchableOpacity onPress={() => togglePreviousAttempts(exercise.id, exercise.name)} style={styles.compareButton}>
                     <Text style={showPreviousAttempts[exercise.id] ? styles.blueIcon : styles.blackIcon}>Previous</Text>
                 </TouchableOpacity>
+
+                    {isFailureTracking && <TouchableOpacity onPress={toggleAllFailure} style={[styles.allFailureButton, styles.failureButtonActive]}>
+                        <Text style={styles.failureButtonTextActive}>FF</Text>
+                    </TouchableOpacity>}
+                    <TouchableOpacity onPress={toggleAllCompleted} style={styles.allCheckboxContainer}>
+                        <View style={styles.checkboxChecked}>
+                            <Text style={styles.checkboxText}>✓✓</Text>
+                        </View>
+                    </TouchableOpacity>
+
                 <TextInput
                     style={styles.header}
                     onChangeText={(text) => handleExerciseNameChange(text, exerciseIndex)}
                     value={exercise.name}
                 />
                 {renderSuggestions(exerciseIndex)}
+
                 {renderSets(exercise.sets, exerciseIndex)}
                 <View style={styles.unitButtonsContainer}>
                     <TouchableOpacity
@@ -928,12 +983,13 @@ export default function WorkoutLogScreen({route}) {
                 </View>
                 <View style={styles.buttonsRow}>
                     <Button title="+ add set" onPress={() => addSet(exerciseIndex)} />
-                    {!item.supersetExercise && <Button title="+ add superset" onPress={() => addExercise(exerciseIndex)} />}
+                    {!item.isSuperset && <Button title="+ add superset" onPress={() => addExercise(exerciseIndex)} />}
                 </View>
                 {item.supersetExercise && exercises.find((ex) => ex.id === item.supersetExercise) &&
                     renderExerciseItem({ item: exercises.find((ex) => ex.id === item.supersetExercise), index: exercises.findIndex((ex) => ex.id === item.supersetExercise),isSuperset: true })}
                     </View>
         );
+    };
 
         return (
             <View key={item.id}>
@@ -1039,6 +1095,7 @@ export default function WorkoutLogScreen({route}) {
                     renderItem={renderExerciseItem}
                     keyExtractor={(item) => item.id}
                     ListHeaderComponent={() => (
+                     <View>
                         <View style={styles.checkboxContainer}>
                             <Checkbox.Item
                                 label="Save as Template"
@@ -1055,6 +1112,14 @@ export default function WorkoutLogScreen({route}) {
                                 />
                             )}
                         </View>
+                        <View style={styles.toggleContainer}>
+                            <Text style={styles.toggleLabel}>Track Failure</Text>
+                            <Switch
+                                onValueChange={toggleFailureTracking}
+                                value={isFailureTracking}
+                            />
+                        </View>
+                    </View>
                     )}
                     ListFooterComponent={() => (
                         <View>
@@ -1362,6 +1427,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginVertical: 10,
     },
+    allCheckboxContainer: {
+        top: 6, // Adjust to properly align the button
+        right: 50,
+        position:"absolute",
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 10,
+    },
     checkboxLabel: {
         fontSize: 16,
         fontWeight: 'bold',
@@ -1575,6 +1648,10 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 10,
+        marginRight: 50,
+    },
+    extraMove: {
+        marginRight: 100,
     },
     previousAttemptButton: {
         backgroundColor: 'blue',
@@ -1650,6 +1727,19 @@ const styles = StyleSheet.create({
         borderColor: 'black',
         marginLeft: 10,
     },
+    allFailureButton: {
+        position: 'absolute',
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'black',
+        marginLeft: 10,
+        top: 16,
+        right: 100,
+    },
     failureButtonActive: {
         backgroundColor: 'red',
     },
@@ -1664,6 +1754,51 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: '#007bff',
+    },
+    toggleContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 10,
+    },
+    toggleLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    checkboxContainer: {
+        marginLeft: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    checkboxUnchecked: {
+        width: 40,
+        height: 40,
+        borderWidth: 2,
+        borderColor: 'green',
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    checkboxChecked: {
+        width: 40,
+        height: 40,
+        borderWidth: 2,
+        borderColor: 'green',
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'green',
+    },
+    checkboxText: {
+        color: 'white',
+        fontWeight: 'bold',
+    },
+    toggleButtonsRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginBottom: 10,
+        alignItems: 'center',
     },
 });
 

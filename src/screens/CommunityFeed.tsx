@@ -1,12 +1,12 @@
 import React, {useState, useEffect, useCallback} from 'react';
-import {View, FlatList, ScrollView, TouchableOpacity, Text, StyleSheet, Image} from 'react-native';
+import {View, FlatList, ScrollView, TouchableOpacity, Text, StyleSheet, Image, Touchable} from 'react-native';
 import Post from './CommunityPage';
 import { db } from "../../firebaseConfig";
 import { doc, setDoc, collection, getDocs } from "firebase/firestore";
 import {useFocusEffect} from "@react-navigation/native";
 
 
-const Feed: React.FC = () => {
+const Feed: React.FC = ({navigation}) => {
   const [communities, setCommunities] = useState([]);
 
 
@@ -28,19 +28,21 @@ const Feed: React.FC = () => {
   );
 
 
+
   return (
       <FlatList
           data={communities}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-              <View style={styles.communityItem}>
+              <TouchableOpacity style={styles.communityItem}
+                                onPress={() => navigation.navigate('CommunityLandingPage', {communityId: item.id})}>
                 {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.communityImage} />}
                   <View style={styles.communityInfo}>
                     <Text style={styles.communityName}>{item.name}</Text>
                     <Text style={styles.communityDescription}>{item.description}</Text>
                     <Text style={styles.communityType}>{item.private ? "(Private)" : "(Public)"}</Text>
                   </View>
-              </View>
+              </TouchableOpacity>
           )}
       />
   );
