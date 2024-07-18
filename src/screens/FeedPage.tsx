@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { FlatList, View, Text, StyleSheet, ActivityIndicator, Image, Dimensions, TouchableOpacity, RefreshControl } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
-import Swiper from 'react-native-swiper';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { db, firebase_auth } from '../../firebaseConfig';
-import { collection, getDocs, query, orderBy, limit, doc, getDoc } from '@firebase/firestore';
-import { Ionicons } from '@expo/vector-icons';
+import { collection, getDocs, query, orderBy, limit, startAfter, doc, getDoc } from '@firebase/firestore';
+import { InteractionManager } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
+import Swiper from 'react-native-swiper';
 
-const { width: screenWidth } = Dimensions.get('window');
 const defaultProfilePicture = 'https://firebasestorage.googleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2Fpfp.jpeg?alt=media&token=dd124ee9-6c61-48ad-b41c-97f3acc3350c';
 
 const FeedPage = ({ navigation }) => {
@@ -15,15 +14,20 @@ const FeedPage = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
-  const batchSize = 10;
+  const [lastVisible, setLastVisible] = useState({});
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadedHighlightIds, setLoadedHighlightIds] = useState(new Set());
 
   useEffect(() => {
-    fetchUserProfile();
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchUserProfile();
+    });
+    return () => task.cancel();
   }, []);
 
   useEffect(() => {
     if (userProfile) {
-      fetchHighlights();
+      fetchHighlights(true);
     }
   }, [userProfile]);
 
@@ -47,17 +51,28 @@ const FeedPage = ({ navigation }) => {
     }
   };
 
-  const fetchHighlights = async () => {
-    setLoading(true);
+  const fetchHighlights = async (isRefresh = false) => {
+    if (isRefresh) {
+      setLoading(true);
+      setLastVisible({});
+      setHighlights([]);
+      setLoadedHighlightIds(new Set());
+    }
+
+    if (loadingMore && !isRefresh) return;
+
+    setLoadingMore(true);
 
     try {
       const following = userProfile.following || [];
       if (following.length === 0) {
         setLoading(false);
+        setLoadingMore(false);
         return;
       }
 
       let allHighlights = [];
+      let newLastVisible = { ...lastVisible };
 
       for (const userId of following) {
         const userRef = doc(db, 'userProfiles', userId);
@@ -67,76 +82,119 @@ const FeedPage = ({ navigation }) => {
         let highlightsQuery = query(
           collection(db, 'userProfiles', userId, 'highlights'),
           orderBy('timestamp', 'desc'),
-          limit(batchSize)
+          limit(10)
         );
+
+        if (lastVisible[userId]) {
+          highlightsQuery = query(highlightsQuery, startAfter(lastVisible[userId]));
+        }
 
         const highlightsSnapshot = await getDocs(highlightsQuery);
 
         if (highlightsSnapshot.docs.length > 0) {
+          newLastVisible[userId] = highlightsSnapshot.docs[highlightsSnapshot.docs.length - 1];
           highlightsSnapshot.docs.forEach(doc => {
             const highlightData = doc.data();
-            allHighlights.push({
-              id: doc.id,
-              ...highlightData,
-              userId,
-              firstName: userProfileData.firstName,
-              lastName: userProfileData.lastName,
-              profilePicture: userProfileData.profilePicture || defaultProfilePicture,
-              timestamp: highlightData.timestamp ? highlightData.timestamp.toDate() : null,
-            });
+            if (!loadedHighlightIds.has(doc.id)) {
+              allHighlights.push({
+                id: doc.id,
+                ...highlightData,
+                userId,
+                firstName: userProfileData.firstName,
+                lastName: userProfileData.lastName,
+                profilePicture: userProfileData.profilePicture || defaultProfilePicture,
+                timestamp: highlightData.timestamp ? highlightData.timestamp.toDate() : null,
+              });
+              setLoadedHighlightIds(prevIds => new Set(prevIds).add(doc.id));
+            }
           });
         }
       }
 
       allHighlights.sort((a, b) => b.timestamp - a.timestamp);
-      setHighlights(allHighlights);
+      setHighlights(prevHighlights => {
+        const mergedHighlights = isRefresh ? allHighlights : [...prevHighlights, ...allHighlights];
+        return mergedHighlights.sort((a, b) => b.timestamp - a.timestamp);
+      });
+      setLastVisible(newLastVisible);
       setLoading(false);
+      setLoadingMore(false);
     } catch (error) {
       console.error('Error fetching highlights: ', error);
       setError('Failed to load highlights');
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   const refreshHighlights = async () => {
     setRefreshing(true);
-    await fetchHighlights();
+    await fetchHighlights(true);
     setRefreshing(false);
   };
 
-  const timeSince = (date) => {
-    const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
-    let interval = Math.floor(seconds / 31536000);
+  const renderItem = useCallback(({ item }) => {
+    return (
+      <View style={styles.highlightContainer}>
+        <View style={styles.userInfoContainer}>
+          <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+            <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+            <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+          </TouchableOpacity>
+        </View>
+        {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
+        {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
 
-    if (interval > 1) {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-    interval = Math.floor(seconds / 2592000);
-    if (interval > 1) {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-    interval = Math.floor(seconds / 604800);
-    if (interval >= 1) {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-    interval = Math.floor(seconds / 86400);
-    if (interval > 1) {
-      return `${interval} days ago`;
-    }
-    interval = Math.floor(seconds / 3600);
-    if (interval > 1) {
-      return `${interval} hours ago`;
-    }
-    interval = Math.floor(seconds / 60);
-    if (interval > 1) {
-      return `${interval} minutes ago`;
-    }
-    return `just now`;
+        {item.mediaUrls && item.mediaUrls.length > 0 && (
+          <View style={styles.imageContainer}>
+            <Swiper style={styles.swiper} showsPagination={true}>
+              {item.mediaUrls.map((mediaUrl, index) => (
+                <Image 
+                  key={`${item.id}_${index}`} 
+                  source={{ uri: mediaUrl }} 
+                  style={styles.postImage} 
+                />
+              ))}
+            </Swiper>
+          </View>
+        )}
+
+        {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleLike(item.id)}>
+            <Icon name="heart-outline" size={25} color="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id)}>
+            <Icon name="chatbubble-outline" size={25} color="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
+            <Icon name="share-outline" size={25} color="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleSave(item.id)}>
+            <Icon name="bookmark-outline" size={25} color="#000" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }, []);
+
+  const handleLike = (postId) => {
+    // Handle like action
   };
 
-  const handleProfilePress = (user) => {
-    navigation.navigate('UserDetails', { user });
+  const handleComment = (postId) => {
+    // Handle comment action
+  };
+
+  const handleShare = (postId) => {
+    // Handle share action
+  };
+
+  const handleSave = (postId) => {
+    // Handle save action
   };
 
   if (loading && !refreshing) {
@@ -155,81 +213,17 @@ const FeedPage = ({ navigation }) => {
     );
   }
 
-  const renderItem = ({ item }) => {
-    return (
-      <View style={styles.highlightContainer}>
-        <View style={styles.userInfoContainer}>
-          <TouchableOpacity onPress={() => handleProfilePress(item)}>
-            <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleProfilePress(item)}>
-            <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
-          </TouchableOpacity>
-        </View>
-        {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
-        {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
-
-        {item.mediaUrls && item.mediaUrls.length > 0 ? (
-          <View style={styles.imageContainer}>
-            <Swiper style={styles.swiper} showsPagination={true}>
-              {item.mediaUrls.map((mediaUrl, index) => {
-                const mediaType = item.mediaType || 'photo';
-                return (
-                  mediaType === 'photo' ? (
-                    <Image 
-                      key={`${item.id}_${index}`} 
-                      source={{ uri: mediaUrl }} 
-                      style={styles.postImage} 
-                    />
-                  ) : (
-                    <Video
-                      key={`${item.id}_${index}`}
-                      source={{ uri: mediaUrl }}
-                      rate={1.0}
-                      volume={1.0}
-                      isMuted={false}
-                      resizeMode={ResizeMode.CONTAIN} 
-                      useNativeControls
-                      style={styles.postImage}
-                    />
-                  )
-                );
-              })}
-            </Swiper>
-            <View style={styles.actionButtonsContainer}>
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="heart-outline" size={24} color="black" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="chatbubble-outline" size={24} color="black" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="share-outline" size={24} color="black" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="bookmark-outline" size={24} color="black" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : null}
-
-        {item.timestamp && <Text style={styles.timestampText}>{timeSince(item.timestamp)}</Text>}
-        {item.weight && <Text style={styles.weightText}>{item.weight}</Text>}
-      </View>
-    );
-  };
-
   return (
     <FlatList
       data={highlights}
-      keyExtractor={(item) => item.id}
+      keyExtractor={item => item.id}
       renderItem={renderItem}
+      onEndReached={() => fetchHighlights()}
+      onEndReachedThreshold={0.5}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={refreshHighlights}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={refreshHighlights} />
       }
+      ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
     />
   );
 };
@@ -295,11 +289,6 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     paddingHorizontal: 10,
   },
-  weightText: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 5,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -317,3 +306,4 @@ const styles = StyleSheet.create({
 });
 
 export default FeedPage;
+/*Current Problem, loads top 10 posts of each user instead of top 10 posts overall */

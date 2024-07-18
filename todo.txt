@@ -1,0 +1,6 @@
+/*TODO: 
+- FIX DATE ORDERING, 
+- ADD LIKE SAVE ETC IMPLEMENTATION
+- Fix image sizing and add autoplay on video
+- fix swiping on video/image
+- Real time updating
