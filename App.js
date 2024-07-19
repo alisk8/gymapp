@@ -24,6 +24,8 @@ import PostDetails from './src/screens/PostDetails';
 import TrackedExercise from './src/screens/TrackedExercise';
 import FeedPage from './src/screens/FeedPage';
 import Saved from './src/screens/Saved';
+import Messages from './src/screens/Messages';
+import UserDMs from './src/screens/UserDMs';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -93,6 +95,16 @@ function PostStack() {
   );
 }
 
+function MessagesStack() {
+  return (
+    <Stack.Navigator initialRouteName='Messages'>
+      <Stack.Screen name='Messages' component={Messages} options={screenOptions} />
+      <Stack.Screen name="UserDMs" component={UserDMs} />
+      <Stack.Screen name='UserDetails' component={UserDetails} />
+    </Stack.Navigator>
+  );
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -148,6 +160,17 @@ function App() {
                 title: 'Post', 
                 tabBarIcon: ({ color, size }) => (
                   <Ionicons name="create-outline" color={color} size={size} />
+                ) 
+              }} 
+            />
+            <Tab.Screen 
+              name='MessagesStack' 
+              component={MessagesStack} 
+              options={{ 
+                headerShown: false, 
+                title: 'Messages', 
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons name="chatbubbles-outline" color={color} size={size} />
                 ) 
               }} 
             />
