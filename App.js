@@ -2,10 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { onAuthStateChanged } from 'firebase/auth';
 import { firebase_auth } from './firebaseConfig'; // Update this path as necessary
+import 'react-native-gesture-handler';
+import 'react-native-reanimated';
+
 
 import Home from './src/screens/Home';
 import Account from './src/screens/Account';
@@ -19,6 +23,7 @@ import UserList from './src/screens/UserList';
 import PostDetails from './src/screens/PostDetails';
 import TrackedExercise from './src/screens/TrackedExercise';
 import FeedPage from './src/screens/FeedPage';
+import Saved from './src/screens/Saved';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -63,6 +68,8 @@ function AccountStack() {
       <Stack.Screen name='UserList' component={UserList} />
       <Stack.Screen name='UserDetails' component={UserDetails} />
       <Stack.Screen options={{ title: "Personal Details" }} name='PersonalDetails' component={PersonalDetails} />
+      <Stack.Screen name="PostDetails" component={PostDetails} />
+      <Stack.Screen name="Saved" component={Saved} />
     </Stack.Navigator>
   );
 }
@@ -107,71 +114,74 @@ function App() {
   }
 
   return (
-    <NavigationContainer>
-      {user ? (
-        <Tab.Navigator>
-          <Tab.Screen 
-            name='HomeStack' 
-            component={HomeStack} 
-            options={{ 
-              headerShown: false, 
-              title: 'Home', 
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="home-outline" color={color} size={size} />
-              ) 
-            }} 
-          />
-          <Tab.Screen 
-            name='FeedPage' 
-            component={FeedPage} 
-            options={{ 
-              headerShown: false, 
-              title: 'Feed', 
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="list-outline" color={color} size={size} />
-              ) 
-            }} 
-          />
-          <Tab.Screen 
-            name='PostStack' 
-            component={PostStack} 
-            options={{ 
-              headerShown: false, 
-              title: 'Post', 
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="create-outline" color={color} size={size} />
-              ) 
-            }} 
-          />
-          <Tab.Screen 
-            name='ProgressStack' 
-            component={ProgressStack} 
-            options={{ 
-              headerShown: false, 
-              title: 'Progress', 
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="bar-chart-outline" color={color} size={size} />
-              ) 
-            }} 
-          />
-          <Tab.Screen 
-            name='AccountStack' 
-            component={AccountStack} 
-            options={{ 
-              headerShown: false, 
-              title: 'Account', 
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="person-outline" color={color} size={size} />
-              ) 
-            }} 
-          />
-        </Tab.Navigator>
-      ) : (
-        <Stack.Navigator initialRouteName='Account'>
-          <Stack.Screen name='Account' component={Account} options={{ headerShown: false }} />
-        </Stack.Navigator>
-      )}
-    </NavigationContainer>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NavigationContainer>
+        {user ? (
+          <Tab.Navigator>
+            <Tab.Screen 
+              name='HomeStack' 
+              component={HomeStack} 
+              options={{ 
+                headerShown: false, 
+                title: 'Home', 
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons name="home-outline" color={color} size={size} />
+                ) 
+              }} 
+            />
+            <Tab.Screen 
+              name='FeedPage' 
+              component={FeedPage} 
+              options={{ 
+                headerShown: false, 
+                title: 'Feed', 
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons name="list-outline" color={color} size={size} />
+                ) 
+              }} 
+            />
+            <Tab.Screen 
+              name='PostStack' 
+              component={PostStack} 
+              options={{ 
+                headerShown: false, 
+                title: 'Post', 
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons name="create-outline" color={color} size={size} />
+                ) 
+              }} 
+            />
+            <Tab.Screen 
+              name='ProgressStack' 
+              component={ProgressStack} 
+              options={{ 
+                headerShown: false, 
+                title: 'Progress', 
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons name="bar-chart-outline" color={color} size={size} />
+                ) 
+              }} 
+            />
+            <Tab.Screen 
+              name='AccountStack' 
+              component={AccountStack} 
+              options={{ 
+                headerShown: false, 
+                title: 'Account', 
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons name="person-outline" color={color} size={size} />
+                ) 
+              }} 
+            />
+          </Tab.Navigator>
+        ) : (
+          <Stack.Navigator initialRouteName='Account'>
+            <Stack.Screen name='Account' component={Account} options={{ headerShown: false }} />
+          </Stack.Navigator>
+        )}
+      </NavigationContainer>
+    </GestureHandlerRootView>
+
   );
 }
 

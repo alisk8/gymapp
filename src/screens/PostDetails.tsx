@@ -134,12 +134,17 @@ const PostDetails = ({ route }) => {
 
     const userUid = currentUser.uid;
     const postRef = doc(db, "userProfiles", userId, collection, postId);
+    const userRef = doc(db, "userProfiles", userUid);
 
     try {
       const postDoc = await getDoc(postRef);
       if (postDoc.exists()) {
         await updateDoc(postRef, {
           savedBy: arrayUnion(userUid),
+        });
+
+        await updateDoc(userRef, {
+          savedPosts: arrayUnion({ collection, postId, userId }),
         });
 
         setLocalPosts((prevPosts) => {
@@ -169,12 +174,17 @@ const PostDetails = ({ route }) => {
 
     const userUid = currentUser.uid;
     const postRef = doc(db, "userProfiles", userId, collection, postId);
+    const userRef = doc(db, "userProfiles", userUid);
 
     try {
       const postDoc = await getDoc(postRef);
       if (postDoc.exists()) {
         await updateDoc(postRef, {
           savedBy: arrayRemove(userUid),
+        });
+
+        await updateDoc(userRef, {
+          savedPosts: arrayRemove({ collection, postId, userId }),
         });
 
         setLocalPosts((prevPosts) => {

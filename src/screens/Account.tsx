@@ -16,8 +16,15 @@ import {
   signInWithEmailAndPassword,
   User,
 } from "firebase/auth";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import useMarkedDates from "../../hooks/setMarkedDates";
+import Swiper from "react-native-swiper";
+import {
+  doc,
+  getDocs,
+  collection,
+  onSnapshot,
+  setDoc,
+} from "firebase/firestore";
 
 type AdditionalInfo = {
   firstName: string;
@@ -52,6 +59,7 @@ export default function Account({ navigation }) {
     following: [],
   });
   const [showMenu, setShowMenu] = useState(false);
+  const [posts, setPosts] = useState([]);
 
   const { clearMarkedDates } = useMarkedDates(); // use the custom hook
 
@@ -77,6 +85,40 @@ export default function Account({ navigation }) {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    fetchHighlightsAndWorkouts();
+  }, [user?.uid]);
+
+  const fetchHighlightsAndWorkouts = async () => {
+    const userRef = doc(db, "userProfiles", user.uid);
+
+    const highlightsRef = collection(userRef, "highlights");
+    const highlightsSnapshot = await getDocs(highlightsRef);
+    const highlightsData = highlightsSnapshot.docs.map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+      timestamp: doc.data().timestamp?.toDate().getTime() || Date.now(),
+      type: "highlight",
+      collection: "highlights",
+    }));
+
+    const workoutsRef = collection(userRef, "workouts");
+    const workoutsSnapshot = await getDocs(workoutsRef);
+    const workoutsData = workoutsSnapshot.docs.map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+      timestamp: doc.data().timestamp?.toDate().getTime() || Date.now(),
+      type: "workout",
+      collection: "workouts",
+    }));
+
+    const combinedData = [...highlightsData, ...workoutsData].sort(
+      (a, b) => a.timestamp - b.timestamp
+    );
+
+    setPosts(combinedData);
+  };
 
   const handleLogin = async () => {
     try {
@@ -124,6 +166,10 @@ export default function Account({ navigation }) {
     clearMarkedDates(); // clear marked dates upon sign out
   };
 
+  const handlePostPress = (postIndex) => {
+    navigation.navigate("PostDetails", { posts, postIndex, userId: user.uid });
+  };
+
   const handleFieldUpdate = (field: string, value: any) => {
     setAdditionalInfo((prevInfo) => ({
       ...prevInfo,
@@ -164,6 +210,15 @@ export default function Account({ navigation }) {
             }}
           >
             <Text style={styles.menuItemText}>Edit Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              setShowMenu(false);
+              navigation.navigate("Saved");
+            }}
+          >
+            <Text style={styles.menuItemText}>My Saved</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.menuItem}
@@ -211,6 +266,56 @@ export default function Account({ navigation }) {
                 <Text style={styles.chipText}>{interest}</Text>
               </View>
             ))}
+          </View>
+
+          <View style={styles.postsContainer}>
+            {posts?.length > 0 ? (
+              posts.map((post, index) => (
+                <View key={index} style={styles.postWrapper}>
+                  {index % 3 === 0 && <View style={styles.row} />}
+                  <TouchableOpacity
+                    style={styles.card}
+                    onPress={() => handlePostPress(index)}
+                  >
+                    {post.type === "workout" ? (
+                      <View style={styles.imageContainer}>
+                        <Image
+                          source={{
+                            uri: "https://cdn.pixabay.com/photo/2018/05/28/13/14/dumbell-3435990_1280.jpg",
+                          }}
+                          style={styles.postImage}
+                        />
+                        <View style={styles.overlay}>
+                          <Text style={styles.workoutTitle}>Workout</Text>
+                        </View>
+                      </View>
+                    ) : post.mediaUrls ? (
+                      <Swiper
+                        autoplay
+                        autoplayTimeout={4}
+                        showsPagination={false}
+                        style={styles.swiper}
+                      >
+                        {post.mediaUrls.map((url, i) => (
+                          <Image
+                            key={i}
+                            source={{ uri: url }}
+                            style={styles.postImage}
+                          />
+                        ))}
+                      </Swiper>
+                    ) : (
+                      <Image
+                        source={require("../../assets/placeholder.jpeg")}
+                        style={styles.postImage}
+                      />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noEntriesText}>No posts found.</Text>
+            )}
           </View>
         </View>
       )}
@@ -438,5 +543,67 @@ const styles = StyleSheet.create({
     marginTop: 20,
     color: "#007BFF",
     fontSize: 16,
+  },
+  postsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 20,
+  },
+  postWrapper: {
+    width: "33%",
+    padding: 5,
+  },
+  row: {
+    flexDirection: "row",
+    width: "100%",
+  },
+  card: {
+    backgroundColor: "#f9f9f9",
+    padding: 10,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  postImage: {
+    width: "100%",
+    height: 100,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  swiper: {
+    height: 100,
+  },
+  noEntriesText: {
+    fontSize: 16,
+    color: "#555",
+    textAlign: "center",
+    marginVertical: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 20,
+  },
+  imageContainer: {
+    position: "relative",
+  },
+  overlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 5,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+  },
+  workoutTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
+    textAlign: "center",
   },
 });
