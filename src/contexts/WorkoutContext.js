@@ -1,5 +1,6 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, {createContext, useState, useContext, useEffect, useCallback} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useFocusEffect} from "@react-navigation/native";
 
 const WorkoutContext = createContext();
 
@@ -10,6 +11,11 @@ export const WorkoutProvider = ({ children }) => {
     const [startTime, setStartTime] = useState(null);
     const [elapsedTime, setElapsedTime] = useState(0);
     const [workoutFinished, setWorkoutFinished] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
+    const [pausedTime, setPausedTime] = useState(0);  // Total time the workout has been paused
+    const [pauseStart, setPauseStart] = useState(null);  // The time when the pause started
+    const [loadedFromTemplate, setLoadedFromTemplate] = ('');
+
 
     useEffect(() => {
         const loadWorkout = async () => {
@@ -47,6 +53,20 @@ export const WorkoutProvider = ({ children }) => {
 
         loadWorkout();
     }, []);
+
+
+    useEffect(() => {
+        let timer;
+        if (startTime && !isPaused) {
+            timer = setInterval(() => {
+                const currentTime = new Date();
+                const updatedElapsedTime = Math.floor((currentTime - startTime - pausedTime) / 1000); // Subtract paused time
+                setElapsedTime(updatedElapsedTime);
+            }, 1000);
+        }
+        return () => clearInterval(timer);
+    }, [startTime, isPaused, pausedTime]);
+
 
     useEffect(() => {
         if (isLoaded) {
@@ -94,6 +114,22 @@ export const WorkoutProvider = ({ children }) => {
         setWorkoutFinished(false);
     };
 
+    const pauseWorkout = () => {
+        if (!isPaused) {
+            setIsPaused(true);
+            setPauseStart(new Date());  // Record the time when the pause started
+        }
+    };
+
+    const resumeWorkout = () => {
+        if (isPaused) {
+            const now = new Date();
+            const pausedDuration = now - pauseStart;  // Calculate how long the workout was paused
+            setPausedTime(pausedTime + pausedDuration);  // Add this duration to the total paused time
+            setIsPaused(false);
+        }
+    };
+
     const stopWorkoutLog = () => setIsWorkoutLogActive(false);
 
     const finishWorkout = () => {setWorkoutFinished(true);
@@ -101,7 +137,7 @@ export const WorkoutProvider = ({ children }) => {
 
 
     return (
-        <WorkoutContext.Provider value={{ workoutState, setWorkoutState, resetWorkout, isWorkoutLogActive, startWorkoutLog, stopWorkoutLog,  startTime, setStartTime, elapsedTime, setElapsedTime, workoutFinished, finishWorkout}}>
+        <WorkoutContext.Provider value={{ workoutState, isPaused, setWorkoutState, resetWorkout, isWorkoutLogActive, startWorkoutLog, stopWorkoutLog,  startTime, setStartTime, elapsedTime, setElapsedTime, workoutFinished, finishWorkout, pauseWorkout, resumeWorkout, loadedFromTemplate}}>
             {children}
         </WorkoutContext.Provider>
     );

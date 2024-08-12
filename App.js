@@ -9,17 +9,21 @@ import Account from './src/screens/Account';
 import Progress from './src/screens/Progress';
 import Notifications from './src/screens/Notifications';
 import PersonalDetails from './src/screens/PersonalDetails';
-import WorkoutLogScreen from './src/screens/workout-log';
+import WorkoutLogScreen from './src/screens/WorkoutLog/workout-log';
 import SaveGymHighlightScreen from "./src/screens/save-gym-highlight";
 import CustomTabBar from "./src/components/CustomTabBar";
 import FeedPage from "./src/screens/FeedPage";
-import TemplateScreen from "./src/screens/TemplateScreen";
+import TemplateScreen from "./src/screens/WorkoutLog/TemplateScreen";
 import { WorkoutProvider } from './src/contexts/WorkoutContext';
-import Communities from './src/screens/CommunityFeed';
+import Communities from './src/screens/Community/CommunityFeed';
 import NewCommunity from './src/screens/new-community';
-import WorkoutSummaryScreen from './src/screens/WorkoutSummary';
-import communityLandingPage from './src/screens/CommunityLandingPage';
-import CommunityPostScreen from "./src/screens/CommunityPost";
+import WorkoutSummaryScreen from './src/screens/WorkoutLog/WorkoutSummary';
+import communityLandingPage from './src/screens/Community/CommunityLandingPage';
+import CommunityPostScreen from "./src/screens/Community/CommunityPost";
+import CreateEventScreen from "./src/screens/Community/CreateEventScreen";
+import EventDetailScreen from './src/screens/Community/EventDetailScreen';
+import WorkoutLogQuickMode from "./src/screens/WorkoutLog/WorkoutLogQuickMode";
+
 
 
 const Stack = createNativeStackNavigator();
@@ -37,6 +41,10 @@ const screenOptions = ({ navigation, iconType }) => ({
             icon = <Ionicons name="add-circle-outline" size={24} color="black"/>;
             onPress = () => navigation.navigate('NewCommunity');
         }
+        else if (iconType === 'CreateOutline'){
+            icon = <Ionicons name="create-outline" size={24} color="black"/>;
+            onPress = () => navigation.navigate('SaveGymHighlightScreen');
+        }
 
         return (
             <TouchableOpacity onPress={onPress} style={{marginRight: 15}}>
@@ -49,7 +57,6 @@ const screenOptions = ({ navigation, iconType }) => ({
         height: 80,
     },
 });
-
 
 
 function HomeStack() {
@@ -127,6 +134,42 @@ function AccountStack() {
     );
 }
 
+function QuickModeStack() {
+    return (
+        <Stack.Navigator initialRouteName='Quickmode'>
+            <Stack.Screen name='Quickmode' component={WorkoutLogQuickMode}
+                options={{
+                headerShown: false,
+                presentation: 'fullScreenModal',
+            }}/>
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='TemplateScreen'
+                component={TemplateScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='WorkoutSummaryScreen'
+                component={WorkoutSummaryScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+        </Stack.Navigator>
+    );
+}
+
 function ProgressStack() {
     return (
         <Stack.Navigator initialRouteName='Progress'>
@@ -163,8 +206,7 @@ function ProgressStack() {
 function PostStack() {
     return (
         <Stack.Navigator initialRouteName='Post'>
-            <Stack.Screen name='Save Highlight' component={SaveGymHighlightScreen} options={screenOptions} />
-            <Stack.Screen name='Notifications' component={Notifications} />
+            <Stack.Screen name='SaveGymHighlightScreen' component={SaveGymHighlightScreen} options={screenOptions} />
             <Stack.Screen
                 name='WorkoutLog'
                 component={WorkoutLogScreen}
@@ -197,6 +239,14 @@ function FeedStack() {
     return (
         <Stack.Navigator initialRouteName='Feed'>
             <Stack.Screen name='Feed' component={FeedPage} />
+            <Stack.Screen
+                name='SaveGymHighlightScreen'
+                component={SaveGymHighlightScreen}
+                options={({navigation}) => ({
+                    ...screenOptions({navigation, iconType: 'CreateOutline'}), // Icon for adding a new community
+                    title: "SaveGymHighlightScreen"
+                })}
+            />
             <Stack.Screen
                 name='WorkoutLog'
                 component={WorkoutLogScreen}
@@ -238,6 +288,7 @@ function CommunitiesStack() {
                     title: "Communities"
                 })}
             />
+            <Stack.Screen name="EventDetailScreen" component={EventDetailScreen} />
             <Stack.Screen
                 name='NewCommunity'
                 component={NewCommunity}
@@ -247,6 +298,14 @@ function CommunitiesStack() {
                 name='CommunityLandingPage'
                 component={communityLandingPage}
                 options={{title: ""}}
+            />
+            <Stack.Screen
+                name='CreateEventScreen'
+                component={CreateEventScreen}
+                options={{
+                    headerShown: true,
+                    presentation: 'fullScreenModal',
+                }}
             />
             <Stack.Screen
                 name='CommunityPostScreen'
@@ -303,6 +362,11 @@ function App() {
                         name='ProgressStack'
                         component={ProgressStack}
                         options={{ headerShown: false, title: 'Progress', tabBarIcon: { name: 'trending-up-outline' } }}
+                    />
+                    <Tab.Screen
+                        name='QuickModeStack'
+                        component={QuickModeStack}
+                        options={{ headerShown: false, title: 'Quick Mode'}}
                     />
                     <Tab.Screen
                         name='AccountStack'

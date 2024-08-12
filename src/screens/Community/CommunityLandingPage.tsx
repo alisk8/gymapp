@@ -1,11 +1,13 @@
 import React, {useState, useEffect, useCallback} from 'react';
 import {View, Image, StyleSheet, FlatList, Text, ScrollView, TouchableOpacity} from 'react-native';
 import { Avatar, Card, Input, Button  } from 'react-native-elements';
-import { db, firebaseApp } from '../../firebaseConfig'; // Adjust the import path based on your project structure
+import { db, firebaseApp } from '../../../firebaseConfig'; // Adjust the import path based on your project structure
 import { doc, getDoc, collection, getDocs, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { useFocusEffect } from "@react-navigation/native";
 import {getAuth, onAuthStateChanged} from "firebase/auth";
 import Icon from 'react-native-vector-icons/FontAwesome';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+
 
 const auth = getAuth(firebaseApp);
 
@@ -33,6 +35,8 @@ const CommunityLandingPage = ({ route, navigation }) => {
     const [communityData, setCommunityData] = useState(null);
     const [posts, setPosts] = useState([]);
     const [commentText, setCommentText] = useState({});
+    const [events, setEvents] = useState([]);
+
 
     const user = useAuth();
     const userId = user?.uid; // Fetch the userId of the logged-in user
@@ -41,8 +45,26 @@ const CommunityLandingPage = ({ route, navigation }) => {
         useCallback(() => {
             fetchCommunityData(communityId);
             fetchCommunityPosts(communityId);
+            fetchCommunityEvents(communityId);
         }, [])
     );
+
+    const [userProfiles, setUserProfiles] = useState({});
+
+// Function to fetch user profiles
+    const fetchUserProfiles = async (userIds) => {
+        const profiles = {};
+        const userDocPromises = userIds.map(userId => getDoc(doc(db, "userProfiles", userId)));
+        const userDocs = await Promise.all(userDocPromises);
+
+        userDocs.forEach(docSnapshot => {
+            if (docSnapshot.exists()) {
+                profiles[docSnapshot.id] = docSnapshot.data();
+            }
+        });
+
+        setUserProfiles(prevProfiles => ({ ...prevProfiles, ...profiles }));
+    };
 
 
     const fetchCommunityData = async (id) => {
@@ -67,6 +89,19 @@ const CommunityLandingPage = ({ route, navigation }) => {
             setPosts(postsList);
         } catch (error) {
             console.error("Error fetching community posts: ", error);
+        }
+    };
+
+    const fetchCommunityEvents = async (id) => {
+        try {
+            const eventsSnapshot = await getDocs(collection(db, "communities", id, "events"));
+            const eventsList = eventsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            setEvents(eventsList);
+
+            const userIds = [...new Set(eventsList.map(event => event.owner))]; // Get unique user IDs
+            await fetchUserProfiles(userIds);
+        } catch (error) {
+            console.error("Error fetching community events: ", error);
         }
     };
 
@@ -135,6 +170,42 @@ const CommunityLandingPage = ({ route, navigation }) => {
             <Text style={styles.communityDetails}>{visibility} · {membersCount} Members</Text>
 
                 <TouchableOpacity
+                    style={styles.createEventButton}
+                    onPress={() => navigation.navigate('CreateEventScreen', { communityId, communityName: communityData.name})}
+                >
+                    <Text style={styles.createEventText}>Add a group lift</Text>
+                </TouchableOpacity>
+
+                {events.length > 0 && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.eventsContainer}>
+                        {events.map(event => (
+                            <TouchableOpacity onPress={()=> navigation.navigate('EventDetailScreen', {eventId: event.id, communityId})}>
+                            <View key={event.id} style={styles.eventCard}>
+                                <View style={styles.eventDateContainer}>
+                                    <Text style={styles.eventDay}>{new Date(event.date.seconds * 1000).getDate()}</Text>
+                                    <Text style={styles.eventMonth}>{new Date(event.date.seconds * 1000).toLocaleString('default', { month: 'short' })}</Text>
+                                </View>
+                                <View style={{paddingLeft: 10, flex: 1, alignItems: 'center'}}>
+                                    <View style={styles.eventDetailContainer}>
+                                        <Icon name="user" size={20} color="#333" />
+                                        <Text style={[styles.eventDetail, {fontWeight: 'bold'}]}>
+                                            {userProfiles[event.owner] ? `${userProfiles[event.owner].firstName} ${userProfiles[event.owner].lastName}` : 'Loading...'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.eventDetailContainer}>
+                                        <MaterialCommunityIcons name="dumbbell" size={20} color="#333" />
+                                        <Text style={styles.eventDetail}>{event.muscleTarget} Day</Text>
+                                    </View>
+                                    <Text style={styles.eventDetail}>{event.workoutFocus ?  event.workoutFocus: ''}</Text>
+                                    <Text style={styles.eventMembers}>People: {event.joinedUsers?.length || 0}</Text>
+                                </View>
+                            </View>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                )}
+
+                <TouchableOpacity
                     style={styles.createPostButton}
                     onPress={() => navigation.navigate('CommunityPostScreen', { communityId, communityName: communityData.name})}
                 >
@@ -166,12 +237,6 @@ const CommunityLandingPage = ({ route, navigation }) => {
                                     />
                                 </TouchableOpacity>
                             </View>
-                            {item.comments && item.comments.map((comment, index) => (
-                                <View key={index} style={styles.comment}>
-                                    <Text style={styles.commentText}>{comment.text}</Text>
-                                    <Text style={styles.commentTimestamp}>{new Date(comment.timestamp?.seconds * 1000).toLocaleString()}</Text>
-                                </View>
-                            ))}
                         </Card>
                     )}
                     contentContainerStyle={styles.feed}
@@ -251,6 +316,63 @@ const styles = StyleSheet.create({
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    createEventButton: {
+        borderRadius: 10,
+        padding: 15,
+        margin: 10,
+    },
+    createEventText: {
+        color: 'grey',
+        fontWeight: 'bold'
+    },
+    eventsContainer: {
+        paddingVertical: 5,
+    },
+    eventCard: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 10,
+        marginHorizontal: 5,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flex: 1,
+        flexDirection: 'row',
+    },
+    eventDateContainer: {
+        backgroundColor: '#f5f5f5',
+        borderRadius: 5,
+        padding: 5,
+        marginBottom: 10,
+        alignItems: 'center',
+    },
+    eventDay: {
+        fontSize: 24,
+        fontWeight: 'bold',
+    },
+    eventMonth: {
+        fontSize: 14,
+        color: '#666',
+    },
+    eventName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    eventDetail: {
+        fontSize: 14,
+        color: '#333',
+        textAlign: 'center',
+    },
+    eventMembers: {
+        fontSize: 14,
+        color: '#999',
+        textAlign: 'center',
+    },
+    eventDetailContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 5,
     },
 });
 

@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useCallback} from 'react';
 import {View, FlatList, ScrollView, TouchableOpacity, Text, StyleSheet, Image, Touchable} from 'react-native';
-import Post from './CommunityPage';
-import { db } from "../../firebaseConfig";
+import Post from '../CommunityPage';
+import { db } from "../../../firebaseConfig";
 import { doc, setDoc, collection, getDocs } from "firebase/firestore";
 import {useFocusEffect} from "@react-navigation/native";
 

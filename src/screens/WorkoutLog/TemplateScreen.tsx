@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Button, FlatList, StyleSheet, ScrollView } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
-import { db, firebase_auth } from '../../firebaseConfig';
+import { db, firebase_auth } from '../../../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
-import { useWorkout } from '../contexts/WorkoutContext';
+import { useWorkout } from '../../contexts/WorkoutContext';
 
 const TemplateScreen = ({ route }) => {
     const [templates, setTemplates] = useState([]);

@@ -12,7 +12,7 @@ import {
     Modal
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { db, storage } from '../../firebaseConfig'; // Adjust the import path based on your project structure
+import { db, storage } from '../../../firebaseConfig'; // Adjust the import path based on your project structure
 import { doc, collection, addDoc } from "firebase/firestore";
 import { getDownloadURL, ref as storageRef, uploadBytes } from "@firebase/storage";
 import { Ionicons } from '@expo/vector-icons'; // Make sure you have installed expo vector icons
@@ -51,7 +51,7 @@ const CommunityPostScreen = ({ route, navigation }) => {
         navigation.setOptions({
             headerTitle: communityName,
             headerLeft: () => (
-                <Button style={styles.backButton} title="<" onPress={() => navigation.goBack()} />
+                <Button style={styles.backButton} title="Back" onPress={() => navigation.goBack()} />
             ),
         });
     }, [navigation, communityName]);

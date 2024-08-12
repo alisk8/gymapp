@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {
     Button,
     StyleSheet,
@@ -10,26 +10,28 @@ import {
     Keyboard,
     Pressable,
     FlatList,
-    Modal, KeyboardAvoidingView, Platform, Switch
+    Modal, KeyboardAvoidingView, Platform, Switch, ScrollView
 } from 'react-native';
-import { db, firebase_auth } from '../../firebaseConfig';
+import { db, firebase_auth } from '../../../firebaseConfig';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { commonExercises } from '../../exercisesList';
+import { commonExercises } from '../../../exercisesList';
 import { Checkbox } from 'react-native-paper';
 import { GestureHandlerRootView, Swipeable, PanGestureHandler} from 'react-native-gesture-handler';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from "@react-native-picker/picker";
 import Animated, {useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
-import { useWorkout } from '../contexts/WorkoutContext';
+import { useWorkout } from '../../contexts/WorkoutContext';
+import { v4 as uuidv4 } from 'uuid';
 
 
-export default function WorkoutLogScreen({route}) {
+
+export default function WorkoutLogQuickMode({route}) {
     const nav = useNavigation();
 
     const [exercises, setExercises] = useState([
-        { id: 'exercise1', name: 'Exercise 1', sets: [{ key: 'set1', weight: '', reps: '', dropSets: [], isFailure: null, completed: false}], weightUnit: 'lbs', supersetExercise: '', weightConfig: 'totalWeight', repsConfig: 'reps', isSuperset: false}
+        { id: 'exercise1', name: 'Exercise 1', setsNum: 3, bestSet: { key: 'set1', weight: '', reps: '', dropSets: [], weightUnit: 'lbs', repsUnit: 'reps'}, supersetExercise: '', weightConfig: 'W', repsConfig: 'reps', isSuperset: false, completed: false}
     ]);
     const [suggestions, setSuggestions] = useState([]);
     const [userExercises, setUserExercises] = useState([]);
@@ -50,11 +52,23 @@ export default function WorkoutLogScreen({route}) {
     const [timerConfigured, setTimerConfigured] = useState(false); // New state variable
     const [comparisonModalVisible, setComparisonModalVisible] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState(null);
-    const { workoutState, setWorkoutState, resetWorkout, startWorkoutLog, stopWorkoutLog, startTime, elapsedTime, setElapsedTime, pauseWorkoutLog, finishWorkout, workoutFinished} = useWorkout();
+    const { isPaused, workoutState, setWorkoutState, resetWorkout, startWorkoutLog, stopWorkoutLog, startTime, elapsedTime, setElapsedTime, pauseWorkoutLog, finishWorkout, workoutFinished, pauseWorkout} = useWorkout();
     const previousScreen = route.params?.previousScreen;
     const [showPreviousAttempts, setShowPreviousAttempts] = useState({});
     const [isFailureTracking, setIsFailureTracking] = useState(false);
+    const [currentSetsExerciseIndex, setCurrentSetsExerciseIndex] = useState(null); // New state variable for current exercise index for sets
+    const [setsModalVisible, setSetsModalVisible] = useState(false); // New state variable for sets modal
 
+    const [modalVisible, setModalVisible] = useState(false);
+    const [selectedExerciseIndex, setSelectedExerciseIndex] = useState(null);
+    const [selectedSetIndex, setSelectedSetIndex] = useState(null);
+    const [selectedDropSetIndex, setSelectedDropSetIndex] = useState(null);
+    const [selectedType, setSelectedType] = useState(''); // 'weight' or 'reps'
+    const [tempWeight, setTempWeight] = useState(0);
+    const [tempReps, setTempReps] = useState(0);
+    const [weightUnit, setWeightUnit] = useState('lbs'); // Default to 'lbs'
+    const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
+    const [proceedWithSave, setProceedWithSave] = useState(false);
 
 
     const timerHeight = useSharedValue(120);
@@ -63,32 +77,8 @@ export default function WorkoutLogScreen({route}) {
     const exercisesRef = useRef(exercises);
     const typingTimeoutRef = useRef(null);
 
-    const togglePreviousAttempts = async (exerciseId, exerciseName) => {
-        if (showPreviousAttempts[exerciseId]) {
-            setShowPreviousAttempts(prev => ({
-                ...prev,
-                [exerciseId]: null
-            }));
-        } else {
-            const latestAttempt = await fetchLatestAttempt(exerciseName);
-            setShowPreviousAttempts(prev => ({
-                ...prev,
-                [exerciseId]: latestAttempt
-            }));
-        }
-    };
 
-    const toggleFailureTracking = () => {
-        setIsFailureTracking(!isFailureTracking);
-    };
-
-    const toggleFailure = (exerciseIndex, setIndex) => {
-        const newExercises = [...exercises];
-        const currentFailureState = newExercises[exerciseIndex].sets[setIndex].isFailure;
-        newExercises[exerciseIndex].sets[setIndex].isFailure = currentFailureState === null ? true : null;
-        setExercises(newExercises);
-    };
-
+    /**
     useEffect(() => {
         let timer;
         if (startTime && !workoutFinished) {
@@ -100,6 +90,20 @@ export default function WorkoutLogScreen({route}) {
         }
         return () => clearInterval(timer);
     }, [startTime, workoutFinished]);
+     **/
+
+    /** reset if needed
+    useFocusEffect(() => {
+        resetWorkout();
+        console.log('after reset:',exercises);
+    });
+     **/
+
+    useFocusEffect(
+        useCallback(() => {
+            console.log('isPaused state changed:', isPaused);
+        }, [isPaused])
+    );
 
     const formatTime = (seconds) => {
         const hours = Math.floor(seconds / 3600);
@@ -210,6 +214,13 @@ export default function WorkoutLogScreen({route}) {
         setTimeRemaining(prevTime => Math.max(0, prevTime + amount));
     };
 
+    const convertWeight = (weight, fromUnit, toUnit) => {
+        if (fromUnit === toUnit) return weight;
+        if (fromUnit === 'lbs' && toUnit === 'kgs') return weight * 0.453592;
+        if (fromUnit === 'kgs' && toUnit === 'lbs') return weight / 0.453592;
+        return weight;
+    };
+
     const fetchUserExercises = async () => {
         if (!firebase_auth.currentUser) return;
 
@@ -254,32 +265,12 @@ export default function WorkoutLogScreen({route}) {
 
         typingTimeoutRef.current = setTimeout(() => {
             const updatedExercises = [...newExercises];
-            const newId = camelCase(text);
-            updatedExercises[index].id = newId;
-
-            // Update the supersetExercise of any parent exercise referencing this exercise
-            const parentExerciseIndex = updatedExercises.findIndex(exercise => exercise.supersetExercise === oldId);
-            if (parentExerciseIndex !== -1) {
-                updatedExercises[parentExerciseIndex].supersetExercise = newId;
-            }
-
             setExercises(updatedExercises);
         }, 1500);
     };
 
 
-    const addSet = (exerciseIndex) => {
-        const newSets = [...exercises[exerciseIndex].sets, {
-            key: `set${exercises[exerciseIndex].sets.length + 1}`,
-            weight: '',
-            reps: '',
-            isFailure: null,
-            completed: false
-        }];
-        const newExercises = [...exercises];
-        newExercises[exerciseIndex].sets = newSets;
-        setExercises(newExercises);
-    };
+
 
     const updateSetData = (text, exerciseIndex, setIndex, type) => {
         const newExercises = [...exercises];
@@ -293,17 +284,21 @@ export default function WorkoutLogScreen({route}) {
         setExercises(newExercises);
     };
 
+    const generateUniqueId = () => {
+        return `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    };
 
     const addExercise = (parentExerciseIndex = null) => {
         const newExercise = {
-            id: `exercise${exercises.length + 1}`,
+            id: generateUniqueId(),
             name: 'New Exercise',
-            sets: [{ key: 'set1', weight: '', reps: '', isFailure: null}],
-            weightUnit: 'lbs',
+            bestSet: { key: 'set1', weight: '', reps: '', isFailure: null, dropSets: [], weightUnit: 'lbs'},
             supersetExercise: '',
-            weightConfig: 'totalWeight',
+            weightConfig: 'W',
             repsConfig: 'reps',
             isSuperset: parentExerciseIndex != null,
+            completed: false,
+            setsNum: 3,
         };
 
         console.log('is superset', newExercise.isSuperset);
@@ -321,11 +316,6 @@ export default function WorkoutLogScreen({route}) {
         }
     };
 
-    const deleteSet = (exerciseIndex, setIndex) => {
-        const newExercises = [...exercises];
-        newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.filter((_, i) => i !== setIndex);
-        setExercises(newExercises);
-    };
 
 
     const deleteDropSet = (exerciseIndex, setIndex, dropSetIndex) => {
@@ -428,7 +418,7 @@ export default function WorkoutLogScreen({route}) {
     const loadPreviousAttempt = (exerciseIndex, setIndex, previousSet, isDropSet = false, dropSetIndex = null) => {
         const newExercises = [...exercises];
 
-            // Handling parent exercise sets
+        // Handling parent exercise sets
         const exercise = newExercises[exerciseIndex];
 
         if (isDropSet) {
@@ -464,152 +454,96 @@ export default function WorkoutLogScreen({route}) {
     };
 
 
-    const renderSets = (sets, exerciseIndex) => {
+    const renderSets = (exerciseIndex) => {
         const exercise = exercises[exerciseIndex];
-        const exerciseId = exercise.id;
+        const { bestSet, weightConfig } = exercise;
+
+        const weightPlaceholder = (() => {
+            switch (weightConfig) {
+                case 'W':
+                    return 'Weight Lifted';
+                case 'BW':
+                    return 'Body Weight';
+                case 'BW+':
+                    return 'BW + Extra Weight';
+                default:
+                    return 'Weight Lifted';
+            }
+        })();
+
+        const repsPlaceholder = (() => {
+            switch (repsConfig) {
+                case 'Reps':
+                    return 'Reps';
+                case 'Hold':
+                    return 'Time (seconds)';
+                case 'Cardio':
+                    return 'Time (minutes)';
+                default:
+                    return 'Reps';
+            }
+        })();
+
+        const isWeightDisabled = weightConfig === 'BW';
+
+
+        if (!bestSet.dropSets) {
+            bestSet.dropSets = [];
+        }
 
         return (
             <View>
-                {showPreviousAttempts[exerciseId] && (
-                    <TouchableOpacity
-                        onPress={() => loadAllPreviousAttempts(exerciseIndex)}
-                        style={styles.addAllPreviousButton}
-                    >
-                        <Text style={styles.addAllPreviousButtonText}>Add All</Text>
-                    </TouchableOpacity>
-                )}
-                {sets.map((set, setIndex) => {
-                    const weightPlaceholder = (() => {
-                        switch (exercise.weightConfig) {
-                            case 'totalWeight':
-                                return 'Total Weight';
-                            case 'weightPerSide':
-                            case 'weightPerSideBarbell':
-                                return 'Weight Per Side';
-                            case 'bodyWeight':
-                                return 'Bodyweight';
-                            case 'extraWeightBodyWeight':
-                                return 'Extra Weight';
-                            default:
-                                return 'Weight';
-                        }
-                    })();
-
-                    const repsPlaceholder = (() => {
-                        switch (exercise.repsConfig) {
-                            case 'reps':
-                                return 'Reps';
-                            case 'time':
-                                return 'Time (seconds)';
-                            default:
-                                return 'Reps';
-                        }
-                    })();
-
-                    const isWeightDisabled = exercise.weightConfig === 'bodyWeight';
-
-                    if (!set.dropSets) {
-                        set.dropSets = [];
-                    }
-
-                    const toggleCompleted = () => {
-                        const newExercises = [...exercises];
-                        newExercises[exerciseIndex].sets[setIndex].completed = !newExercises[exerciseIndex].sets[setIndex].completed;
-                        setExercises(newExercises);
-                    };
-
-                    return (
-                        <GestureHandlerRootView key={set.key}>
-                            <Swipeable
-                                renderLeftActions={() => (
-                                    <TouchableOpacity
-                                        style={styles.deleteButton}
-                                        onPress={() => deleteSet(exerciseIndex, setIndex)}
-                                    >
-                                        <Text style={styles.deleteButtonText}>Delete</Text>
-                                    </TouchableOpacity>
-                                )}
-                                renderRightActions={() => (
-                                    <TouchableOpacity
-                                        style={styles.addButton}
-                                        onPress={() => addDropSet(exerciseIndex, setIndex)}
-                                    >
-                                        <Text style={styles.deleteButtonText}>Add Drop Set</Text>
-                                    </TouchableOpacity>
-                                )}
+                <GestureHandlerRootView key={bestSet.key}>
+                    <Swipeable
+                        renderRightActions={() => (
+                            <TouchableOpacity
+                                style={styles.addButton}
+                                onPress={() => addDropSet(exerciseIndex)}
                             >
-                                <View style={styles.setRow}>
-                                    {showPreviousAttempts[exerciseId] && (
-                                        <View style={styles.previousAttemptContainer}>
-                                            {showPreviousAttempts[exerciseId][setIndex] && (showPreviousAttempts[exerciseId][setIndex].weight || showPreviousAttempts[exerciseId][setIndex].reps) ? (
-                                                <TouchableOpacity
-                                                    onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, showPreviousAttempts[exerciseId][setIndex], false, null)}
-                                                    style={styles.previousAttemptRow}
-                                                >
-                                                    <Text>{`${showPreviousAttempts[exerciseId][setIndex]?.weight || ''} x ${showPreviousAttempts[exerciseId][setIndex]?.reps || ''}`}</Text>
-                                                </TouchableOpacity>
-                                            ) : (
-                                                <View style={styles.previousAttemptRow}>
-                                                    <Text style={styles.indicatorText}>-- x --</Text>
-                                                </View>
-                                            )}
-                                            {showPreviousAttempts[exerciseId][setIndex]?.dropSets?.map((dropSet, dropSetIndex) => (
-                                                (dropSet.weight || dropSet.reps) ? (
-                                                    <TouchableOpacity
-                                                        key={dropSetIndex}
-                                                        onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, dropSet, true, dropSetIndex)}
-                                                        style={styles.previousAttemptRow}
-                                                    >
-                                                        <Text>Dropset: {dropSet.weight} x {dropSet.reps}</Text>
-                                                    </TouchableOpacity>
-                                                ) : (
-                                                    <View key={dropSetIndex} style={styles.previousAttemptRow}>
-                                                        <Text style={styles.indicatorText}>Dropset: -- x --</Text>
-                                                    </View>
-                                                )
-                                            ))}
-                                        </View>
-                                    )}
-                                    <TextInput
-                                        placeholder={weightPlaceholder}
-                                        keyboardType="numeric"
-                                        style={styles.weightInput}
-                                        onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'weight')}
-                                        value={set.weight}
-                                        editable={!isWeightDisabled}
-                                    />
-                                    <TextInput
-                                        placeholder={repsPlaceholder}
-                                        keyboardType="numeric"
-                                        style={styles.repsInput}
-                                        onChangeText={(text) => updateSetData(text, exerciseIndex, setIndex, 'reps')}
-                                        value={set.reps}
-                                    />
-                                    {isFailureTracking && <TouchableOpacity
-                                        style={[styles.failureButton, set.isFailure && styles.failureButtonActive]}
-                                        onPress={() => toggleFailure(exerciseIndex, setIndex)}
-                                    >
-                                       <Text style={[styles.failureButtonText, set.isFailure && styles.failureButtonTextActive]}>F</Text>
-                                    </TouchableOpacity>}
-                                    <TouchableOpacity onPress={toggleCompleted} style={styles.checkboxContainer}>
-                                        {set.completed ? (
-                                            <View style={styles.checkboxChecked}>
-                                                <Text style={styles.checkboxText}>✓</Text>
-                                            </View>
-                                        ) : (
-                                            <View style={styles.checkboxUnchecked} />
-                                        )}
-                                    </TouchableOpacity>
-                                </View>
-                            </Swipeable>
-                            {renderDropSets(set.dropSets, exerciseIndex, setIndex)}
-                        </GestureHandlerRootView>
-                    );
-                })}
-                {renderTotalWeightMessage(exercise, sets)}
+                                <Text style={styles.deleteButtonText}>Add Drop Set</Text>
+                            </TouchableOpacity>
+                        )}
+                    >
+                        <View style={styles.setRow}>
+                            <Text style={{ fontWeight: 'bold', fontSize: 12, paddingRight: 5, paddingVertical: 10 }}>Max: </Text>
+                            <TouchableOpacity
+                                style={styles.weightInput}
+                                onPress={() => {
+                                    setModalVisible(true);
+                                    setSelectedExerciseIndex(exerciseIndex);
+                                    setSelectedSetIndex(null); // No set index since there's only one set
+                                    setSelectedDropSetIndex(null);
+                                    setSelectedType('weight');
+                                    const value = bestSet.weight;
+                                    const unit = bestSet.weightUnit;
+                                    setTempWeight(parseFloat(value) || 0);
+                                    setWeightUnit(unit || 'lbs');
+                                }}
+                            >
+                                <Text style={styles.inputText}>{bestSet.weight !== ''? `${bestSet.weight} ${weightUnit}`: `${weightPlaceholder} (${weightUnit})`}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.repsInput}
+                                onPress={() => {
+                                    setModalVisible(true);
+                                    setSelectedExerciseIndex(exerciseIndex);
+                                    setSelectedSetIndex(null); // No set index since there's only one set
+                                    setSelectedDropSetIndex(null);
+                                    setSelectedType('reps');
+                                    setTempReps(parseFloat(bestSet.reps) || 0);
+                                }}
+                            >
+                                <Text style={styles.inputText}>{bestSet.reps !== '' ? `${bestSet.reps}` : `Enter ${repsPlaceholder}`}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Swipeable>
+                    {renderDropSets(bestSet.dropSets, exerciseIndex)}
+                </GestureHandlerRootView>
+                {renderTotalWeightMessage(exercise, bestSet)}
             </View>
         );
     };
+
 
     const updateDropSetData = (text, exerciseIndex, setIndex, dropSetIndex, type) => {
         const newExercises = [...exercises];
@@ -617,19 +551,18 @@ export default function WorkoutLogScreen({route}) {
         setExercises(newExercises);
     };
 
-    const addDropSet = (exerciseIndex, setIndex) => {
+    const addDropSet = (exerciseIndex) => {
         const newExercises = [...exercises];
         const exercise =  newExercises[exerciseIndex];
 
         const newDropSet = {
-            key: `dropset${exercise.sets[setIndex].dropSets.length + 1}`,
+            key: `dropset${exercise.bestSet.dropSets.length + 1}`,
             weight: '',
+            weightUnit: 'lbs',
             reps: '',
-            weightConfig: exercise.weightConfig,
-            repsConfig: exercise.repsConfig
         };
 
-        newExercises[exerciseIndex].sets[setIndex].dropSets.push(newDropSet);
+        newExercises[exerciseIndex].bestSet.dropSets.push(newDropSet);
         setExercises(newExercises);
     };
 
@@ -637,33 +570,32 @@ export default function WorkoutLogScreen({route}) {
         const exercise = exercises[exerciseIndex];
 
         const weightPlaceholder = (() => {
-            switch (exercise.weightConfig) {
-                case 'totalWeight':
-                    return 'Total Weight';
-                case 'weightPerSide':
-                case 'weightPerSideBarbell':
-                    return 'Weight Per Side';
-                case 'bodyWeight':
-                    return 'Bodyweight';
-                case 'extraWeightBodyWeight':
-                    return 'Extra Weight';
+            switch (weightConfig) {
+                case 'W':
+                    return 'Weight Lifted';
+                case 'BW':
+                    return 'Body Weight';
+                case 'BW+':
+                    return 'BW + Extra Weight';
                 default:
-                    return 'Weight';
+                    return 'Weight Lifted';
             }
         })();
 
         const repsPlaceholder = (() => {
-            switch (exercise.repsConfig) {
-                case 'reps':
+            switch (repsConfig) {
+                case 'Reps':
                     return 'Reps';
-                case 'time':
+                case 'Hold':
                     return 'Time (seconds)';
+                case 'Cardio':
+                    return 'Time (minutes)';
                 default:
                     return 'Reps';
             }
         })();
 
-        const isWeightDisabled = exercise.weightConfig === 'bodyWeight';
+        const isWeightDisabled = exercise.weightConfig === 'BW';
 
         return (
             <View style={styles.dropSetsContainer}>
@@ -681,21 +613,35 @@ export default function WorkoutLogScreen({route}) {
                     >
                         <View style={[styles.dropSetRow, isFailureTracking && styles.extraMove]}>
                             <FontAwesome5 name="arrow-down" size={16} style={styles.dropSetIcon}/>
-                            <TextInput
-                                placeholder={weightPlaceholder}
-                                keyboardType="numeric"
+                            <TouchableOpacity
                                 style={styles.weightInput}
-                                onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'weight')}
-                                value={dropSet.weight}
-                                editable={!isWeightDisabled}
-                            />
-                            <TextInput
-                                placeholder={repsPlaceholder}
-                                keyboardType="numeric"
+                                onPress={() => {
+                                    setModalVisible(true);
+                                    setSelectedExerciseIndex(exerciseIndex);
+                                    setSelectedSetIndex(setIndex);
+                                    setSelectedDropSetIndex(dropSetIndex);
+                                    setSelectedType('weight');
+                                    const value = dropSet.weight;
+                                    const unit = dropSet.weightUnit;
+                                    setTempWeight(parseFloat(value) || 0);
+                                    setWeightUnit(unit || 'lbs');
+                                }}
+                            >
+                                <Text style={styles.inputText}>{ dropSet.weight !== ''? `${dropSet.weight} ${dropSet.weightUnit}` : `Enter Weight (${weightUnit})`}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
                                 style={styles.repsInput}
-                                onChangeText={(text) => updateDropSetData(text, exerciseIndex, setIndex, dropSetIndex, 'reps')}
-                                value={dropSet.reps}
-                            />
+                                onPress={() => {
+                                    setModalVisible(true);
+                                    setSelectedExerciseIndex(exerciseIndex);
+                                    setSelectedSetIndex(setIndex);
+                                    setSelectedDropSetIndex(dropSetIndex);
+                                    setSelectedType('reps');
+                                    setTempReps(parseFloat(dropSet.reps) || 0);
+                                }}
+                            >
+                                <Text style={styles.inputText}>{dropSet.reps !== ''?`${dropSet.reps} `: 'Enter Reps'}</Text>
+                            </TouchableOpacity>
                         </View>
                     </Swipeable>
                 ))}
@@ -802,91 +748,57 @@ export default function WorkoutLogScreen({route}) {
 
 
 
-    const saveWorkouts = async (isTemplate) => {
+    const saveWorkout = async (isTemplate) => {
         if (!firebase_auth.currentUser) {
             Alert.alert("Error", "You must be logged in to save workouts.");
             return;
         }
 
+        const incompleteExercises = exercises.some(ex => !ex.completed);
+
+        if (incompleteExercises && !proceedWithSave) {
+            setConfirmationModalVisible(true);
+            return;
+        }
         const userId = firebase_auth.currentUser.uid;
-        const filteredExercises = exercises.map(ex => ({
-            id: camelCase(ex.name),
-            name: ex.name,
-            sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'bodyWeight') && set.reps !== '').map(set => ({
-                ...set,
-                weight: ex.weightConfig === 'bodyWeight'
-                    ? 'BW'
-                    : ex.weightConfig === 'extraWeightBodyWeight'
-                        ? `BW + ${set.weight} ${ex.weightUnit}`
-                        : `${calculateTotalWeight(parseFloat(set.weight), ex.weightConfig, ex.weightUnit)} ${ex.weightUnit}`,
-                reps: ex.repsConfig === 'time' ? `${set.reps} secs` : `${set.reps} reps`,
-                dropSets: set.dropSets.filter(dropSet => (dropSet.weight !== '' || ex.weightConfig === 'bodyWeight') && dropSet.reps !== '').map(dropSet => ({
-                    ...dropSet,
-                    weight: dropSet.weightConfig === 'bodyWeight'
-                        ? 'BW'
-                        : dropSet.weightConfig === 'extraWeightBodyWeight'
-                            ? `BW + ${dropSet.weight} ${ex.weightUnit}`
-                            : `${calculateTotalWeight(parseFloat(dropSet.weight), dropSet.weightConfig, ex.weightUnit)} ${ex.weightUnit}`,
-                    reps: dropSet.repsConfig === 'time' ? `${dropSet.reps} secs` : `${dropSet.reps} reps`
-                }))
-            })),
-            supersetExercise: ex.supersetExercise,
-        })).filter(ex => ex.sets.length > 0);
+
+        const filteredExercises = exercises.map(ex => {
+            const bestSet = ex.bestSet;
+
+            // Filter and validate the bestSet
+            if (
+                (bestSet.weight !== '' || ex.weightConfig === 'BW') &&
+                bestSet.reps !== '' &&
+                ex.completed
+            ) {
+                return {
+                    id: camelCase(ex.name),
+                    name: ex.name,
+                    supersetExercise: ex.supersetExercise,
+                    isSuperset: ex.isSuperset,
+                };
+            }
+
+            // If bestSet is not valid, return null to filter it out later
+            return null;
+        }).filter(ex => ex !== null); // Filter out exercises with no valid bestSet
 
         if (filteredExercises.length === 0) {
-            Alert.alert("Error", "Please fill in all the required fields.");
+            Alert.alert("Error", "Please add reps/failure to all sets and mark completed.");
             return;
         }
 
-        try {
-            const templateRef = collection(db, "userProfiles", userId, "templates");
-            const querySnapshot = await getDocs(templateRef);
-            const existingTemplates = querySnapshot.docs.map(doc => doc.data().templateName.toLowerCase());
+         try {
 
-            const mapDropSets = (sets) => {
-                return sets.map(set => ({
-                    dropSetsCount: set.dropSets.length, // Only include the count of drop sets
-                }));
-            };
-
-            if (isTemplate) {
-                if (!templateName.trim()) {
-                    Alert.alert("Error", "Please provide a name for the template.");
-                    return;
-                }
-
-                if (existingTemplates.includes(templateName.trim().toLowerCase())) {
-                    Alert.alert("Error", "A template with this name already exists. Please choose a different name.");
-                    return;
-                }
-
-                const templateExercises = exercises.map(ex => ({
-                    id: camelCase(ex.name),
-                    name: ex.name,
-                    setsCount: ex.sets.length,
-                    weightConfig: ex.weightConfig,
-                    repsConfig: ex.repsConfig,
-                    sets: mapDropSets(ex.sets),
-                    startTime: startTime,
-                    date: new Date(),
-                    totalWorkoutTime: elapsedTime,
-                    supersetExercise: ex.supersetExercise,
-                    isSuperset: ex.isSuperset,
-                }));
-
-                await addDoc(templateRef, {
-                    templateName: templateName.trim(),
-                    exercises: templateExercises,
-                    createdAt: new Date()
-                });
-            }
-
+            /**
             await addDoc(collection(db, "userProfiles", userId, "workouts"), {
                 exercises: filteredExercises,
                 createdAt: new Date()
             });
+            **/
 
-            finishWorkout();
+
+            pauseWorkout();
 
             nav.navigate('WorkoutSummaryScreen', {previousScreen});
 
@@ -909,87 +821,65 @@ export default function WorkoutLogScreen({route}) {
 
 
     const renderExerciseItem = ({ item, index, isSuperset = false}) => {
-
         const renderExercise = (exercise, exerciseIndex) => {
 
-        const toggleAllCompleted = () => {
-            const newExercises = [...exercises];
-            newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.map(set => ({
-                ...set,
-                completed: !set.completed,
-            }));
-            setExercises(newExercises);
-        };
+            const toggleCompleted = () => {
+                const newExercises = [...exercises];
+                newExercises[exerciseIndex].completed = !newExercises[exerciseIndex].completed;
+                setExercises(newExercises);
+            };
 
-        const toggleAllFailure = () => {
-            const newExercises = [...exercises];
-            newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.map(set => ({
-                ...set,
-                isFailure: !set.isFailure,
-            }));
-            setExercises(newExercises);
-        };
-
-        return(
-            <View key={exercise.id} style={isSuperset ? styles.supersetContainer : styles.exerciseContainer}>
-                <FontAwesome5
-                    name="times"
-                    onPress={() => deleteExercise(exerciseIndex)}
-                    size={20}
-                    color="black"
-                    style={isSuperset ? styles.deleteSupersetButton : styles.deleteExerciseButton}
-                />
-                <TouchableOpacity onPress={() => openEditModal(exerciseIndex)} style={styles.editButton}>
-                    <FontAwesome5 name="ellipsis-h" size={20} color="black" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => togglePreviousAttempts(exercise.id, exercise.name)} style={styles.compareButton}>
-                    <Text style={showPreviousAttempts[exercise.id] ? styles.blueIcon : styles.blackIcon}>Previous</Text>
-                </TouchableOpacity>
-
-                    {isFailureTracking && <TouchableOpacity onPress={toggleAllFailure} style={[styles.allFailureButton, styles.failureButtonActive]}>
-                        <Text style={styles.failureButtonTextActive}>FF</Text>
-                    </TouchableOpacity>}
-                    <TouchableOpacity onPress={toggleAllCompleted} style={styles.allCheckboxContainer}>
-                        <View style={styles.checkboxChecked}>
-                            <Text style={styles.checkboxText}>✓✓</Text>
-                        </View>
+            return(
+                <View key={exercise.id} style={isSuperset ? styles.supersetContainer : styles.exerciseContainer}>
+                    <FontAwesome5
+                        name="times"
+                        onPress={() => deleteExercise(exerciseIndex)}
+                        size={20}
+                        color="black"
+                        style={isSuperset ? styles.deleteSupersetButton : styles.deleteExerciseButton}
+                    />
+                    <TouchableOpacity onPress={() => openEditModal(exerciseIndex)} style={styles.editButton}>
+                        <FontAwesome5 name="ellipsis-h" size={20} color="black" />
                     </TouchableOpacity>
 
-                <TextInput
-                    style={styles.header}
-                    onChangeText={(text) => handleExerciseNameChange(text, exerciseIndex)}
-                    value={exercise.name}
-                />
-                {renderSuggestions(exerciseIndex)}
 
-                {renderSets(exercise.sets, exerciseIndex)}
-                <View style={styles.unitButtonsContainer}>
-                    <TouchableOpacity
-                        style={[styles.unitButton, exercise.weightUnit === 'lbs' && styles.unitButtonSelected]}
-                        onPress={() => updateWeightUnit(exerciseIndex, 'lbs')}
-                    >
-                        <Text style={[styles.unitButtonText, exercise.weightUnit === 'lbs' ? styles.unitButtonSelectedText : styles.unitButtonUnselectedText]}>
-                            lbs
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.unitButton, exercise.weightUnit === 'kgs' && styles.unitButtonSelected]}
-                        onPress={() => updateWeightUnit(exerciseIndex, 'kgs')}
-                    >
-                        <Text style={[styles.unitButtonText, exercise.weightUnit === 'kgs' ? styles.unitButtonSelectedText : styles.unitButtonUnselectedText]}>
-                            kgs
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-                <View style={styles.buttonsRow}>
-                    <Button title="+ add set" onPress={() => addSet(exerciseIndex)} />
-                    {!item.isSuperset && <Button title="+ add superset" onPress={() => addExercise(exerciseIndex)} />}
-                </View>
-                {item.supersetExercise && exercises.find((ex) => ex.id === item.supersetExercise) &&
-                    renderExerciseItem({ item: exercises.find((ex) => ex.id === item.supersetExercise), index: exercises.findIndex((ex) => ex.id === item.supersetExercise),isSuperset: true })}
+                    <View style={styles.indicatorsRow}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setCurrentSetsExerciseIndex(exerciseIndex);
+                                setSetsModalVisible(true);
+                            }}
+                            style={styles.setsButton}
+                        >
+                            <Text style={styles.setsButtonText}>{exercise.setsNum}</Text>
+                        </TouchableOpacity>
+                        <TextInput
+                            style={styles.header}
+                            onChangeText={(text) => handleExerciseNameChange(text, exerciseIndex)}
+                            value={exercise.name}
+                        />
+                        <TouchableOpacity onPress={toggleCompleted} style={styles.checkboxContainer}>
+                            {exercise.completed ? (
+                                <View style={styles.checkboxChecked}>
+                                    <Text style={styles.checkboxText}>✓</Text>
+                                </View>
+                            ) : (
+                                <View style={styles.checkboxUnchecked} />
+                            )}
+                        </TouchableOpacity>
                     </View>
-        );
-    };
+                    {renderSuggestions(exerciseIndex)}
+                    {renderSets(exerciseIndex)}
+
+                    <View style={styles.buttonsRow}>
+                        {!item.supersetExercise && <Button title="+ add superset" onPress={() => addExercise(exerciseIndex)} />}
+                    </View>
+
+                    {item.supersetExercise && exercises.find((ex) => ex.id === item.supersetExercise) &&
+                        renderExerciseItem({ item: exercises.find((ex) => ex.id === item.supersetExercise), index: exercises.findIndex((ex) => ex.id === item.supersetExercise),isSuperset: true })}
+                </View>
+            );
+        };
 
         return (
             <View key={item.id}>
@@ -1071,7 +961,7 @@ export default function WorkoutLogScreen({route}) {
     return (
         <GestureHandlerRootView style={styles.fullScreenContainer}>
             <View style={styles.modalHeader}>
-                <Text style={styles.headerText}>Workout Log</Text>
+                <Text style={styles.headerText}>Workout</Text>
                 <Text style={styles.workoutTimeText}>
                     {formatTime(elapsedTime)}
                 </Text>
@@ -1094,37 +984,10 @@ export default function WorkoutLogScreen({route}) {
                     data={exercises.filter(exercise => !exercise.isSuperset)}
                     renderItem={renderExerciseItem}
                     keyExtractor={(item) => item.id}
-                    ListHeaderComponent={() => (
-                     <View>
-                        <View style={styles.checkboxContainer}>
-                            <Checkbox.Item
-                                label="Save as Template"
-                                status={isTemplate ? 'checked' : 'unchecked'}
-                                onPress={() => setIsTemplate(!isTemplate)}
-                                labelStyle={styles.checkboxLabel}
-                            />
-                            {isTemplate && (
-                                <TextInput
-                                    style={styles.templateNameInput}
-                                    placeholder="Template Name"
-                                    value={templateName}
-                                    onChangeText={setTemplateName}
-                                />
-                            )}
-                        </View>
-                        <View style={styles.toggleContainer}>
-                            <Text style={styles.toggleLabel}>Track Failure</Text>
-                            <Switch
-                                onValueChange={toggleFailureTracking}
-                                value={isFailureTracking}
-                            />
-                        </View>
-                    </View>
-                    )}
                     ListFooterComponent={() => (
                         <View>
                             <Button title="Add Exercise" onPress={() => addExercise()} />
-                            <Button title="Save Workouts" onPress={() => saveWorkouts(isTemplate)} />
+                            <Button title="Save Workouts" onPress={() => saveWorkout(isTemplate)} />
                             <View style={{height: 200}}/>
                         </View>
                     )}
@@ -1226,6 +1089,152 @@ export default function WorkoutLogScreen({route}) {
                     </View>
                 </View>
             </Modal>
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={setsModalVisible}
+                onRequestClose={() => setSetsModalVisible(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Select Number of Sets</Text>
+                        <ScrollView style={styles.scrollView}>
+                            {[...Array(11).keys()].map((i) => (
+                                <TouchableOpacity
+                                    key={i}
+                                    onPress={() => {
+                                        const newExercises = [...exercises];
+                                        const currentExercise = newExercises[currentSetsExerciseIndex];
+                                        currentExercise.setsNum = i;
+                                        setExercises(newExercises);
+                                        setSetsModalVisible(false);
+                                    }}
+                                    style={styles.scrollViewItem}
+                                >
+                                    <Text style={styles.scrollViewItemText}>{i}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                        <Button title="Cancel" onPress={() => setSetsModalVisible(false)} />
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Select {selectedType === 'weight' ? 'Weight' : 'Reps'}</Text>
+                        <View style={styles.adjustContainer}>
+                            <TouchableOpacity
+                                style={styles.adjustButton}
+                                onPress={() => {
+                                    if (selectedType === 'weight') {
+                                        setTempWeight(tempWeight - (weightUnit === 'lbs' ? 5 : 2));
+                                    } else {
+                                        setTempReps(tempReps - 1);
+                                    }
+                                }}
+                            >
+                                <Text style={styles.adjustButtonText}>-</Text>
+                            </TouchableOpacity>
+                            <View style={styles.inputWrapper}>
+                                <TextInput
+                                    style={styles.adjustInput}
+                                    keyboardType="numeric"
+                                    value={selectedType === 'weight' ? tempWeight.toString() : tempReps.toString()}
+                                    onChangeText={(value) => {
+                                        if (selectedType === 'weight') {
+                                            setTempWeight(parseFloat(value) || 0);
+                                        } else {
+                                            setTempReps(parseInt(value) || 0);
+                                        }
+                                    }}
+                                />
+                                {selectedType === 'weight' && (
+                                    <TouchableOpacity
+                                        style={styles.unitSwitcher}
+                                        onPress={() => {
+                                            setWeightUnit(prevUnit => prevUnit === 'lbs' ? 'kgs' : 'lbs');
+                                        }}
+                                    >
+                                        <Text style={styles.unitText}>{weightUnit}</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {selectedType === 'reps' && (
+                                    <Text style={styles.unitText}>reps</Text>
+                                )}
+                            </View>
+                            <TouchableOpacity
+                                style={styles.adjustButton}
+                                onPress={() => {
+                                    if (selectedType === 'weight') {
+                                        setTempWeight(tempWeight + (weightUnit === 'lbs' ? 5 : 2));
+                                    } else {
+                                        setTempReps(tempReps + 1);
+                                    }
+                                }}
+                            >
+                                <Text style={styles.adjustButtonText}>+</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <Button
+                            title="Save"
+                            onPress={() => {
+                                const newExercises = [...exercises];
+                                if (selectedDropSetIndex !== null) {
+                                    if (selectedType === 'weight') {
+                                        newExercises[selectedExerciseIndex].bestSet.dropSets[selectedDropSetIndex].weight = tempWeight;
+                                        newExercises[selectedExerciseIndex].bestSet.dropSets[selectedDropSetIndex].weightUnit = `${weightUnit}`;
+                                    } else {
+                                        newExercises[selectedExerciseIndex].bestSet.dropSets[selectedDropSetIndex].reps = tempReps;
+                                        //add reps unit change in the future
+                                    }
+                                } else {
+                                    if (selectedType === 'weight') {
+                                        newExercises[selectedExerciseIndex].bestSet.weight = tempWeight;
+                                        newExercises[selectedExerciseIndex].bestSet.weightUnit = `${weightUnit}`;
+                                    } else {
+                                        newExercises[selectedExerciseIndex].bestSet.reps = tempReps;
+                                    }
+                                }
+                                setExercises(newExercises);
+                                setModalVisible(false);
+                            }}
+                        />
+                        <Button title="Cancel" onPress={() => setModalVisible(false)} />
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={confirmationModalVisible}
+                onRequestClose={() => setConfirmationModalVisible(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Incomplete Exercises</Text>
+                        <Text style={{ marginBottom: 20 }}>Some exercises are not marked as completed. Do you want to proceed?</Text>
+                        <Button
+                            title="Yes, Proceed"
+                            onPress={() => {
+                                setProceedWithSave(true);
+                                setConfirmationModalVisible(false);
+                                saveWorkout(isTemplate); // Recursively call saveWorkout
+                            }}
+                        />
+                        <Button title="No, Go Back" onPress={() => setConfirmationModalVisible(false)} />
+                    </View>
+                </View>
+            </Modal>
+
+
             {timeRemaining !== null && (
                 <PanGestureHandler onGestureEvent={handleGesture}>
                     <Animated.View style={[styles.timerContainer, animatedStyle]}>
@@ -1294,7 +1303,7 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     exerciseContainer: {
-        marginBottom: 20,
+        marginBottom: 10,
         padding: 20,
         backgroundColor: '#fff',
         borderRadius: 7,
@@ -1309,35 +1318,48 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.5
     },
     header: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        paddingVertical: 10,
+        paddingHorizontal: 5,
+        flex: 1,
+    },
+    setsNum: {
         fontSize: 20,
         fontWeight: 'bold',
         marginBottom: 10,
         borderWidth: 1,
         borderColor: '#ccc',
-        padding: 10,
         borderRadius: 5,
+        paddingVertical: 10,
+        width: 30,
+        marginRight: 5,
     },
     setRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 10,
     },
     weightInput: {
-        flex: 1,
         borderWidth: 1,
         borderColor: '#ccc',
         padding: 10,
         marginRight: 5,
         borderRadius: 5,
         backgroundColor: '#fff',
+        flex: 0.5
     },
     repsInput: {
-        flex: 1,
         borderWidth: 1,
         borderColor: '#ccc',
         padding: 10,
         borderRadius: 5,
         backgroundColor: '#fff',
+        flex: 0.5,
+        marginRight: 50,
     },
     buttonsRow: {
         flexDirection: 'row',
@@ -1422,22 +1444,13 @@ const styles = StyleSheet.create({
         fontSize: 16,
         padding: 10,
     },
-    checkboxContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 10,
-    },
-    allCheckboxContainer: {
-        top: 6, // Adjust to properly align the button
-        right: 50,
-        position:"absolute",
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 10,
-    },
     checkboxLabel: {
         fontSize: 16,
         fontWeight: 'bold',
+        left: 10,
+    },
+    saveTemplateText:{
+        alignSelf: 'flex-start',
     },
     templateNameInput: {
         borderWidth: 1,
@@ -1451,9 +1464,6 @@ const styles = StyleSheet.create({
     supersetContainer: {
         marginTop: 5,
         paddingTop: 60, // Adjust padding to make space for the edit button
-        borderLeftWidth: 2,
-        borderLeftColor: '#ccc',
-        paddingLeft: 10,
         position: 'relative',
     },
     deleteButton: {
@@ -1647,7 +1657,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
+        marginTop: 5,
         marginRight: 50,
     },
     extraMove: {
@@ -1727,19 +1737,6 @@ const styles = StyleSheet.create({
         borderColor: 'black',
         marginLeft: 10,
     },
-    allFailureButton: {
-        position: 'absolute',
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'black',
-        marginLeft: 10,
-        top: 16,
-        right: 100,
-    },
     failureButtonActive: {
         backgroundColor: 'red',
     },
@@ -1765,8 +1762,15 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
     },
+    templateCheckContainer: {
+        marginLeft: 10,
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+    },
     checkboxContainer: {
         marginLeft: 10,
+        marginBottom: 13,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1777,7 +1781,6 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: 'green',
         borderRadius: 12,
-        alignItems: 'center',
         justifyContent: 'center',
     },
     checkboxChecked: {
@@ -1799,6 +1802,144 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         marginBottom: 10,
         alignItems: 'center',
+    },
+    indicatorsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+    },
+    indicatorIcon: {
+        flex: 1,
+        textAlign: 'center',
+    },
+    repsIndicatorText: {
+        flex: 1,
+        textAlign: 'center',
+        fontSize: 16,
+        color: '#aaa',
+        fontStyle: 'italic',
+        right: 10,
+    },
+    allCheckboxContainer: {
+        alignItems: 'center',
+        alignSelf: 'flex-end',
+        marginLeft: 10,
+        marginBottom: 14,
+    },
+    allCheckboxChecked: {
+        width: 40,
+        height: 40,
+        borderWidth: 2,
+        borderColor: 'green',
+        alignItems: 'center',
+        borderRadius: 12,
+        justifyContent: 'center',
+        backgroundColor: 'green',
+    },
+    allFailureButton: {
+        alignItems: 'center',
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'black',
+        marginLeft: 10,
+        right: 10,
+    },
+    setsButton: {
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        paddingVertical: 10,
+        width: 30,
+        marginRight: 5,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#007bff',
+    },
+    setsButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 18,
+    },
+    scrollView: {
+        width: '100%',
+        maxHeight: 300,
+        marginBottom: 20,
+    },
+    scrollViewItem: {
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ccc',
+        alignItems: 'center',
+    },
+    scrollViewItemText: {
+        fontSize: 18,
+    },
+    inputText: {
+        fontSize: 14,
+        color: '#000',
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    scrollViewContent: {
+        alignItems: 'center',
+    },
+    adjustButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#007bff',
+    },
+    adjustButtonText: {
+        fontSize: 30,
+        color: 'white',
+    },
+    adjustText: {
+        fontSize: 24,
+        marginHorizontal: 20,
+    },
+    adjustContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '80%',
+        marginBottom: 20,
+    },
+    adjustInput: {
+        fontSize: 24,
+        marginHorizontal: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#000',
+        textAlign: 'center',
+        width: 100,
+    },
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+    },
+    unitText: {
+        fontSize: 24,
+        marginLeft: 5,
+    },
+    unitSwitcher: {
+        marginLeft: 5,
+        paddingVertical: 5,
+        paddingHorizontal: 10,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        backgroundColor: '#f8f9fa',
     },
 });
 
@@ -1829,35 +1970,4 @@ const pickerSelectStyles = StyleSheet.create({
     },
 });
 
-export default WorkoutLogScreen;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+export default WorkoutLogQuickMode;
