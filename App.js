@@ -10,9 +10,9 @@ import Progress from './src/screens/Progress';
 import Notifications from './src/screens/Notifications';
 import PersonalDetails from './src/screens/PersonalDetails';
 import WorkoutLogScreen from './src/screens/WorkoutLog/workout-log';
-import SaveGymHighlightScreen from "./src/screens/save-gym-highlight";
+import SaveGymHighlightScreen from "./src/screens/Feed/save-gym-highlight";
 import CustomTabBar from "./src/components/CustomTabBar";
-import FeedPage from "./src/screens/FeedPage";
+import FeedPage from "./src/screens/Feed/FeedPage";
 import TemplateScreen from "./src/screens/WorkoutLog/TemplateScreen";
 import { WorkoutProvider } from './src/contexts/WorkoutContext';
 import Communities from './src/screens/Community/CommunityFeed';
@@ -203,6 +203,7 @@ function ProgressStack() {
     );
 }
 
+/**
 function PostStack() {
     return (
         <Stack.Navigator initialRouteName='Post'>
@@ -235,17 +236,19 @@ function PostStack() {
     );
 }
 
+    **/
+
 function FeedStack() {
     return (
         <Stack.Navigator initialRouteName='Feed'>
-            <Stack.Screen name='Feed' component={FeedPage} />
+            <Stack.Screen name='Feed' component={FeedPage}
+                          options={({navigation}) => ({
+                              ...screenOptions({navigation, iconType: 'CreateOutline'}), // Icon for adding a new community
+                              title: "Feed"
+                          })}/>
             <Stack.Screen
                 name='SaveGymHighlightScreen'
                 component={SaveGymHighlightScreen}
-                options={({navigation}) => ({
-                    ...screenOptions({navigation, iconType: 'CreateOutline'}), // Icon for adding a new community
-                    title: "SaveGymHighlightScreen"
-                })}
             />
             <Stack.Screen
                 name='WorkoutLog'
@@ -343,6 +346,14 @@ function CommunitiesStack() {
     );
 }
 
+/**
+<Tab.Screen
+    name='PostStack'
+    component={PostStack}
+    options={{ headerShown: false, title: 'Post', tabBarIcon: { name: 'create-outline' } }}
+/>
+
+    **/
 function App() {
     return (
         <WorkoutProvider>
@@ -352,11 +363,6 @@ function App() {
                         name='HomeStack'
                         component={HomeStack}
                         options={{ headerShown: false, title: 'Home', tabBarIcon: { name: 'home-outline' } }}
-                    />
-                    <Tab.Screen
-                        name='PostStack'
-                        component={PostStack}
-                        options={{ headerShown: false, title: 'Post', tabBarIcon: { name: 'create-outline' } }}
                     />
                     <Tab.Screen
                         name='ProgressStack'

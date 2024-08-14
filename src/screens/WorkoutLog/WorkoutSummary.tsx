@@ -192,6 +192,7 @@ const WorkoutSummaryScreen = ({ route }) => {
                                 reps: dropSet.reps
                             }))
                         },
+                        setsNum: ex.setsNum,
                         supersetExercise: ex.supersetExercise,
                         isSuperset: ex.isSuperset,
                     };
@@ -213,7 +214,7 @@ const WorkoutSummaryScreen = ({ route }) => {
                  const templateExercises = workoutState.exercises.map(ex => ({
                          id: camelCase(ex.name),
                          name: ex.name,
-                         setsCount: ex.setsNum,
+                         setsNum: ex.setsNum,
                          supersetExercise: ex.supersetExercise,
                          isSuperset: ex.isSuperset,
                      }));

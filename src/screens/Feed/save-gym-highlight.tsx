@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, TouchableOpacity, Image, View, FlatList, Text, Modal, Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { db, firebase_auth, storage } from '../../firebaseConfig';
+import { db, firebase_auth, storage } from '../../../firebaseConfig';
 import { addDoc, collection, getDocs, query, where, Timestamp, serverTimestamp } from '@firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "@firebase/storage";
 import Video from 'react-native-video';
