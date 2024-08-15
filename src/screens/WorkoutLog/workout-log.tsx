@@ -65,6 +65,12 @@ export default function WorkoutLogScreen({route}) {
     const exercisesRef = useRef(exercises);
     const typingTimeoutRef = useRef(null);
 
+
+    useFocusEffect(() => {
+        resetWorkout();
+        console.log('after reset:',exercises);
+    });
+
     const togglePreviousAttempts = async (exerciseId, exerciseName) => {
         if (showPreviousAttempts[exerciseId]) {
             setShowPreviousAttempts(prev => ({

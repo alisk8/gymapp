@@ -209,7 +209,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
                     style={styles.createPostButton}
                     onPress={() => navigation.navigate('CommunityPostScreen', { communityId, communityName: communityData.name})}
                 >
-                    <Text style={styles.createPostText}>Post something...</Text>
+                    <Text style={styles.createPostText}>Post an announcement...</Text>
                 </TouchableOpacity>
 
                 <FlatList

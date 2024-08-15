@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import { View, Text, Button, FlatList, StyleSheet, ScrollView } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { db, firebase_auth } from '../../../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
-import { useNavigation } from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import { useWorkout } from '../../contexts/WorkoutContext';
 
 const TemplateScreen = ({ route }) => {
@@ -13,8 +13,10 @@ const TemplateScreen = ({ route }) => {
     const [items, setItems] = useState([]);
     const navigation = useNavigation();
     const [previousScreen, setPreviousScreen] = useState(null);
-    const {workoutState, setWorkoutState} = useWorkout();
-
+    const {workoutState, setWorkoutState, resetWorkout, handleWorkoutMode} = useWorkout();
+    const [loadWorkoutMode, setLoadWorkoutMode] = useState('Quick');
+    const [workoutModes, setWorkoutModes] = useState([{label: 'Quick Mode', value: 'Quick'}, {label: 'Normal Mode', value: 'Normal'}]);
+    const [openModePicker, setOpenModePicker] = useState(false);
 
     useEffect(() => {
         fetchTemplates();
@@ -24,6 +26,7 @@ const TemplateScreen = ({ route }) => {
 
         return unsubscribe;
     }, []);
+
 
     const fetchTemplates = async () => {
         if (!firebase_auth.currentUser) return;
@@ -53,6 +56,18 @@ const TemplateScreen = ({ route }) => {
             console.log('No template selected');
         }
     };
+
+    const startNewWorkout = () => {
+        if (loadWorkoutMode === 'Quick'){
+            handleWorkoutMode('Quick');
+            console.log('quick mode running');
+            navigation.navigate('QuickMode', {previousScreen});
+        }
+        else{
+            handleWorkoutMode('Normal');
+            navigation.navigate('WorkoutLog', {previousScreen});
+        }
+    }
 
     const renderExercise = (exercise, exercises) => (
         <View key={exercise.id} style={exercise.isSuperset ? styles.supersetContainer : styles.previewItem}>
@@ -102,8 +117,22 @@ const TemplateScreen = ({ route }) => {
                     })}
                 </ScrollView>
             )}
+
+            <DropDownPicker
+                open={openModePicker}
+                value={loadWorkoutMode}
+                items={workoutModes}
+                setOpen={setOpenModePicker}
+                setValue={setLoadWorkoutMode}
+                setItems={setWorkoutModes}
+                placeholder="Workout Mode"
+                containerStyle={styles.dropdownContainer}
+                style={styles.dropdown}
+                dropDownStyle={styles.dropdown}
+            />
+
             <Button title="Load Template" onPress={handleLoadTemplate} />
-            <Button title="Start New Workout" onPress={() => navigation.navigate('WorkoutLog', {previousScreen})} />
+            <Button title="Start New Workout" onPress={startNewWorkout} />
             <Button title="Cancel" onPress={() => navigation.goBack()} />
         </View>
     );

@@ -70,6 +70,11 @@ function HomeStack() {
                     title: "Home"
                 })}
             />
+            <Stack.Screen name='Quickmode' component={WorkoutLogQuickMode}
+                          options={{
+                              headerShown: false,
+                              presentation: 'fullScreenModal',
+                          }}/>
             <Stack.Screen name='Notifications' component={Notifications} />
             <Stack.Screen
                 name='WorkoutLog'
@@ -114,6 +119,11 @@ function AccountStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen name='QuickMode' component={WorkoutLogQuickMode}
+                          options={{
+                              headerShown: false,
+                              presentation: 'fullScreenModal',
+                          }}/>
             <Stack.Screen
                 name='TemplateScreen'
                 component={TemplateScreen}
@@ -134,6 +144,7 @@ function AccountStack() {
     );
 }
 
+/**
 function QuickModeStack() {
     return (
         <Stack.Navigator initialRouteName='Quickmode'>
@@ -170,6 +181,8 @@ function QuickModeStack() {
     );
 }
 
+    **/
+
 function ProgressStack() {
     return (
         <Stack.Navigator initialRouteName='Progress'>
@@ -183,6 +196,11 @@ function ProgressStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen name='QuickMode' component={WorkoutLogQuickMode}
+                          options={{
+                              headerShown: false,
+                              presentation: 'fullScreenModal',
+                          }}/>
             <Stack.Screen
                 name='TemplateScreen'
                 component={TemplateScreen}
@@ -258,6 +276,11 @@ function FeedStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen name='QuickMode' component={WorkoutLogQuickMode}
+                          options={{
+                              headerShown: false,
+                              presentation: 'fullScreenModal',
+                          }}/>
             <Stack.Screen
                 name='TemplateScreen'
                 component={TemplateScreen}
@@ -318,6 +341,11 @@ function CommunitiesStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen name='QuickMode' component={WorkoutLogQuickMode}
+                          options={{
+                              headerShown: false,
+                              presentation: 'fullScreenModal',
+                          }}/>
             <Stack.Screen
                 name='WorkoutLog'
                 component={WorkoutLogScreen}
@@ -353,6 +381,12 @@ function CommunitiesStack() {
     options={{ headerShown: false, title: 'Post', tabBarIcon: { name: 'create-outline' } }}
 />
 
+<Tab.Screen
+name='QuickModeStack'
+component={QuickModeStack}
+options={{ headerShown: false, title: 'Quick Mode'}}
+/>
+
     **/
 function App() {
     return (
@@ -360,19 +394,9 @@ function App() {
             <NavigationContainer>
                 <Tab.Navigator tabBar={props => <CustomTabBar {...props} />}>
                     <Tab.Screen
-                        name='HomeStack'
-                        component={HomeStack}
-                        options={{ headerShown: false, title: 'Home', tabBarIcon: { name: 'home-outline' } }}
-                    />
-                    <Tab.Screen
                         name='ProgressStack'
                         component={ProgressStack}
                         options={{ headerShown: false, title: 'Progress', tabBarIcon: { name: 'trending-up-outline' } }}
-                    />
-                    <Tab.Screen
-                        name='QuickModeStack'
-                        component={QuickModeStack}
-                        options={{ headerShown: false, title: 'Quick Mode'}}
                     />
                     <Tab.Screen
                         name='AccountStack'
@@ -388,7 +412,6 @@ function App() {
                         name='CommunitiesStack'
                         component={CommunitiesStack}
                         options={{ headerShown: false, title: 'Communities' }} />
-
                 </Tab.Navigator>
             </NavigationContainer>
         </WorkoutProvider>

@@ -24,6 +24,7 @@ import { Picker } from "@react-native-picker/picker";
 import Animated, {useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { useWorkout } from '../../contexts/WorkoutContext';
 import { v4 as uuidv4 } from 'uuid';
+import ExercisePickerModal from './ExercisePickerModal';  // Import the custom modal
 
 
 
@@ -69,7 +70,7 @@ export default function WorkoutLogQuickMode({route}) {
     const [weightUnit, setWeightUnit] = useState('lbs'); // Default to 'lbs'
     const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
     const [proceedWithSave, setProceedWithSave] = useState(false);
-
+    const [pickerModalVisible, setPickerModalVisible] = useState(false);
 
     const timerHeight = useSharedValue(120);
 
@@ -288,6 +289,7 @@ export default function WorkoutLogQuickMode({route}) {
         return `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     };
 
+    /**
     const addExercise = (parentExerciseIndex = null) => {
         const newExercise = {
             id: generateUniqueId(),
@@ -314,6 +316,33 @@ export default function WorkoutLogQuickMode({route}) {
             // It's a regular exercise
             setExercises([...exercises, newExercise]);
         }
+    };
+    **/
+
+    const addExercise = (selectedExercise, parentExerciseIndex = null) => {
+        const newExercise = {
+            id: `${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+            name: selectedExercise,
+            bestSet: { weight: '', reps: '', dropSets: [], weightUnit: 'lbs', repsUnit: 'reps'},
+            supersetExercise: '',
+            weightConfig: 'W',
+            repsConfig: 'reps',
+            isSuperset: parentExerciseIndex != null,
+            completed: false,
+            setsNum: 3,
+        };
+
+        const newExercises = [...exercises];
+        if (parentExerciseIndex !== null && parentExerciseIndex >= 0 && parentExerciseIndex < newExercises.length) {
+            // It's a superset, update the parent exercise
+            newExercises[parentExerciseIndex].supersetExercise = newExercise.id;
+            newExercises.push(newExercise);
+        } else {
+            // It's a regular exercise
+            newExercises.push(newExercise);
+        }
+        setExercises(newExercises);
+        setPickerModalVisible(false);
     };
 
 
@@ -819,6 +848,13 @@ export default function WorkoutLogQuickMode({route}) {
             });
     };
 
+    /**
+     <TextInput
+     style={styles.header}
+     onChangeText={(text) => handleExerciseNameChange(text, exerciseIndex)}
+     value={exercise.name}
+     />
+     */
 
     const renderExerciseItem = ({ item, index, isSuperset = false}) => {
         const renderExercise = (exercise, exerciseIndex) => {
@@ -853,11 +889,7 @@ export default function WorkoutLogQuickMode({route}) {
                         >
                             <Text style={styles.setsButtonText}>{exercise.setsNum}</Text>
                         </TouchableOpacity>
-                        <TextInput
-                            style={styles.header}
-                            onChangeText={(text) => handleExerciseNameChange(text, exerciseIndex)}
-                            value={exercise.name}
-                        />
+                        <Text style={styles.header}>{exercise.name}</Text>
                         <TouchableOpacity onPress={toggleCompleted} style={styles.checkboxContainer}>
                             {exercise.completed ? (
                                 <View style={styles.checkboxChecked}>
@@ -872,7 +904,10 @@ export default function WorkoutLogQuickMode({route}) {
                     {renderSets(exerciseIndex)}
 
                     <View style={styles.buttonsRow}>
-                        {!item.supersetExercise && <Button title="+ add superset" onPress={() => addExercise(exerciseIndex)} />}
+                        {!item.supersetExercise && <Button title="+ add superset" onPress={() => {
+                            setSelectedExerciseIndex(exerciseIndex);
+                            setPickerModalVisible(true);
+                        }} />}
                     </View>
 
                     {item.supersetExercise && exercises.find((ex) => ex.id === item.supersetExercise) &&
@@ -986,7 +1021,9 @@ export default function WorkoutLogQuickMode({route}) {
                     keyExtractor={(item) => item.id}
                     ListFooterComponent={() => (
                         <View>
-                            <Button title="Add Exercise" onPress={() => addExercise()} />
+                            <Button title="Add Exercise" onPress={() =>{
+                                                                setSelectedExerciseIndex(null);
+                                                                setPickerModalVisible(true)} }/>
                             <Button title="Save Workouts" onPress={() => saveWorkout(isTemplate)} />
                             <View style={{height: 200}}/>
                         </View>
@@ -1234,6 +1271,11 @@ export default function WorkoutLogQuickMode({route}) {
                 </View>
             </Modal>
 
+            <ExercisePickerModal
+                visible={pickerModalVisible}
+                onClose={() => setPickerModalVisible(false)}
+                onSelectExercise={(exerciseName) => addExercise(exerciseName, selectedExerciseIndex)}
+            />
 
             {timeRemaining !== null && (
                 <PanGestureHandler onGestureEvent={handleGesture}>

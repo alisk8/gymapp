@@ -15,7 +15,7 @@ export const WorkoutProvider = ({ children }) => {
     const [pausedTime, setPausedTime] = useState(0);  // Total time the workout has been paused
     const [pauseStart, setPauseStart] = useState(null);  // The time when the pause started
     const [loadedFromTemplate, setLoadedFromTemplate] = ('');
-
+    const [workoutMode, setWorkoutMode] = useState('');
 
     useEffect(() => {
         const loadWorkout = async () => {
@@ -132,12 +132,19 @@ export const WorkoutProvider = ({ children }) => {
 
     const stopWorkoutLog = () => setIsWorkoutLogActive(false);
 
+    const handleWorkoutMode = (mode) => setWorkoutMode(mode);
+
     const finishWorkout = () => {setWorkoutFinished(true);
                                         console.log('workout finished state', workoutFinished)};
 
 
     return (
-        <WorkoutContext.Provider value={{ workoutState, isPaused, setWorkoutState, resetWorkout, isWorkoutLogActive, startWorkoutLog, stopWorkoutLog,  startTime, setStartTime, elapsedTime, setElapsedTime, workoutFinished, finishWorkout, pauseWorkout, resumeWorkout, loadedFromTemplate}}>
+        <WorkoutContext.Provider value={{ workoutState, isPaused, setWorkoutState,
+                                        resetWorkout, isWorkoutLogActive, startWorkoutLog,
+                                        stopWorkoutLog,  startTime, setStartTime, elapsedTime,
+                                        setElapsedTime, workoutFinished, finishWorkout, pauseWorkout,
+                                        resumeWorkout, loadedFromTemplate, handleWorkoutMode,
+                                        workoutMode}}>
             {children}
         </WorkoutContext.Provider>
     );
