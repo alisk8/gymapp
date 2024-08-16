@@ -1,33 +1,39 @@
-import React, {useState, useEffect, useCallback} from 'react';
-import {View, FlatList, ScrollView, TouchableOpacity, Text, StyleSheet, Image, Touchable} from 'react-native';
-import Post from '../CommunityPage';
-import { db } from "../../../firebaseConfig";
-import { doc, setDoc, collection, getDocs } from "firebase/firestore";
-import {useFocusEffect} from "@react-navigation/native";
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, FlatList, TouchableOpacity, Text, StyleSheet, Image } from 'react-native';
+import { db, firebase_auth } from "../../../firebaseConfig";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { useFocusEffect } from "@react-navigation/native";
 
-
-const Feed: React.FC = ({navigation}) => {
+const Feed: React.FC = ({ navigation }) => {
   const [communities, setCommunities] = useState([]);
-
 
   const fetchCommunities = async () => {
     try {
-      const communitiesSnapshot = await getDocs(collection(db, "communities"));
-      const communitiesList = communitiesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setCommunities(communitiesList);
+      const userId = firebase_auth.currentUser.uid; // Get the current user's ID
+      const userDocRef = doc(db, "userProfiles", userId);
+      const userDoc = await getDoc(userDocRef);
+      const followedCommunities = userDoc.data().communities || []; // Get the list of followed communities
+
+      if (followedCommunities.length > 0) {
+        const communitiesSnapshot = await getDocs(collection(db, "communities"));
+        const communitiesList = communitiesSnapshot.docs
+            .map(doc => ({ ...doc.data(), id: doc.id }))
+            .filter(community => followedCommunities.includes(community.id)); // Filter by followed communities
+
+        setCommunities(communitiesList);
+      } else {
+        setCommunities([]); // Set empty if no followed communities
+      }
     } catch (error) {
       console.error("Error fetching communities: ", error);
     }
   };
-
 
   useFocusEffect(
       useCallback(() => {
         fetchCommunities();
       }, [])
   );
-
-
 
   return (
       <FlatList

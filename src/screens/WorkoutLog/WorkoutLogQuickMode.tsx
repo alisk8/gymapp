@@ -31,9 +31,7 @@ import ExercisePickerModal from './ExercisePickerModal';  // Import the custom m
 export default function WorkoutLogQuickMode({route}) {
     const nav = useNavigation();
 
-    const [exercises, setExercises] = useState([
-        { id: 'exercise1', name: 'Exercise 1', setsNum: 3, bestSet: { key: 'set1', weight: '', reps: '', dropSets: [], weightUnit: 'lbs', repsUnit: 'reps'}, supersetExercise: '', weightConfig: 'W', repsConfig: 'reps', isSuperset: false, completed: false}
-    ]);
+    const [exercises, setExercises] = useState([]);
     const [suggestions, setSuggestions] = useState([]);
     const [userExercises, setUserExercises] = useState([]);
     const [exercisePresets, setExercisePresets] = useState({});
@@ -127,14 +125,8 @@ export default function WorkoutLogQuickMode({route}) {
             const workout = doc.data();
             workout.exercises.forEach(ex => {
                 if (ex.name === exerciseName) {
-                    latestAttempt = ex.sets.map((set, index) => ({
-                        setNumber: index + 1,
-                        weight: set.weight,
-                        reps: set.reps,
-                        dropSets: set.dropSets
-                    }));
-                }
-            });
+                    latestAttempt = ex.bestSet;
+                }});
         });
         console.log('here', latestAttempt)
 
@@ -319,11 +311,15 @@ export default function WorkoutLogQuickMode({route}) {
     };
     **/
 
-    const addExercise = (selectedExercise, parentExerciseIndex = null) => {
+    const addExercise = async (selectedExercise, parentExerciseIndex = null) => {
+
+        const latestAttempt = await fetchLatestAttempt(selectedExercise);
+        console.log('latest attempt here', latestAttempt);
+
         const newExercise = {
             id: `${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
             name: selectedExercise,
-            bestSet: { weight: '', reps: '', dropSets: [], weightUnit: 'lbs', repsUnit: 'reps'},
+            bestSet: { weight: latestAttempt.weight || '', reps: latestAttempt.weight || '', dropSets: latestAttempt.dropSets || [], weightUnit: latestAttempt.weightUnit || 'lbs', repsUnit: latestAttempt.repsUnit || 'reps'},
             supersetExercise: '',
             weightConfig: 'W',
             repsConfig: 'reps',
