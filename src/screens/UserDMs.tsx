@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  Alert,
+  ScrollView,
 } from "react-native";
 import { firebase_auth, db } from "../../firebaseConfig";
 import {
@@ -21,14 +23,17 @@ import {
   onSnapshot,
   orderBy,
   updateDoc,
-  doc,
 } from "firebase/firestore";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 
 const UserDMs = ({ route, navigation }) => {
   const { userId, firstName, lastName, profilePicture } = route.params;
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [imageUri, setImageUri] = useState(null);
   const currentUser = firebase_auth.currentUser;
+  const flatListRef = useRef(null);
 
   useEffect(() => {
     const q = query(
@@ -57,19 +62,70 @@ const UserDMs = ({ route, navigation }) => {
   }, [userId]);
 
   const handleSend = async () => {
-    if (newMessage.trim()) {
+    if (newMessage.trim() || imageUri) {
       try {
-        await addDoc(collection(db, "messages"), {
+        const messageData = {
           createdAt: new Date(),
           senderID: currentUser.uid,
           receiverID: userId,
           body: newMessage,
+          imageUrl: imageUri || null,
           hasUnread: true,
-        });
+        };
+
+        // Add the message to Firestore and update state after success
+        await addDoc(collection(db, "messages"), messageData);
+
+        // Clear input fields after successful send
         setNewMessage("");
+        setImageUri(null);
+
+        // Scroll to bottom of FlatList
+        flatListRef.current.scrollToEnd({ animated: true });
       } catch (error) {
         console.error("Error sending message: ", error);
       }
+    }
+  };
+
+  const confirmAndSendImage = () => {
+    Alert.alert(
+      "Confirm Image",
+      "Do you want to send this image?",
+      [
+        {
+          text: "Cancel",
+          onPress: () => {
+            setImageUri(null); // Reset the image URI if canceled
+          },
+          style: "cancel",
+        },
+        {
+          text: "Send",
+          onPress: () => {
+            handleSend();
+          },
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
+  const pickImage = async () => {
+    try {
+      const response = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      if (!response.canceled) {
+        setImageUri(response.assets[0].uri); // Set the image URI
+        confirmAndSendImage(); // Confirm and send the image
+      }
+    } catch (error) {
+      console.error("Error picking image: ", error);
     }
   };
 
@@ -82,7 +138,10 @@ const UserDMs = ({ route, navigation }) => {
           : styles.theirMessage,
       ]}
     >
-      <Text style={styles.messageText}>{item.body}</Text>
+      {item.body ? <Text style={styles.messageText}>{item.body}</Text> : null}
+      {item.imageUrl ? (
+        <Image source={{ uri: item.imageUrl }} style={styles.messageImage} />
+      ) : null}
     </View>
   );
 
@@ -93,43 +152,53 @@ const UserDMs = ({ route, navigation }) => {
       keyboardVerticalOffset={90}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.innerContainer}>
-          <TouchableOpacity
-            style={styles.header}
-            onPress={() =>
-              navigation.navigate("UserDetails", {
-                user: { userId, firstName, lastName, profilePicture },
-              })
-            }
-          >
-            <Image
-              source={{ uri: profilePicture }}
-              style={styles.profilePicture}
-            />
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>
-                {firstName} {lastName}
-              </Text>
-            </View>
-          </TouchableOpacity>
-          <FlatList
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.messagesList}
-          />
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Write a message..."
-              value={newMessage}
-              onChangeText={setNewMessage}
-            />
-            <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-              <Text style={styles.sendButtonText}>Send</Text>
+        <ScrollView contentContainerStyle={styles.scrollViewContainer}>
+          <View style={styles.innerContainer}>
+            <TouchableOpacity
+              style={styles.header}
+              onPress={() =>
+                navigation.navigate("UserDetails", {
+                  user: { userId, firstName, lastName, profilePicture },
+                })
+              }
+            >
+              <Image
+                source={{ uri: profilePicture }}
+                style={styles.profilePicture}
+              />
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>
+                  {firstName} {lastName}
+                </Text>
+              </View>
             </TouchableOpacity>
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              renderItem={renderMessage}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.messagesList}
+              onContentSizeChange={() =>
+                flatListRef.current.scrollToEnd({ animated: true })
+              }
+              showsVerticalScrollIndicator={false}
+            />
+            <View style={styles.inputContainer}>
+              <TouchableOpacity onPress={pickImage}>
+                <Ionicons name="image-outline" size={28} color="#007AFF" />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.input}
+                placeholder="Write a message..."
+                value={newMessage}
+                onChangeText={setNewMessage}
+              />
+              <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+                <Text style={styles.sendButtonText}>Send</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </ScrollView>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
@@ -140,6 +209,9 @@ export default UserDMs;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollViewContainer: {
+    flexGrow: 1,
   },
   innerContainer: {
     flex: 1,
@@ -165,8 +237,9 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   messagesList: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     flexGrow: 1,
-    padding: 16,
   },
   messageContainer: {
     padding: 10,
@@ -185,12 +258,19 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 16,
   },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 10,
+    marginTop: 5,
+  },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: "#ccc",
+    backgroundColor: "#fff",
   },
   input: {
     flex: 1,
@@ -199,7 +279,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 12,
-    marginRight: 12,
+    marginHorizontal: 12,
   },
   sendButton: {
     backgroundColor: "#007AFF",

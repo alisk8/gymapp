@@ -31,6 +31,7 @@
     "react-native-gesture-handler": "^2.17.1",
     "react-native-gifted-charts": "^1.4.16",
     "react-native-graph": "^1.1.0",
+    "react-native-image-picker": "^7.1.2",
     "react-native-linear-gradient": "^2.8.3",
     "react-native-modal-datetime-picker": "^17.1.0",
     "react-native-reanimated": "~3.10.1",
