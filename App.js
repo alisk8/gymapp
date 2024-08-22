@@ -24,8 +24,6 @@ import CreateEventScreen from "./src/screens/Community/CreateEventScreen";
 import EventDetailScreen from './src/screens/Community/EventDetailScreen';
 import WorkoutLogQuickMode from "./src/screens/WorkoutLog/WorkoutLogQuickMode";
 
-
-
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
