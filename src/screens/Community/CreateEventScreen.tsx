@@ -7,15 +7,18 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    TouchableWithoutFeedback, KeyboardAvoidingView, Platform, Alert
+    TouchableWithoutFeedback, KeyboardAvoidingView, Platform, Alert, FlatList, Modal
 } from 'react-native';
 import {db, firebaseApp} from '../../../firebaseConfig'; // Adjust the import path based on your project structure
-import { collection, addDoc } from 'firebase/firestore';
+import {collection, addDoc, doc, getDoc, getDocs, updateDoc, arrayUnion} from 'firebase/firestore';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import GPSModal from '../../screens/Community/GPSModal';
 import { Picker } from '@react-native-picker/picker';
 import CustomPickerModal from "./CustomPickerModal";
-import {getAuth, onAuthStateChanged} from "firebase/auth"; // Import the Picker component
+import {getAuth, onAuthStateChanged} from "firebase/auth";
+import {Checkbox} from "react-native-paper";
+import InviteModal from "./InviteModal";
+import {useFocusEffect} from "@react-navigation/native";
 
 
 const muscleTargets = ['Push', 'Pull', 'Legs', 'Upper Body', 'Lower Body', 'Full Body', 'Core', 'Abs', 'Arms', 'Chest', 'Back', 'Shoulders']; // Replace with your data source
@@ -45,7 +48,7 @@ const useAuth = () => {
 
 
 const CreateEventScreen = ({ route, navigation }) => {
-    const { communityId } = route.params;
+    const { communityId, event, isEdit } = route.params || {};
     const [eventName, setEventName] = useState('');
     const [eventDescription, setEventDescription] = useState('');
     const [eventDate, setEventDate] = useState(new Date());
@@ -62,6 +65,13 @@ const CreateEventScreen = ({ route, navigation }) => {
     const [levelPickerVisible, setLevelPickerVisible] = useState(false);
     const [trainingFocusPickerVisible, setTrainingFocusPickerVisible] = useState(false);
     const [muscleTargetPickerVisible, setMuscleTargetPickerVisible] = useState(false);
+
+    //specify invite location
+    const [inviteModalVisible, setInviteModalVisible] = useState(false);
+    const [selectedCommunities, setSelectedCommunities] = useState([]);
+    const [selectedFollowers, setSelectedFollowers] = useState([]);
+    const [userCommunities, setUserCommunities] = useState([]);
+    const [mutualFollowers, setMutualFollowers] = useState([]);
 
     const user = useAuth();
 
@@ -86,7 +96,7 @@ const CreateEventScreen = ({ route, navigation }) => {
         }
 
         try {
-            await addDoc(collection(db, "communities", communityId, "events"), {
+            const eventRef = await addDoc(collection(db, "events"), {
                 name: eventName,
                 description: eventDescription,
                 date: eventDate,
@@ -98,13 +108,58 @@ const CreateEventScreen = ({ route, navigation }) => {
                 trainingFocus: trainingFocus || null,
                 maxPeople: maxPeople,
                 joinedUsers: [user?.uid],
-                creator: user?.uid,
+                owner: user?.uid,
+                invitedCommunities: selectedCommunities,
+                invitedPeople: selectedFollowers
             });
+
+            if(isEdit){
+                await updateDoc(doc(db, "events", event.id), eventData);
+                Alert.alert("Event updated successfully.");
+            }
+            else {
+                const communityUpdatePromises = selectedCommunities.map(communityId =>
+                    updateDoc(doc(db, "communities", communityId), {
+                        events: arrayUnion(eventRef.id)
+                    })
+                );
+                await Promise.all(communityUpdatePromises);
+
+                const followersUpdatePromises = selectedFollowers.map(communityId =>
+                    updateDoc(doc(db, "userProfiles", communityId), {
+                        events: arrayUnion(eventRef.id)
+                    })
+                );
+                await Promise.all(communityUpdatePromises);
+
+                //the creator of the event
+                await updateDoc(doc(db, "userProfiles", user?.uid), {
+                    events: arrayUnion(eventRef.id)
+                });
+            }
+
             navigation.goBack(); // Go back to the previous screen after creating the event
         } catch (error) {
             console.error("Error creating event: ", error);
         }
     };
+
+    useEffect(() => {
+        if (isEdit && event) {
+            setEventName(event.name || '');
+            setEventDescription(event.description || '');
+            setEventDate(new Date(event.date.seconds * 1000) || new Date());
+            setEventTime(new Date(event.time.seconds * 1000) || new Date());
+            setLocation(event.location || null);
+            setWorkoutFocus(event.workoutFocus || '');
+            setLevel(event.level || '');
+            setTrainingFocus(event.trainingFocus || '');
+            setMuscleTarget(event.muscleTarget || '');
+            setMaxPeople(event.maxPeople || null);
+            setSelectedCommunities(event.invitedCommunities || []);
+            setSelectedFollowers(event.invitedPeople || []);
+        }
+    }, [isEdit, event]);
 
     useEffect(() => {
         navigation.setOptions({
@@ -115,9 +170,6 @@ const CreateEventScreen = ({ route, navigation }) => {
         });
     }, [navigation]);
 
-    useEffect(() => {
-        console.log("locationModalVisible:", locationModalVisible);
-    }, [locationModalVisible]);
 
 
     const handleSelectLocation = (selectedLocation) => {
@@ -132,6 +184,71 @@ const CreateEventScreen = ({ route, navigation }) => {
             result += characters.charAt(Math.floor(Math.random() * characters.length));
         }
         return result;
+    };
+
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                // Fetch the user's profile document once
+                const userProfileDoc = await getDoc(doc(db, "userProfiles", user?.uid));
+
+                if (userProfileDoc.exists()) {
+                    const userProfileData = userProfileDoc.data();
+
+                    // Fetch communities the user is part of
+                    const communityIds = userProfileData?.communities || [];
+                    const communities = await Promise.all(
+                        communityIds.map(async (communityId) => {
+                            const communityDoc = await getDoc(doc(db, "communities", communityId));
+                            return communityDoc.exists() ? { id: communityDoc.id, ...communityDoc.data() } : null;
+                        })
+                    );
+                    setUserCommunities(communities.filter(Boolean)); // Filter out any null values
+
+                    // Fetch mutual followers
+                    const followers = userProfileData?.followers || [];
+                    const following = userProfileData?.following || [];
+
+                    const mutualFollowersIds = followers.filter(followerId => following.includes(followerId));
+                    const mutualFollowersData = await Promise.all(
+                        mutualFollowersIds.map(async (followerId) => {
+                            const followerDoc = await getDoc(doc(db, "userProfiles", followerId));
+                            return followerDoc.exists() ? { id: followerDoc.id, ...followerDoc.data() } : null;
+                        })
+                    );
+                    setMutualFollowers(mutualFollowersData.filter(Boolean)); // Filter out any null values
+
+                } else {
+                    console.error("User profile not found.");
+                    setUserCommunities([]);
+                    setMutualFollowers([]);
+                }
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+                // Optionally, you could update the state to reflect the error or show a message to the user
+                // setError("Failed to fetch user data. Please try again later.");
+            }
+        };
+
+        if (user) {
+            fetchUserData();
+        }
+    }, [user]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            console.log("Selected Communities:", selectedCommunities);
+            console.log("Selected Followers:", selectedFollowers);
+
+            // Return a cleanup function if necessary
+            return () => {
+                console.log("Screen unfocused");
+            };
+        }, [selectedCommunities, selectedFollowers])
+    );
+
+    const getSelectedDetails = (selectedIds, allItems) => {
+        return selectedIds.map(id => allItems.find(item => item.id === id)).filter(Boolean);
     };
 
     return (
@@ -232,7 +349,31 @@ const CreateEventScreen = ({ route, navigation }) => {
                 keyboardType={"number-pad"}
             />
 
-            <Button title="Create Event" onPress={handleCreateEvent} />
+            <TouchableOpacity
+                style={styles.selectedContainer}
+                onPress={() => setInviteModalVisible(true)}
+            >
+                {selectedCommunities.length > 0 && (
+                    <Text style={styles.selectedLabel}>Selected Communities:</Text>
+                )}
+                {getSelectedDetails(selectedCommunities, userCommunities).map(community => (
+                    <Text key={community.id} style={styles.selectedItem}>{community.name}</Text>
+                ))}
+
+                {selectedFollowers.length > 0 && (
+                    <Text style={styles.selectedLabel}>Selected Followers:</Text>
+                )}
+                {getSelectedDetails(selectedFollowers, mutualFollowers).map(follower => (
+                    <Text key={follower.id} style={styles.selectedItem}>{follower.firstName} {follower.lastName}</Text>
+                ))}
+
+                {(selectedCommunities.length === 0 && selectedFollowers.length === 0) && (
+                    <Text style={styles.selectedItem}>No invites selected. Tap to choose.</Text>
+                )}
+            </TouchableOpacity>
+
+            <Button title={isEdit? "Update Event" : "Create Event"} onPress={handleCreateEvent} />
+
             <GPSModal
                 isVisible={locationModalVisible}
                 onClose={() => setLocationModalVisible(false)}
@@ -259,6 +400,20 @@ const CreateEventScreen = ({ route, navigation }) => {
                 onValueChange={(itemValue) => setMuscleTarget(itemValue)}
                 onClose={() => setMuscleTargetPickerVisible(false)}
             />
+            <InviteModal
+                isVisible={inviteModalVisible}
+                onClose={() => setInviteModalVisible(false)}
+                onSave={(communities, followers) => {
+                    setSelectedCommunities(communities);
+                    setSelectedFollowers(followers);
+                }}
+                userCommunities={userCommunities}
+                mutualFollowers={mutualFollowers}
+                selectedCommunities={selectedCommunities}
+                selectedFollowers={selectedFollowers}
+            />
+
+
         </ScrollView>
  </KeyboardAvoidingView>
     );
@@ -301,6 +456,40 @@ const styles = StyleSheet.create({
         borderColor: '#ccc',
         borderRadius: 4,
         marginBottom: 16,
+    },
+    modalContainer: {
+        flex: 1,
+        padding: 16,
+        backgroundColor: '#fff',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 16,
+    },
+    item: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
+    selectedContainer: {
+        padding: 10,
+        marginVertical: 10,
+        borderRadius: 8,
+        backgroundColor: '#f0f0f0',
+        borderWidth: 1,
+        borderColor: '#ddd',
+    },
+    selectedLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 4,
+    },
+    selectedItem: {
+        fontSize: 14,
+        color: '#555',
+        marginBottom: 2,
     },
 });
 

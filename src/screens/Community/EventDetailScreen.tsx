@@ -17,7 +17,7 @@ const EventDetailScreen = ({ route, navigation }) => {
 
     useEffect(() => {
         const fetchEvent = async () => {
-            const eventDoc = await getDoc(doc(db, "communities", communityId, "events", eventId));
+            const eventDoc = await getDoc(doc(db,  "events", eventId));
             if (eventDoc.exists()) {
                 setEvent(eventDoc.data());
                 const ownerDoc = await getDoc(doc(db, "userProfiles", eventDoc.data().owner));
@@ -38,6 +38,19 @@ const EventDetailScreen = ({ route, navigation }) => {
         return () => unsubscribe();
     }, [eventId, communityId]);
 
+    useEffect(() => {
+        if (event && user && event.owner === user.uid) {
+            navigation.setOptions({
+                headerRight: () => (
+                    <Button
+                        title="Edit"
+                        onPress={() => navigation.navigate('CreateEventScreen', { event, isEdit: true })}
+                    />
+                ),
+            });
+        }
+    }, [navigation, event, user]);
+
     const handleJoin = async () => {
         if (event.joinedUsers.includes(user.uid)) {
             Alert.alert("You have already joined this event.");
@@ -50,7 +63,7 @@ const EventDetailScreen = ({ route, navigation }) => {
         }
 
         try {
-            await updateDoc(doc(db, "communities", communityId, "events", eventId), {
+            await updateDoc(doc(db, "events", eventId), {
                 joinedUsers: arrayUnion(user.uid)
             });
             Alert.alert("You have successfully joined the event.");

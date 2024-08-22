@@ -30,12 +30,17 @@ const useAuth = () => {
 };
 
 
+
+
+
 const CommunityLandingPage = ({ route, navigation }) => {
     const { communityId } = route.params;
     const [communityData, setCommunityData] = useState(null);
     const [posts, setPosts] = useState([]);
     const [commentText, setCommentText] = useState({});
     const [events, setEvents] = useState([]);
+    const [leaderboard, setLeaderboard] = useState([]);
+    const [userProfiles, setUserProfiles] = useState({});
 
 
     const user = useAuth();
@@ -43,13 +48,21 @@ const CommunityLandingPage = ({ route, navigation }) => {
 
     useFocusEffect(
         useCallback(() => {
-            fetchCommunityData(communityId);
-            fetchCommunityPosts(communityId);
-            fetchCommunityEvents(communityId);
+            const fetchAllData = async () => {
+                await fetchCommunityData(communityId); // Ensure this completes before fetching events
+                console.log(communityData.events);
+            };
+
+            fetchAllData();
         }, [])
     );
 
-    const [userProfiles, setUserProfiles] = useState({});
+    useEffect(() => {
+        if (communityData) {
+            fetchCommunityPosts(communityId);
+            fetchCommunityEvents();  // Now fetch events after community data is available
+        }
+    }, [communityData]); // Run when communityData changes
 
 // Function to fetch user profiles
     const fetchUserProfiles = async (userIds) => {
@@ -82,6 +95,70 @@ const CommunityLandingPage = ({ route, navigation }) => {
         }
     };
 
+    useEffect(() => {
+        const loadLeaderboard = async () => {
+            const data = await fetchBenchPressLeaderboard();
+            setLeaderboard(data);
+        };
+
+        loadLeaderboard();
+    }, [communityData]);
+
+
+    const fetchBenchPressLeaderboard = async () => {
+        if (!communityData || !communityData.members) {
+            return;
+        }
+
+        try {
+            const benchPressData = [];
+
+            // Fetch each member's bench press data
+            for (let userId of communityData.members) {
+                const userProfileDoc = await getDoc(doc(db, "userProfiles", userId));
+                if (userProfileDoc.exists()) {
+                    const userProfileData = userProfileDoc.data();
+                    const workoutsCollection = collection(db, "userProfiles", userId, "workouts");
+                    const workoutsSnapshot = await getDocs(workoutsCollection);
+
+                    let latestBenchPress = null;
+
+                    workoutsSnapshot.forEach((workoutDoc) => {
+                        const workoutData = workoutDoc.data();
+                        const exercise = workoutData.exercises.find(
+                            (exercise) => exercise.name.toLowerCase() === 'bench press'
+                        );
+                        if (exercise && exercise.bestSet) {
+                            const estimated1RM = exercise.bestSet.weight * (1 + 0.0333 * exercise.bestSet.reps);
+
+                            if (!latestBenchPress || workoutDoc.id > latestBenchPress.date) {
+                                latestBenchPress = {
+                                    userId,
+                                    ...exercise.bestSet,
+                                    estimated1RM,
+                                    date: workoutDoc.id,
+                                    userName: `${userProfileData.firstName} ${userProfileData.lastName}`,
+                                };
+                            }
+                        }
+                    });
+
+                    if (latestBenchPress) {
+                        benchPressData.push(latestBenchPress);
+                    }
+                }
+            }
+
+            // Sort the data by estimated 1RM
+            benchPressData.sort((a, b) => b.estimated1RM - a.estimated1RM);
+
+            return benchPressData;
+        } catch (error) {
+            console.error("Error fetching bench press data: ", error);
+        }
+    };
+
+
     const fetchCommunityPosts = async (id) => {
         try {
             const postsSnapshot = await getDocs(collection(db, "communities", id, "posts"));
@@ -92,6 +169,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
         }
     };
 
+    /**
     const fetchCommunityEvents = async (id) => {
         try {
             const eventsSnapshot = await getDocs(collection(db, "communities", id, "events"));
@@ -102,6 +180,32 @@ const CommunityLandingPage = ({ route, navigation }) => {
             await fetchUserProfiles(userIds);
         } catch (error) {
             console.error("Error fetching community events: ", error);
+        }
+    };
+        **/
+
+    const fetchCommunityEvents = async () => {
+        if (!communityData || !communityData.events) {
+            console.error("No community data or events found.");
+            return;
+        }
+
+        try {
+            const eventPromises = communityData.events.map(eventId =>
+                getDoc(doc(db, "events", eventId))
+            );
+            const eventDocs = await Promise.all(eventPromises);
+
+            const eventsList = eventDocs
+                .filter(eventDoc => eventDoc.exists())
+                .map(eventDoc => ({ ...eventDoc.data(), id: eventDoc.id }));
+
+            setEvents(eventsList);
+
+            const userIds = [...new Set(eventsList.map(event => event.owner))]; // Get unique user IDs
+            await fetchUserProfiles(userIds);
+        } catch (error) {
+            console.error("Error fetching community events:", error);
         }
     };
 
@@ -203,6 +307,23 @@ const CommunityLandingPage = ({ route, navigation }) => {
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
+                )}
+
+                <Text style={styles.leaderboardTitle}>Bench Press Leaderboard</Text>
+                {leaderboard ? (
+                    <FlatList
+                        data={leaderboard}
+                        keyExtractor={(item, index) => index.toString()}
+                        renderItem={({ item, index }) => (
+                            <View style={styles.leaderboardItem}>
+                                <Text style={styles.leaderboardRank}>{index + 1}.</Text>
+                                <Text style={styles.leaderboardName}>{item.userName}</Text>
+                                <Text style={styles.leaderboardDetails}>{item.weight}{item.weightUnit} x {item.reps} reps</Text>
+                            </View>
+                        )}
+                    />
+                ) : (
+                    <Text>No bench press data available.</Text>
                 )}
 
                 <TouchableOpacity
@@ -373,6 +494,30 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 5,
+    },
+    leaderboardTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginVertical: 10,
+    },
+    leaderboardItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ccc',
+    },
+    leaderboardRank: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    leaderboardName: {
+        fontSize: 16,
+    },
+    leaderboardDetails: {
+        fontSize: 16,
+        color: '#666',
     },
 });
 

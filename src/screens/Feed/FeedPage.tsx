@@ -18,6 +18,8 @@ const FeedPage = ({ navigation }) => {
   const [lastVisible, setLastVisible] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadedHighlightIds, setLoadedHighlightIds] = useState(new Set());
+  const [userEvents, setUserEvents] = useState([]);
+
 
 
   useEffect(() => {

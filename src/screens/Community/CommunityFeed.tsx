@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, FlatList, TouchableOpacity, Text, StyleSheet, Image } from 'react-native';
+import {View, FlatList, TouchableOpacity, Text, StyleSheet, Image, ScrollView} from 'react-native';
 import { db, firebase_auth } from "../../../firebaseConfig";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { useFocusEffect } from "@react-navigation/native";
 
 const Feed: React.FC = ({ navigation }) => {
   const [communities, setCommunities] = useState([]);
+  const [userEvents, setUserEvents] = useState([]);
+
 
   const fetchCommunities = async () => {
     try {
@@ -29,14 +31,71 @@ const Feed: React.FC = ({ navigation }) => {
     }
   };
 
+  const fetchUserEvents = async () => {
+    try {
+      const userDoc = await getDoc(doc(db, "userProfiles", firebase_auth.currentUser.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const eventIds = userData.events || [];
+
+        const eventPromises = eventIds.map(eventId =>
+            getDoc(doc(db, "events", eventId))
+        );
+        const eventDocs = await Promise.all(eventPromises);
+
+        const eventsList = eventDocs
+            .filter(eventDoc => eventDoc.exists())
+            .map(eventDoc => ({ ...eventDoc.data(), id: eventDoc.id }));
+
+        setUserEvents(eventsList);
+      }
+    } catch (error) {
+      console.error("Error fetching user events: ", error);
+    }
+  };
+
   useFocusEffect(
       useCallback(() => {
         fetchCommunities();
+        fetchUserEvents();
       }, [])
   );
 
   return (
-      <FlatList
+      <View>
+      <View>
+        <Text style={styles.eventsTitle}>Events</Text>
+        {userEvents.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.eventsContainer}>
+              {userEvents.map(event => {
+                const isUserJoined = event.joinedUsers?.includes(firebase_auth.currentUser.uid);
+                return(
+                  <TouchableOpacity key={event.id} onPress={() => navigation.navigate('EventDetailScreen', { eventId: event.id })}>
+                    <View style={styles.eventCard}>
+                      <View style={styles.eventDateContainer}>
+                        <Text style={styles.eventDay}>{new Date(event.date.seconds * 1000).getDate()}</Text>
+                        <Text style={styles.eventMonth}>{new Date(event.date.seconds * 1000).toLocaleString('default', { month: 'short' })}</Text>
+                      </View>
+                      <View style={styles.eventDetailContainer}>
+                        <Text style={styles.eventName}>{event.name}</Text>
+                        <Text style={styles.eventDetails}>{event.workoutFocus || ''}</Text>
+                        <Text style={styles.eventDetails}>{`People: ${event.joinedUsers?.length || 0}`}</Text>
+                        <Text style={styles.eventStatus}>
+                          {isUserJoined ? 'Joined' : 'Invited'}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+              );
+              })}
+            </ScrollView>
+        ) : (
+            <Text>No events available.</Text>
+        )}
+      </View>
+       <Text style={styles.eventsTitle}>Groups</Text>
+
+        <FlatList
           data={communities}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
@@ -54,6 +113,7 @@ const Feed: React.FC = ({ navigation }) => {
           )}
           contentContainerStyle={styles.container}
       />
+      </View>
   );
 };
 
@@ -101,6 +161,59 @@ const styles = StyleSheet.create({
   communityType: {
     fontSize: 14,
     color: "#999",
+  },
+  eventsTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginVertical: 5,
+  },
+  eventsContainer: {
+    paddingVertical: 2,
+  },
+  eventCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 10,
+    marginHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'column-reverse',
+  },
+  eventDateContainer: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 5,
+    padding: 5,
+    marginTop: 10,
+    marginBottom: 5,
+    alignItems: 'center',
+  },
+  eventDay: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  eventMonth: {
+    fontSize: 14,
+    color: '#666',
+  },
+  eventDetailContainer: {
+    alignItems: 'center',
+  },
+  eventName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  eventDetails: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
+  },
+  eventStatus: {
+    marginTop: 5,
+    fontSize: 14,
+    color: 'blue', // You can adjust this color as needed
+    fontWeight: 'bold',
   },
 });
 

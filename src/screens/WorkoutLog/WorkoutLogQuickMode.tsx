@@ -125,7 +125,7 @@ export default function WorkoutLogQuickMode({route}) {
             const workout = doc.data();
             workout.exercises.forEach(ex => {
                 if (ex.name === exerciseName) {
-                    latestAttempt = ex.bestSet;
+                    latestAttempt = ex.bestSet || '';
                 }});
         });
         console.log('here', latestAttempt)
@@ -319,7 +319,7 @@ export default function WorkoutLogQuickMode({route}) {
         const newExercise = {
             id: `${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
             name: selectedExercise,
-            bestSet: { weight: latestAttempt.weight || '', reps: latestAttempt.weight || '', dropSets: latestAttempt.dropSets || [], weightUnit: latestAttempt.weightUnit || 'lbs', repsUnit: latestAttempt.repsUnit || 'reps'},
+            bestSet: { weight: latestAttempt?.weight || '', reps: latestAttempt?.weight || '', dropSets: latestAttempt?.dropSets || [], weightUnit: latestAttempt?.weightUnit || 'lbs', repsUnit: latestAttempt?.repsUnit || 'reps'},
             supersetExercise: '',
             weightConfig: 'W',
             repsConfig: 'reps',
