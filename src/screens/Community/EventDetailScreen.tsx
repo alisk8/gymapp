@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, ScrollView, Alert } from 'react-native';
+import {View, Text, Button, StyleSheet, ScrollView, Alert, FlatList, Image} from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
-import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import {doc, getDoc, updateDoc, arrayUnion, arrayRemove} from "firebase/firestore";
 import { db } from '../../../firebaseConfig';
 import { getAuth } from "firebase/auth";
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -14,6 +14,8 @@ const EventDetailScreen = ({ route, navigation }) => {
     const [event, setEvent] = useState(null);
     const [ownerName, setOwnerName] = useState('');
     const [user, setUser] = useState(null);
+    const [attendees, setAttendees] = useState([]);
+
 
     useEffect(() => {
         const fetchEvent = async () => {
@@ -24,6 +26,14 @@ const EventDetailScreen = ({ route, navigation }) => {
                 if (ownerDoc.exists()) {
                     setOwnerName(`${ownerDoc.data().firstName} ${ownerDoc.data().lastName}`);
                 }
+
+                const attendeesData = await Promise.all(
+                    eventDoc.data().joinedUsers.map(async (userId) => {
+                        const userDoc = await getDoc(doc(db, "userProfiles", userId));
+                        return userDoc.exists() ? userDoc.data() : null;
+                    })
+                );
+                setAttendees(attendeesData.filter(Boolean));
             }
         };
 
@@ -51,26 +61,41 @@ const EventDetailScreen = ({ route, navigation }) => {
         }
     }, [navigation, event, user]);
 
-    const handleJoin = async () => {
-        if (event.joinedUsers.includes(user.uid)) {
-            Alert.alert("You have already joined this event.");
-            return;
-        }
 
-        if (event.joinedUsers.length >= event.maxPeople) {
-            Alert.alert("This event is full.");
-            return;
-        }
+
+    const handleJoin = async () => {
+        if (!user) return;
 
         try {
-            await updateDoc(doc(db, "events", eventId), {
-                joinedUsers: arrayUnion(user.uid)
-            });
-            Alert.alert("You have successfully joined the event.");
-            navigation.goBack();
+            const eventRef = doc(db, "events", eventId);
+
+            if (event.joinedUsers.includes(user.uid)) {
+                // User has joined, so unjoin
+                await updateDoc(eventRef, {
+                    joinedUsers: arrayRemove(user.uid)
+                });
+                Alert.alert("You have successfully unjoined the event.");
+            } else {
+                // User has not joined, so join
+                if (event.joinedUsers.length >= event.maxPeople) {
+                    Alert.alert("This event is full.");
+                    return;
+                }
+
+                await updateDoc(eventRef, {
+                    joinedUsers: arrayUnion(user.uid)
+                });
+                Alert.alert("You have successfully joined the event.");
+            }
+
+            // Refresh the event data after updating
+            const updatedEventDoc = await getDoc(eventRef);
+            if (updatedEventDoc.exists()) {
+                setEvent(updatedEventDoc.data());
+            }
         } catch (error) {
-            console.error("Error joining event: ", error);
-            Alert.alert("Error joining event. Please try again.");
+            console.error("Error updating event: ", error);
+            Alert.alert("Error updating event. Please try again.");
         }
     };
 
@@ -132,11 +157,30 @@ const EventDetailScreen = ({ route, navigation }) => {
                 <Icon name="users" size={20} color="#333" />
                 <Text style={styles.detailText}>Joined Users: {event.joinedUsers.length}/{event.maxPeople}</Text>
             </View>
+
+            <Text style={styles.attendeesTitle}>Attendees</Text>
+            <FlatList
+                data={attendees}
+                keyExtractor={(item) => item.uid}
+                renderItem={({ item }) => (
+                    <View style={styles.attendeeItem}>
+                        {item.profilePicture && (
+                            <Image source={{ uri: item.profilePicture }} style={styles.attendeeImage} />
+                        )}
+                        <Text style={styles.attendeeName}>{item.firstName} {item.lastName}</Text>
+                    </View>
+                )}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.attendeesList}
+            />
+
             <Text style={styles.description}>{event.description}</Text>
             <Button
-                title={userHasJoined ? "Already Joined" : "Join Event"}
+                title={userHasJoined ? "Unjoin Session" : "Join Session"}
                 onPress={handleJoin}
-                disabled={userHasJoined || event.joinedUsers.length >= event.maxPeople}
+                disabled={event.joinedUsers.length >= event.maxPeople && !userHasJoined}
+                color={userHasJoined ? "#FF6347" : "#32CD32"} // Red for unjoin, green for join
             />
         </ScrollView>
     );
@@ -166,10 +210,34 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 200,
         marginBottom: 16,
+        borderRadius: 8, // Rounded corners
     },
     description: {
         fontSize: 16,
         marginVertical: 16,
+    },
+    attendeesTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginTop: 20,
+        marginBottom: 10,
+    },
+    attendeesList: {
+        paddingVertical: 10,
+    },
+    attendeeItem: {
+        alignItems: 'center',
+        marginRight: 10,
+    },
+    attendeeImage: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        marginBottom: 5,
+    },
+    attendeeName: {
+        fontSize: 14,
+        fontWeight: 'bold',
     },
 });
 
