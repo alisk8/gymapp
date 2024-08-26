@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { db, firebase_auth } from '../../../firebaseConfig';
-import {collection, getDocs, query, orderBy, limit, startAfter, doc, getDoc, where} from '@firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, startAfter, doc, getDoc, updateDoc, arrayUnion, arrayRemove } from '@firebase/firestore';
 import { InteractionManager } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Swiper from 'react-native-swiper';
-import {useFocusEffect} from "@react-navigation/native";
+import { useFocusEffect } from "@react-navigation/native";
 
 const defaultProfilePicture = 'https://firebasestorage.googleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2Fpfp.jpeg?alt=media&token=dd124ee9-6c61-48ad-b41c-97f3acc3350c';
 
@@ -18,9 +18,6 @@ const FeedPage = ({ navigation }) => {
   const [lastVisible, setLastVisible] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadedHighlightIds, setLoadedHighlightIds] = useState(new Set());
-  const [userEvents, setUserEvents] = useState([]);
-
-
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
@@ -29,13 +26,12 @@ const FeedPage = ({ navigation }) => {
     return () => task.cancel();
   }, []);
 
-
   useFocusEffect(
-      useCallback(() => {
-        if (userProfile) {
-          fetchHighlights(true);
-        }
-      }, [userProfile])
+    useCallback(() => {
+      if (userProfile) {
+        fetchHighlights(true);
+      }
+    }, [userProfile])
   );
 
   const fetchUserProfile = async () => {
@@ -81,23 +77,24 @@ const FeedPage = ({ navigation }) => {
       let allHighlights = [];
       let newLastVisible = { ...lastVisible };
 
+      const currentUserUid = firebase_auth.currentUser.uid;
+
       for (const userId of following) {
         const userRef = doc(db, 'userProfiles', userId);
         const userDoc = await getDoc(userRef);
         const userProfileData = userDoc.data();
 
         let highlightsQuery = query(
-            collection(db, 'userProfiles', userId, 'highlights'),
-            orderBy('timestamp', 'desc'),
-            limit(10)
+          collection(db, 'userProfiles', userId, 'highlights'),
+          orderBy('timestamp', 'desc'),
+          limit(10)
         );
 
         let workoutsQuery = query(
-            collection(db, 'userProfiles', userId, 'workouts'),
-            orderBy('createdAt', 'desc'),
-            limit(10)
+          collection(db, 'userProfiles', userId, 'workouts'),
+          orderBy('createdAt', 'desc'),
+          limit(10)
         );
-
 
         if (lastVisible[userId] && lastVisible[userId].highlight) {
           highlightsQuery = query(highlightsQuery, startAfter(lastVisible[userId].highlight));
@@ -111,10 +108,9 @@ const FeedPage = ({ navigation }) => {
           getDocs(workoutsQuery)
         ]);
 
-
         if (highlightsSnapshot.docs.length > 0) {
           newLastVisible[userId] = {
-            ...newLastVisible[userId], // Preserve the workout's last visible document
+            ...newLastVisible[userId], 
             highlight: highlightsSnapshot.docs[highlightsSnapshot.docs.length - 1]
           };
 
@@ -129,6 +125,10 @@ const FeedPage = ({ navigation }) => {
                 lastName: userProfileData.lastName,
                 profilePicture: userProfileData.profilePicture || defaultProfilePicture,
                 timestamp: highlightData.timestamp ? highlightData.timestamp.toDate() : null,
+                liked: highlightData.likes ? highlightData.likes.includes(currentUserUid) : false,
+                saved: highlightData.savedBy ? highlightData.savedBy.includes(currentUserUid) : false,
+                likes: highlightData.likes ? highlightData.likes.length : 0,
+                savedBy: highlightData.savedBy ? highlightData.savedBy.length : 0,
               });
               setLoadedHighlightIds(prevIds => new Set(prevIds).add(doc.id));
             }
@@ -137,7 +137,7 @@ const FeedPage = ({ navigation }) => {
 
         if (workoutsSnapshot.docs.length > 0) {
           newLastVisible[userId] = {
-            ...newLastVisible[userId], // Preserve the highlight's last visible document
+            ...newLastVisible[userId], 
             workout: workoutsSnapshot.docs[workoutsSnapshot.docs.length - 1]
           };
 
@@ -153,6 +153,10 @@ const FeedPage = ({ navigation }) => {
                 lastName: userProfileData.lastName,
                 profilePicture: userProfileData.profilePicture || defaultProfilePicture,
                 timestamp: workoutData.createdAt ? workoutData.createdAt.toDate() : null,
+                liked: workoutData.likes ? workoutData.likes.includes(currentUserUid) : false,
+                saved: workoutData.savedBy ? workoutData.savedBy.includes(currentUserUid) : false,
+                likes: workoutData.likes ? workoutData.likes.length : 0,
+                savedBy: workoutData.savedBy ? workoutData.savedBy.length : 0,
               });
               setLoadedHighlightIds(prevIds => new Set(prevIds).add(doc.id));
             }
@@ -168,7 +172,6 @@ const FeedPage = ({ navigation }) => {
       setLastVisible(newLastVisible);
       setLoading(false);
       setLoadingMore(false);
-      console.log(allHighlights);
     } catch (error) {
       console.error('Error fetching highlights: ', error);
       setError('Failed to load highlights');
@@ -177,6 +180,135 @@ const FeedPage = ({ navigation }) => {
     }
   };
 
+  const handleLike = async (postId, userId, isWorkout) => {
+    const collectionName = isWorkout ? 'workouts' : 'highlights';
+    const postRef = doc(db, 'userProfiles', userId, collectionName, postId);
+    const currentUser = firebase_auth.currentUser;
+
+    if (!currentUser) {
+      console.error("User not authenticated");
+      return;
+    }
+
+    const userUid = currentUser.uid;
+
+    try {
+      const postDoc = await getDoc(postRef);
+      if (postDoc.exists()) {
+        await updateDoc(postRef, {
+          likes: arrayUnion(userUid),
+        });
+
+        setHighlights(prevHighlights => prevHighlights.map(post => 
+          post.id === postId ? { ...post, liked: true, likes: post.likes + 1 } : post
+        ));
+      } else {
+        console.error("Post does not exist");
+      }
+    } catch (error) {
+      console.error("Error liking post: ", error);
+    }
+  };
+
+  const handleUnlike = async (postId, userId, isWorkout) => {
+    const collectionName = isWorkout ? 'workouts' : 'highlights';
+    const postRef = doc(db, 'userProfiles', userId, collectionName, postId);
+    const currentUser = firebase_auth.currentUser;
+
+    if (!currentUser) {
+      console.error("User not authenticated");
+      return;
+    }
+
+    const userUid = currentUser.uid;
+
+    try {
+      const postDoc = await getDoc(postRef);
+      if (postDoc.exists()) {
+        await updateDoc(postRef, {
+          likes: arrayRemove(userUid),
+        });
+
+        setHighlights(prevHighlights => prevHighlights.map(post => 
+          post.id === postId ? { ...post, liked: false, likes: post.likes - 1 } : post
+        ));
+      } else {
+        console.error("Post does not exist");
+      }
+    } catch (error) {
+      console.error("Error unliking post: ", error);
+    }
+  };
+
+  const handleSave = async (postId, userId, isWorkout) => {
+    const collectionName = isWorkout ? 'workouts' : 'highlights';
+    const postRef = doc(db, 'userProfiles', userId, collectionName, postId);
+    const currentUser = firebase_auth.currentUser;
+    const userRef = doc(db, 'userProfiles', currentUser.uid);
+
+    if (!currentUser) {
+      console.error("User not authenticated");
+      return;
+    }
+
+    const userUid = currentUser.uid;
+
+    try {
+      const postDoc = await getDoc(postRef);
+      if (postDoc.exists()) {
+        await updateDoc(postRef, {
+          savedBy: arrayUnion(userUid),
+        });
+
+        await updateDoc(userRef, {
+          savedPosts: arrayUnion({ collection: collectionName, postId, userId }),
+        });
+
+        setHighlights(prevHighlights => prevHighlights.map(post => 
+          post.id === postId ? { ...post, saved: true, savedBy: post.savedBy + 1 } : post
+        ));
+      } else {
+        console.error("Post does not exist");
+      }
+    } catch (error) {
+      console.error("Error saving post: ", error);
+    }
+  };
+
+  const handleUnsave = async (postId, userId, isWorkout) => {
+    const collectionName = isWorkout ? 'workouts' : 'highlights';
+    const postRef = doc(db, 'userProfiles', userId, collectionName, postId);
+    const currentUser = firebase_auth.currentUser;
+    const userRef = doc(db, 'userProfiles', currentUser.uid);
+
+    if (!currentUser) {
+      console.error("User not authenticated");
+      return;
+    }
+
+    const userUid = currentUser.uid;
+
+    try {
+      const postDoc = await getDoc(postRef);
+      if (postDoc.exists()) {
+        await updateDoc(postRef, {
+          savedBy: arrayRemove(userUid),
+        });
+
+        await updateDoc(userRef, {
+          savedPosts: arrayRemove({ collection: collectionName, postId, userId }),
+        });
+
+        setHighlights(prevHighlights => prevHighlights.map(post => 
+          post.id === postId ? { ...post, saved: false, savedBy: post.savedBy - 1 } : post
+        ));
+      } else {
+        console.error("Post does not exist");
+      }
+    } catch (error) {
+      console.error("Error unsaving post: ", error);
+    }
+  };
 
   const refreshHighlights = async () => {
     setRefreshing(true);
@@ -191,168 +323,155 @@ const FeedPage = ({ navigation }) => {
   };
 
   const renderItem = useCallback(({ item }) => {
-
-
     if (item.type === 'workout') {
       const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.setsNum), 0);
-      console.log(item);
       const elapsedTime  = formatTotalWorkoutTime(item.totalWorkoutTime);
 
       // Render workout item
       return (
-          <View style={styles.highlightContainer}>
-            <View style={styles.userInfoContainer}>
-              <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-                <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-                <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
-            {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
-
-            <View style={styles.metricsContainer}>
-              <Text style={styles.metricText}>{`Total Sets: ${totalSets}`}</Text>
-              <Text style={styles.metricText}>{`Workout Time: ${elapsedTime}`}</Text>
-            </View>
-
-            <Text style={styles.exerciseHeader}>Exercises:</Text>
-            <View style={styles.exerciseNamesContainer}>
-              {item.exercises.map((exercise, index) => (
-                  <View key={index} style={styles.exerciseItemContainer}>
-                    <Text style={styles.exerciseNameText}>{exercise.name}</Text>
-                    <Text style={styles.bestSetText}>
-                      {`Best Set: ${exercise.bestSet.weight} ${exercise.bestSet.weightUnit} x ${exercise.bestSet.reps} ${exercise.bestSet.repsUnit}`}
-                    </Text>
-                  </View>
-              ))}
-            </View>
-            {item.mediaUrls && item.mediaUrls.length > 0 && (
-                <View style={styles.imageContainer}>
-                  <Swiper style={styles.swiper} showsPagination={true}>
-                    {item.mediaUrls.map((mediaUrl, index) => (
-                        <Image
-                            key={`${item.id}_${index}`}
-                            source={{ uri: mediaUrl }}
-                            style={styles.postImage}
-                        />
-                    ))}
-                  </Swiper>
-                </View>
-            )}
-
-            {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
-            <View style={styles.actionButtonsContainer}>
-              <TouchableOpacity style={styles.actionButton} onPress={() => handleLike(item.id)}>
-                <Icon name="heart-outline" size={25} color="#000" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id)}>
-                <Icon name="chatbubble-outline" size={25} color="#000" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
-                <Icon name="share-outline" size={25} color="#000" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={() => handleSave(item.id)}>
-                <Icon name="bookmark-outline" size={25} color="#000" />
-              </TouchableOpacity>
-            </View>
+        <View style={styles.highlightContainer}>
+          <View style={styles.userInfoContainer}>
+            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+              <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+              <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+            </TouchableOpacity>
           </View>
+
+          {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
+          {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+
+          <View style={styles.metricsContainer}>
+            <Text style={styles.metricText}>{`Total Sets: ${totalSets}`}</Text>
+            <Text style={styles.metricText}>{`Workout Time: ${elapsedTime}`}</Text>
+          </View>
+
+          <Text style={styles.exerciseHeader}>Exercises:</Text>
+          <View style={styles.exerciseNamesContainer}>
+            {item.exercises.map((exercise, index) => (
+              <View key={index} style={styles.exerciseItemContainer}>
+                <Text style={styles.exerciseNameText}>{exercise.name}</Text>
+                <Text style={styles.bestSetText}>
+                  {`Best Set: ${exercise.bestSet.weight} ${exercise.bestSet.weightUnit} x ${exercise.bestSet.reps} ${exercise.bestSet.repsUnit}`}
+                </Text>
+              </View>
+            ))}
+          </View>
+          {item.mediaUrls && item.mediaUrls.length > 0 && (
+            <View style={styles.imageContainer}>
+              <Swiper style={styles.swiper} showsPagination={true}>
+                {item.mediaUrls.map((mediaUrl, index) => (
+                  <Image
+                    key={`${item.id}_${index}`}
+                    source={{ uri: mediaUrl }}
+                    style={styles.postImage}
+                  />
+                ))}
+              </Swiper>
+            </View>
+          )}
+
+          {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, true) : handleLike(item.id, item.userId, true)}>
+              <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
+              <Text style={styles.actionText}>{item.likes}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id)}>
+              <Icon name="chatbubble-outline" size={25} color="#000" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
+              <Icon name="share-outline" size={25} color="#000" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, true) : handleSave(item.id, item.userId, true)}>
+              <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
+              <Text style={styles.actionText}>{item.savedBy}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )
     } else {
       // Render highlight item (default case)
       return (
-          <View style={styles.highlightContainer}>
-            <View style={styles.userInfoContainer}>
-              <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-                <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-                <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
-              </TouchableOpacity>
-            </View>
-            {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
-            {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
-            {item.mediaUrls && item.mediaUrls.length > 0 && (
-                <View style={styles.imageContainer}>
-                  <Swiper style={styles.swiper} showsPagination={true}>
-                    {item.mediaUrls.map((mediaUrl, index) => (
-                        <Image
-                            key={`${item.id}_${index}`}
-                            source={{ uri: mediaUrl }}
-                            style={styles.postImage}
-                        />
-                    ))}
-                  </Swiper>
-                </View>
-            )}
-            {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
-            <View style={styles.actionButtonsContainer}>
-              <TouchableOpacity style={styles.actionButton} onPress={() => handleLike(item.id)}>
-                <Icon name="heart-outline" size={25} color="#000" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id)}>
-                <Icon name="chatbubble-outline" size={25} color="#000" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
-                <Icon name="share-outline" size={25} color="#000" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={() => handleSave(item.id)}>
-                <Icon name="bookmark-outline" size={25} color="#000" />
-              </TouchableOpacity>
-            </View>
+        <View style={styles.highlightContainer}>
+          <View style={styles.userInfoContainer}>
+            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+              <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+              <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+            </TouchableOpacity>
           </View>
+          {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
+          {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+          {item.mediaUrls && item.mediaUrls.length > 0 && (
+            <View style={styles.imageContainer}>
+              <Swiper style={styles.swiper} showsPagination={true}>
+                {item.mediaUrls.map((mediaUrl, index) => (
+                  <Image
+                    key={`${item.id}_${index}`}
+                    source={{ uri: mediaUrl }}
+                    style={styles.postImage}
+                  />
+                ))}
+              </Swiper>
+            </View>
+          )}
+          {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, false) : handleLike(item.id, item.userId, false)}>
+              <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
+              <Text style={styles.actionText}>{item.likes}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id)}>
+              <Icon name="chatbubble-outline" size={25} color="#000" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
+              <Icon name="share-outline" size={25} color="#000" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, false) : handleSave(item.id, item.userId, false)}>
+              <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
+              <Text style={styles.actionText}>{item.savedBy}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       );
     }
   }, []);
-  const handleLike = (postId) => {
-    // Handle like action
-  };
-
-  const handleComment = (postId) => {
-    // Handle comment action
-  };
-
-  const handleShare = (postId) => {
-    // Handle share action
-  };
-
-  const handleSave = (postId) => {
-    // Handle save action
-  };
 
   if (loading && !refreshing) {
     return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0000ff" />
-        </View>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
     );
   }
 
   if (error) {
     return (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
     );
   }
 
   return (
-      <FlatList
-          data={highlights}
-          keyExtractor={item => item.id}
-          renderItem={renderItem}
-          onEndReached={() => {
-            if (!loadingMore) {
-              fetchHighlights();
-            }
-          }}          onEndReachedThreshold={0.5}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={refreshHighlights} />
-          }
-          ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
-      />
+    <FlatList
+      data={highlights}
+      keyExtractor={item => item.id}
+      renderItem={renderItem}
+      onEndReached={() => {
+        if (!loadingMore) {
+          fetchHighlights();
+        }
+      }}
+      onEndReachedThreshold={0.5}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refreshHighlights} />
+      }
+      ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
+    />
   );
 };
 
@@ -378,7 +497,14 @@ const styles = StyleSheet.create({
     borderTopColor: '#ccc',
   },
   actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 15,
+  },
+  actionText: {
+    marginLeft: 5,
+    fontSize: 14,
+    color: '#000',
   },
   loadingContainer: {
     flex: 1,
@@ -478,4 +604,3 @@ const styles = StyleSheet.create({
 });
 
 export default FeedPage;
-/*Current Problem, loads top 10 posts of each user instead of top 10 posts overalllem, loads top 10 posts of each user instead of top 10 posts overall */
