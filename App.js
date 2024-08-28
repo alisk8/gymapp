@@ -38,6 +38,8 @@ import TrackedExercise from './src/screens/TrackedExercise';
 import Saved from './src/screens/Saved';
 import Messages from './src/screens/Messages';
 import UserDMs from './src/screens/UserDMs';
+import ExerciseLogScreen from "./src/screens/ExerciseLog/ExerciseLog";
+import TrackingExerciseScreen from "./src/screens/ExerciseLog/TrackingExerciseScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -56,6 +58,9 @@ const screenOptions = ({ navigation, iconType }) => ({
         } else if (iconType === 'CreateOutline') {
             icon = <Ionicons name="create-outline" size={24} color="black" />;
             onPress = () => navigation.navigate('SaveGymHighlightScreen');
+        }else if (iconType === 'addEntry') {
+            icon = <Ionicons name="add-outline" size={24} color="black" />;
+            onPress = () => navigation.navigate('AddExerciseEntry'); // Example navigation action
         }
 
         return (
@@ -161,6 +166,27 @@ function AccountStack() {
         </Stack.Navigator>
     );
 }
+
+function ExerciseLogStack(){
+    return (
+        <Stack.Navigator initialRouteName='ExerciseLog'>
+            <Stack.Screen
+                name="ExerciseLogScreen"
+                component={ExerciseLogScreen}
+                options={({ navigation }) => ({
+                    ...screenOptions({ navigation }),
+                    title: "Exercise Log"
+                })}
+            />
+            <Stack.Screen name='TrackingExerciseScreen' component={TrackingExerciseScreen}
+                          options={({ navigation }) => ({
+                ...screenOptions({ navigation, iconType: 'AddEntry' }), // Icon for adding a new community
+                title: "Track Exercise"
+            })} />
+        </Stack.Navigator>
+    );
+}
+
 
 function ProgressStack() {
     return (
@@ -370,6 +396,17 @@ function App() {
                                 options={{
                                     headerShown: false,
                                     title: 'Feed',
+                                    tabBarIcon: ({ color, size }) => (
+                                        <Ionicons name="list-outline" color={color} size={size} />
+                                    )
+                                }}
+                            />
+                            <Tab.Screen
+                                name='ExerciseLogStack'
+                                component={ExerciseLogStack}
+                                options={{
+                                    headerShown: false,
+                                    title: 'ExerciseLog',
                                     tabBarIcon: ({ color, size }) => (
                                         <Ionicons name="list-outline" color={color} size={size} />
                                     )
