@@ -105,9 +105,6 @@ const WorkoutSummaryScreen = ({ route }) => {
     }, [isPaused]);
 
     const getBestAttempts = (exercise) => {
-        if(exercise.bestSet){
-            return exercise.bestSet;
-        }
 
         return exercise.sets.reduce((best, set) => {
             const weight = parseFloat(set.weight);
@@ -124,7 +121,12 @@ const WorkoutSummaryScreen = ({ route }) => {
     const calculateTotalWeightLifted = (exercises) => {
         return exercises.reduce((totalWeight, exercise) => {
             const exerciseWeight = exercise.sets.reduce((exerciseTotal, set) => {
-                return exerciseTotal + (parseFloat(set.weight) * parseInt(set.reps, 10));
+                let weight = parseFloat(set.weight);
+                // Standardize weight to kg if it's in lbs
+                if (exercise.weightUnit === 'lbs') {
+                    weight = weight * 0.453592; // Convert lbs to kg
+                }
+                return exerciseTotal + (weight * parseInt(set.reps, 10));
             }, 0);
             return totalWeight + exerciseWeight;
         }, 0);
@@ -132,7 +134,7 @@ const WorkoutSummaryScreen = ({ route }) => {
 
     const calculateTotalSetsDone = (exercises) => {
         return exercises.reduce((totalSets, exercise) => {
-            return totalSets + exercise.setsNum;
+            return totalSets + exercise.sets.length;
         }, 0);
     };
 
@@ -159,53 +161,20 @@ const WorkoutSummaryScreen = ({ route }) => {
         }
 
         try {
-            const mapDropSets = (sets) => {
-                return sets.map(set => ({
-                    dropSetsCount: set.dropSets.length, // Only include the count of drop sets
-                }));
-            };
-
-            const filteredExercises = workoutState.exercises.map(ex => {
-                const bestSet = ex.bestSet;
-
-                // Filter and validate the bestSet
-                if (
-                    (bestSet.weight !== '' || ex.weightConfig === 'BW') &&
-                    bestSet.reps !== '' &&
-                    ex.completed
-                ) {
-                    return {
-                        id: camelCase(ex.name),
-                        name: ex.name,
-                        bestSet: {
-                            ...bestSet,
-                            weight: ex.weightConfig === 'BW' ? 0 : bestSet.weight,
-                            weightUnit: bestSet.weightUnit,
-                            reps: bestSet.reps || '',
-                            repsUnit: bestSet.repsUnit || 'reps',
-                            dropSets: bestSet.dropSets.filter(dropSet =>
-                                (dropSet.weight !== '' || ex.weightConfig === 'BW') &&
-                                dropSet.reps !== ''
-                            ).map(dropSet => ({
-                                ...dropSet,
-                                weight: ex.weightConfig === 'BW' ? 0 : parseFloat(dropSet.weight),
-                                reps: dropSet.reps
-                            }))
-                        },
-                        setsNum: ex.setsNum,
-                        supersetExercise: ex.supersetExercise,
-                        isSuperset: ex.isSuperset,
-                    };
-                }
-
-                // If bestSet is not valid, return null to filter it out later
-                return null;
-            }).filter(ex => ex !== null); // Filter out exercises with no valid bestSet
-
-            if (filteredExercises.length === 0) {
-                Alert.alert("Error", "Please add reps/failure to all sets and mark completed.");
-                return;
-            }
+            const filteredExercises = workoutState.exercises.map(ex => ({
+                id: camelCase(ex.name),
+                name: ex.name,
+                sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'bodyWeight') && (set.reps !== '')).map(set => ({
+                    ...set,
+                    weight: set.weight,
+                    reps: set.reps,
+                    key: set.key,
+                })),
+                isSuperset: ex.isSuperset,
+                supersetExercise: ex.supersetExercise,
+                weightUnit: ex.weightUnit,
+                repsUnit: ex.repsUnit,
+            })).filter(ex => ex.sets.length > 0);
 
 
              if (isTemplateSaveChecked && newTemplateName) {
@@ -214,7 +183,7 @@ const WorkoutSummaryScreen = ({ route }) => {
                  const templateExercises = workoutState.exercises.map(ex => ({
                          id: camelCase(ex.name),
                          name: ex.name,
-                         setsNum: ex.setsNum,
+                         setsKeys: ex.sets.length,
                          supersetExercise: ex.supersetExercise,
                          isSuperset: ex.isSuperset,
                      }));
@@ -400,6 +369,14 @@ const WorkoutSummaryScreen = ({ route }) => {
             <Text style={styles.subheading}>Date: {new Date().toLocaleDateString()}</Text>
             <Text style={styles.subheading}>Start Time: {formatStartTime(startTime)}</Text>
             <Text style={styles.subheading}>Total Workout Time: {formatTotalWorkoutTime(elapsedTime)}</Text>
+                <View style={styles.summaryHeaderContainer}>
+                    <Text style={styles.summaryHeaderText}>
+                        Total Weight Lifted: {calculateTotalWeightLifted(workoutState.exercises).toFixed(2)} kg
+                    </Text>
+                    <Text style={styles.summaryHeaderText}>
+                        Total Sets Done: {calculateTotalSetsDone(workoutState.exercises)}
+                    </Text>
+                </View>
             {workoutState.exercises
                 .filter(exercise => exercise.completed)
                 .map((exercise, index) => {
@@ -762,6 +739,22 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         paddingHorizontal: 10,
+    },
+    summaryHeaderContainer: {
+        marginBottom: 20,
+        padding: 10,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+    },
+    summaryHeaderText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 5,
     },
 });
 

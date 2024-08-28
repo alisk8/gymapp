@@ -67,29 +67,16 @@ export default function WorkoutLogScreen({route}) {
     const [tempReps, setTempReps] = useState(0);
     const [weightUnit, setWeightUnit] = useState('lbs'); // Default to 'lbs'
 
-
     const timerHeight = useSharedValue(120);
 
     const template = route?.params?.template;
     const exercisesRef = useRef(exercises);
     const typingTimeoutRef = useRef(null);
 
+    //autofill
+    const [lastFilledWeights, setLastFilledWeights] = useState({});
+    const [lastFilledReps, setLastFilledReps] = useState({});
 
-
-    const togglePreviousAttempts = async (exerciseId, exerciseName) => {
-        if (showPreviousAttempts[exerciseId]) {
-            setShowPreviousAttempts(prev => ({
-                ...prev,
-                [exerciseId]: null
-            }));
-        } else {
-            const latestAttempt = await fetchLatestAttempt(exerciseName);
-            setShowPreviousAttempts(prev => ({
-                ...prev,
-                [exerciseId]: latestAttempt
-            }));
-        }
-    };
 
     const toggleFailureTracking = () => {
         setIsFailureTracking(!isFailureTracking);
@@ -122,6 +109,7 @@ export default function WorkoutLogScreen({route}) {
         return `${hours > 0 ? `${hours}:` : ''}${hours > 0 ? minutes.toString().padStart(2, '0') : minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
 
+
     const fetchLatestAttempt = async (exerciseName) => {
         if (!firebase_auth.currentUser) return;
 
@@ -136,17 +124,15 @@ export default function WorkoutLogScreen({route}) {
             workout.exercises.forEach(ex => {
                 if (ex.name === exerciseName) {
                     latestAttempt = ex.sets.map((set, index) => ({
-                        setNumber: index + 1,
+                        key: ex.key,
                         weight: set.weight,
-                        weightUnit: set.weightUnit,
                         reps: set.reps,
-                        repsUnit: set.repsUnit,
-                        dropSets: set.dropSets
+                        weightUnit: ex.weightUnit,
+                        repsUnit: ex.repsUnit,
                     }));
                 }
             });
         });
-        console.log('here', latestAttempt)
 
         return latestAttempt;
     };
@@ -275,12 +261,13 @@ export default function WorkoutLogScreen({route}) {
 
 
     const addSet = (exerciseIndex) => {
+
+        const existingSets = exercises[exerciseIndex].sets.filter(set => !set.key.includes('_dropset'));
+
         const newSets = [...exercises[exerciseIndex].sets, {
-            key: `set${exercises[exerciseIndex].sets.length + 1}`,
+            key: `set${existingSets.length + 1}`,
             weight: '',
             reps: '',
-            weightUnit: 'lbs',
-            repsUnit: 'reps',
             isFailure: null,
             completed: false
         }];
@@ -291,7 +278,10 @@ export default function WorkoutLogScreen({route}) {
 
     const updateSetData = (text, exerciseIndex, setIndex, type) => {
         const newExercises = [...exercises];
-        newExercises[exerciseIndex].sets[setIndex][type] = text;
+
+        const newNum = type === 'weight'? parseFloat(text): parseInt(text);
+
+        newExercises[exerciseIndex].sets[setIndex][type] = newNum;
         setExercises(newExercises);
     };
 
@@ -301,23 +291,33 @@ export default function WorkoutLogScreen({route}) {
         setExercises(newExercises);
     };
 
-    const generateUniqueId = () => {
+    const generateUniqueId =  () => {
         return `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     };
 
-    const addExercise = (selectedExercise, parentExerciseIndex = null) => {
+    const addExercise = async (selectedExercise, parentExerciseIndex = null) => {
         const newExercise = {
             id: generateUniqueId(),
             name: selectedExercise,
-            sets: [{ key: 'set1', weight: '', reps: '', weightUnit:'lbs', repsUnit: 'reps', isFailure: null, completed: false}],
+            sets: [{ key: 'set1', weight: '', reps: '', isFailure: null, completed: false}],
+            weightUnit:'lbs',
+            repsUnit: 'reps',
             supersetExercise: '',
             weightConfig: 'W',
             repsConfig: 'reps',
             isSuperset: parentExerciseIndex != null,
         };
 
-        console.log('is superset', newExercise.isSuperset);
-        console.log('parent exercise index',parentExerciseIndex);
+        // Fetch the previous attempt for the new exercise
+        const latestAttempt = await fetchLatestAttempt(selectedExercise);
+
+        // Store the previous attempts in the showPreviousAttempts state
+        if (latestAttempt) {
+            setShowPreviousAttempts(prev => ({
+                ...prev,
+                [newExercise.id]: latestAttempt
+            }));
+        }
 
         const newExercises = [...exercises];
         if (parentExerciseIndex !== null && parentExerciseIndex >= 0 && parentExerciseIndex < newExercises.length) {
@@ -475,58 +475,78 @@ export default function WorkoutLogScreen({route}) {
     };
 
 
+
+
     const renderSets = (sets, exerciseIndex) => {
         const exercise = exercises[exerciseIndex];
         const exerciseId = exercise.id;
 
+        const lastFilledWeight = lastFilledWeights[exerciseId] || '';
+        const lastFilledRep = lastFilledReps[exerciseId] || '';
+
+
         return (
             <View>
-                {showPreviousAttempts[exerciseId] && (
-                    <TouchableOpacity
-                        onPress={() => loadAllPreviousAttempts(exerciseIndex)}
-                        style={styles.addAllPreviousButton}
-                    >
-                        <Text style={styles.addAllPreviousButtonText}>Add All</Text>
-                    </TouchableOpacity>
-                )}
                 {sets.map((set, setIndex) => {
-                    const weightPlaceholder = (() => {
-                        switch (exercise.weightConfig) {
-                            case 'W':
-                                return 'Weight Lifted';
-                            case 'BW':
-                                return 'Body Weight';
-                            case 'BW+':
-                                return 'BW + Extra Weight';
-                            default:
-                                return 'Weight Lifted';
-                        }
-                    })();
+                    const isDropSet = set.key.includes('_dropset');
+                    const parentSetIndex = isDropSet ? set.key.split('_')[0].replace('set', '') : null;
+                    let indicator = '';
+                    const previousSet = showPreviousAttempts[exerciseId]?.find(prevSet => prevSet.key === set.key) || {};
 
-                    const repsPlaceholder = (() => {
-                        switch (exercise.repsConfig) {
-                            case 'Reps':
-                                return 'Reps';
-                            case 'Hold':
-                                return 'Time (seconds)';
-                            case 'Cardio':
-                                return 'Time (minutes)';
-                            default:
-                                return 'Reps';
-                        }
-                    })();
+
+                    if (isDropSet) {
+                        indicator = 'D'; // Dropset indicator
+                    } else {
+                        // Extract the set number from the key, assuming it's in the format 'setX'
+                        const setNumber = set.key.match(/set(\d+)/);
+                        indicator = setNumber ? setNumber[1] : '';
+                    }
+
+                    const weightPlaceholder = lastFilledWeight? lastFilledWeight.toString():'Weight';
+
+                    const repsPlaceholder = lastFilledRep? lastFilledRep.toString(): 'reps';
 
                     const isWeightDisabled = exercise.weightConfig === 'bodyWeight';
 
-                    if (!set.dropSets) {
-                        set.dropSets = [];
-                    }
 
                     const toggleCompleted = () => {
                         const newExercises = [...exercises];
+                        if (set.weight === '' && lastFilledWeight) {
+                            newExercises[exerciseIndex].sets[setIndex].weight = lastFilledWeight;
+                        }
+                        if (set.reps === '' && lastFilledRep){
+                            newExercises[exerciseIndex].sets[setIndex].reps = lastFilledRep;
+                        }
                         newExercises[exerciseIndex].sets[setIndex].completed = !newExercises[exerciseIndex].sets[setIndex].completed;
                         setExercises(newExercises);
+
                     };
+
+                    const handleWeightChange = (text) => {
+                        updateSetData(text, exerciseIndex, setIndex, 'weight');
+                        const newWeight = parseFloat(text);
+                        if (!isNaN(newWeight)) {
+                            // Update the last filled weight for this exercise
+                            setLastFilledWeights(prev => ({
+                                ...prev,
+                                [exerciseId]: newWeight,
+                            }));
+                        }
+                        console.log('NEW WEIGHT', newWeight);
+                        console.log('FUCK YEAH', lastFilledWeights[exerciseId]);
+                    }
+
+                    const handleRepsChange = (text) => {
+                        updateSetData(text, exerciseIndex, setIndex, 'reps');
+                        const newReps = parseInt(text);
+                        if (!isNaN(newReps)) {
+                            // Update the last filled reps for this exercise
+                            setLastFilledReps(prev => ({
+                                ...prev,
+                                [exerciseId]: newReps,
+                            }));
+                        }
+                    }
 
                     return (
                         <GestureHandlerRootView key={set.key}>
@@ -549,6 +569,12 @@ export default function WorkoutLogScreen({route}) {
                                 )}
                             >
                                 <View style={styles.setRow}>
+                                    <Text style={styles.setIndicator}>{indicator}</Text>
+                                    <View style={styles.previousAttemptContainer}>
+                                        <Text style={[styles.previousAttemptText]}>
+                                            {previousSet.weight ? `${previousSet.weight} ${previousSet.weightUnit}` : '--'} x {previousSet.reps ? previousSet.reps : '--'}
+                                        </Text>
+                                    </View>
                                     {showPreviousAttempts[exerciseId] && (
                                         <View style={styles.previousAttemptContainer}>
                                             {showPreviousAttempts[exerciseId][setIndex] && (showPreviousAttempts[exerciseId][setIndex].weight || showPreviousAttempts[exerciseId][setIndex].reps) ? (
@@ -563,52 +589,22 @@ export default function WorkoutLogScreen({route}) {
                                                     <Text style={styles.indicatorText}>-- x --</Text>
                                                 </View>
                                             )}
-                                            {showPreviousAttempts[exerciseId][setIndex]?.dropSets?.map((dropSet, dropSetIndex) => (
-                                                (dropSet.weight || dropSet.reps) ? (
-                                                    <TouchableOpacity
-                                                        key={dropSetIndex}
-                                                        onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, dropSet, true, dropSetIndex)}
-                                                        style={styles.previousAttemptRow}
-                                                    >
-                                                        <Text>Dropset: {dropSet.weight} x {dropSet.reps}</Text>
-                                                    </TouchableOpacity>
-                                                ) : (
-                                                    <View key={dropSetIndex} style={styles.previousAttemptRow}>
-                                                        <Text style={styles.indicatorText}>Dropset: -- x --</Text>
-                                                    </View>
-                                                )
-                                            ))}
                                         </View>
                                     )}
-                                    <TouchableOpacity
+                                    <TextInput
                                         style={styles.weightInput}
-                                        onPress={() => {
-                                            setModalVisible(true);
-                                            setSelectedExerciseIndex(exerciseIndex);
-                                            setSelectedSetIndex(setIndex); // change
-                                            setSelectedDropSetIndex(null); //change
-                                            setSelectedType('weight'); //
-                                            const value = set.weight;
-                                            const unit = set.weightUnit;
-                                            setTempWeight(parseFloat(value) || 0);
-                                            setWeightUnit(unit || 'lbs');
-                                        }}
-                                    >
-                                        <Text style={styles.inputText}>{set.weight !== ''? `${set.weight} ${set.weightUnit}`: `${weightPlaceholder} (${set.weightUnit})`}</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
+                                        keyboardType="numeric"
+                                        placeholder={weightPlaceholder}
+                                        value={set.weight !== '' ? set.weight.toString() : ''}
+                                        onChangeText={text => handleWeightChange(text)}
+                                    />
+                                    <TextInput
                                         style={styles.repsInput}
-                                        onPress={() => {
-                                            setModalVisible(true);
-                                            setSelectedExerciseIndex(exerciseIndex);
-                                            setSelectedSetIndex(setIndex);
-                                            setSelectedDropSetIndex(null);
-                                            setSelectedType('reps');
-                                            setTempReps(parseFloat(set.reps) || 0);
-                                        }}
-                                    >
-                                        <Text style={styles.inputText}>{set.reps !== '' ? `${set.reps}` : `Enter ${repsPlaceholder}`}</Text>
-                                    </TouchableOpacity>
+                                        keyboardType="numeric"
+                                        placeholder={repsPlaceholder}
+                                        value={set.reps !== '' ? set.reps.toString() : ''}
+                                        onChangeText={text => handleRepsChange(text)}
+                                    />
                                     {isFailureTracking && <TouchableOpacity
                                         style={[styles.failureButton, set.isFailure && styles.failureButtonActive]}
                                         onPress={() => toggleFailure(exerciseIndex, setIndex)}
@@ -626,11 +622,9 @@ export default function WorkoutLogScreen({route}) {
                                     </TouchableOpacity>
                                 </View>
                             </Swipeable>
-                            {renderDropSets(set.dropSets, exerciseIndex, setIndex)}
                         </GestureHandlerRootView>
                     );
                 })}
-                {renderTotalWeightMessage(exercise, sets)}
             </View>
         );
     };
@@ -641,140 +635,28 @@ export default function WorkoutLogScreen({route}) {
         setExercises(newExercises);
     };
 
-    const addDropSet = (exerciseIndex, setIndex) => {
-        const newExercises = [...exercises];
-        const exercise =  newExercises[exerciseIndex];
+    const addDropSet = (exerciseIndex, parentSetIndex) => {
+        const parentSetKey = `set${parentSetIndex}`;
+        const existingDropSets = exercises[exerciseIndex].sets.filter(set => set.key.startsWith(`${parentSetKey}_dropset`));
+        const dropSetOrder = existingDropSets.length + 1; // Determine the next order for the dropset
+        const dropSetKey = `set${parentSetIndex}_dropset${dropSetOrder}`;
 
         const newDropSet = {
-            key: `dropset${exercise.sets[setIndex].dropSets.length + 1}`,
+            key: dropSetKey,
             weight: '',
             reps: '',
-            weightConfig: exercise.weightConfig,
-            repsConfig: exercise.repsConfig
+            weightUnit: 'lbs',
+            repsUnit: 'reps',
+            isFailure: null,
+            completed: false,
         };
 
-        newExercises[exerciseIndex].sets[setIndex].dropSets.push(newDropSet);
-        setExercises(newExercises);
-    };
-
-    const renderDropSets = (dropSets, exerciseIndex, setIndex) => {
-        const exercise = exercises[exerciseIndex];
-
-        const weightPlaceholder = (() => {
-            switch (exercise.weightConfig) {
-                case 'totalWeight':
-                    return 'Total Weight';
-                case 'weightPerSide':
-                case 'weightPerSideBarbell':
-                    return 'Weight Per Side';
-                case 'bodyWeight':
-                    return 'Bodyweight';
-                case 'extraWeightBodyWeight':
-                    return 'Extra Weight';
-                default:
-                    return 'Weight';
-            }
-        })();
-
-        const repsPlaceholder = (() => {
-            switch (exercise.repsConfig) {
-                case 'reps':
-                    return 'Reps';
-                case 'time':
-                    return 'Time (seconds)';
-                default:
-                    return 'Reps';
-            }
-        })();
-
-        const isWeightDisabled = exercise.weightConfig === 'bodyWeight';
-
-        return (
-            <View style={styles.dropSetsContainer}>
-                {dropSets.map((dropSet, dropSetIndex) => (
-                    <Swipeable
-                        key={dropSet.key}
-                        renderLeftActions={() => (
-                            <TouchableOpacity
-                                style={styles.deleteButton}
-                                onPress={() => deleteDropSet(exerciseIndex, setIndex, dropSetIndex)}
-                            >
-                                <Text style={styles.deleteButtonText}>Delete</Text>
-                            </TouchableOpacity>
-                        )}
-                    >
-                        <View style={[styles.dropSetRow, isFailureTracking && styles.extraMove]}>
-                            <FontAwesome5 name="arrow-down" size={16} style={styles.dropSetIcon}/>
-                            <TouchableOpacity
-                                style={styles.weightInput}
-                                onPress={() => {
-                                    setModalVisible(true);
-                                    setSelectedExerciseIndex(exerciseIndex);
-                                    setSelectedSetIndex(setIndex);
-                                    setSelectedDropSetIndex(dropSetIndex);
-                                    setSelectedType('weight');
-                                    const value = dropSet.weight;
-                                    const unit = dropSet.weightUnit;
-                                    setTempWeight(parseFloat(value) || 0);
-                                    setWeightUnit(unit || 'lbs');
-                                }}
-                            >
-                                <Text style={styles.inputText}>{ dropSet.weight !== ''? `${dropSet.weight} ${dropSet.weightUnit}` : `Enter Weight (${weightUnit})`}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.repsInput}
-                                onPress={() => {
-                                    setModalVisible(true);
-                                    setSelectedExerciseIndex(exerciseIndex);
-                                    setSelectedSetIndex(setIndex);
-                                    setSelectedDropSetIndex(dropSetIndex);
-                                    setSelectedType('reps');
-                                    setTempReps(parseFloat(dropSet.reps) || 0);
-                                }}
-                            >
-                                <Text style={styles.inputText}>{dropSet.reps !== ''?`${dropSet.reps} `: 'Enter Reps'}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Swipeable>
-                ))}
-            </View>
-        );
-    };
-
-
-    const renderSuggestions = (exerciseIndex) => (
-        suggestions.length > 0 && (currentExerciseIndex === exerciseIndex) && (
-            <FlatList
-                data={suggestions}
-                renderItem={({ item }) => (
-                    <Pressable onPress={() => {
-                        Keyboard.dismiss();
-                        handleSuggestionSelect(item, exerciseIndex);
-                    }} style={styles.suggestionItem}>
-                        <Text style={styles.suggestionItemText}>{item}</Text>
-                    </Pressable>
-                )}
-                keyExtractor={(item, index) => index.toString()}
-                style={styles.suggestionsContainer}
-                scrollEnabled={true}
-            />
-        )
-    );
-
-    const handleSuggestionSelect = (suggestion, exerciseIndex) => {
         const newExercises = [...exercises];
-        newExercises[exerciseIndex].name = suggestion;
-
-        // Check if the exercise has presets and set weightConfig and repsConfig accordingly
-        if (exercisePresets[suggestion]) {
-            newExercises[exerciseIndex].weightConfig = exercisePresets[suggestion].weightConfig;
-            newExercises[exerciseIndex].repsConfig = exercisePresets[suggestion].repsConfig;
-        }
-
+        newExercises[exerciseIndex].sets.splice(parentSetIndex + 1, 0, newDropSet);
         setExercises(newExercises);
-        setSuggestions([]);
-        setCurrentExerciseIndex(null);
     };
+
+
 
 
     const deleteExercise = (index) => {
@@ -846,7 +728,9 @@ export default function WorkoutLogScreen({route}) {
             return;
         }
 
-        const incompleteExercises = exercises.some(ex => !ex.completed);
+        const incompleteExercises = exercises.some(exercise =>
+            exercise.sets.some(set => !set.completed)
+        );
 
         if (incompleteExercises && !proceedWithSave) {
             setConfirmationModalVisible(true);
@@ -857,25 +741,16 @@ export default function WorkoutLogScreen({route}) {
         const filteredExercises = exercises.map(ex => ({
             id: camelCase(ex.name),
             name: ex.name,
-            sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'bodyWeight') && (set.reps !== '' || set.isFailure) && set.completed).map(set => ({
+            sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'bodyWeight') && (set.reps !== '')).map(set => ({
                 ...set,
-                weight: ex.weightConfig === 'bodyWeight'
-                    ? 'BW'
-                    : ex.weightConfig === 'extraWeightBodyWeight'
-                        ? `BW + ${set.weight} ${ex.weightUnit}`
-                        : `${calculateTotalWeight(parseFloat(set.weight), ex.weightConfig, ex.weightUnit)} ${ex.weightUnit}`,
-                reps: ex.repsConfig === 'time' ? `${set.reps} secs` : `${set.reps} reps`,
-                dropSets: set.dropSets.filter(dropSet => (dropSet.weight !== '' || ex.weightConfig === 'bodyWeight') && dropSet.reps !== '').map(dropSet => ({
-                    ...dropSet,
-                    weight: dropSet.weightConfig === 'bodyWeight'
-                        ? 'BW'
-                        : dropSet.weightConfig === 'extraWeightBodyWeight'
-                            ? `BW + ${dropSet.weight} ${ex.weightUnit}`
-                            : `${calculateTotalWeight(parseFloat(dropSet.weight), dropSet.weightConfig, ex.weightUnit)} ${ex.weightUnit}`,
-                    reps: dropSet.repsConfig === 'time' ? `${dropSet.reps} secs` : `${dropSet.reps} reps`
-                }))
+                weight: set.weight,
+                reps: set.reps,
+                key: set.key,
             })),
+            isSuperset: ex.isSuperset,
             supersetExercise: ex.supersetExercise,
+            weightUnit: ex.weightUnit,
+            repsUnit: ex.repsUnit,
         })).filter(ex => ex.sets.length > 0);
 
         if (filteredExercises.length === 0) {
@@ -960,18 +835,30 @@ export default function WorkoutLogScreen({route}) {
     };
 
 
+
+
+
     const renderExerciseItem = ({ item, index, isSuperset = false}) => {
 
         const renderExercise = (exercise, exerciseIndex) => {
 
-        const toggleAllCompleted = () => {
+
+            const toggleWeightUnit = () => {
+                const newExercises = [...exercises];
+                const currentUnit = newExercises[exerciseIndex].weightUnit;
+                newExercises[exerciseIndex].weightUnit = currentUnit === 'lbs' ? 'kgs' : 'lbs';
+                setExercises(newExercises);
+            };
+
+
+            const toggleAllCompleted = () => {
             const newExercises = [...exercises];
             newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.map(set => ({
                 ...set,
                 completed: true,
             }));
             setExercises(newExercises);
-        };
+            };
 
         const toggleAllFailure = () => {
             const newExercises = [...exercises];
@@ -994,16 +881,20 @@ export default function WorkoutLogScreen({route}) {
                 <TouchableOpacity onPress={() => openEditModal(exerciseIndex)} style={styles.editButton}>
                     <FontAwesome5 name="ellipsis-h" size={20} color="black" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => togglePreviousAttempts(exercise.id, exercise.name)} style={styles.compareButton}>
-                    <Text style={showPreviousAttempts[exercise.id] ? styles.blueIcon : styles.blackIcon}>Previous</Text>
-                </TouchableOpacity>
 
 
                 <Text style={styles.header}>{exercise.name}</Text>
 
                 <View style={styles.indicatorsRow}>
-                    <FontAwesome5 name="dumbbell" size={20} style={styles.indicatorIcon} />
-                    <Text style={styles.repsIndicatorText}>REPS</Text>
+                    <Text style={[styles.setIndicator]}>Set</Text>
+                    <Text style={[styles.previousAttemptHeader]}>Previous</Text>
+
+                    <TouchableOpacity onPress={toggleWeightUnit} style={styles.weightToggleContainer}>
+                        <Text style={styles.weightHeader}>
+                            {exercise.weightUnit}
+                        </Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.repsIndicatorText]}>REPS</Text>
                     {isFailureTracking && <TouchableOpacity onPress={toggleAllFailure} style={[styles.allFailureButton, styles.failureButtonActive]}>
                         <Text style={styles.failureButtonTextActive}>FF</Text>
                     </TouchableOpacity>}
@@ -1215,7 +1106,7 @@ export default function WorkoutLogScreen({route}) {
                         </View>
                     )}
                     keyboardShouldPersistTaps="handled"
-                    style={{ zIndex: 1 }}
+                    style={{ zIndex: 1, flex: 1 }}
                     nestedScrollEnabled={true}
                 />
             </KeyboardAvoidingView>
@@ -1313,100 +1204,6 @@ export default function WorkoutLogScreen({route}) {
                     </View>
                 </View>
             </Modal>
-
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={modalVisible}
-                onRequestClose={() => setModalVisible(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Select {selectedType === 'weight' ? 'Weight' : 'Reps'}</Text>
-                        <View style={styles.adjustContainer}>
-                            <TouchableOpacity
-                                style={styles.adjustButton}
-                                onPress={() => {
-                                    if (selectedType === 'weight') {
-                                        setTempWeight(tempWeight - (weightUnit === 'lbs' ? 5 : 2));
-                                    } else {
-                                        setTempReps(tempReps - 1);
-                                    }
-                                }}
-                            >
-                                <Text style={styles.adjustButtonText}>-</Text>
-                            </TouchableOpacity>
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    style={styles.adjustInput}
-                                    keyboardType="numeric"
-                                    value={selectedType === 'weight' ? tempWeight.toString() : tempReps.toString()}
-                                    onChangeText={(value) => {
-                                        if (selectedType === 'weight') {
-                                            setTempWeight(parseFloat(value) || 0);
-                                        } else {
-                                            setTempReps(parseInt(value) || 0);
-                                        }
-                                    }}
-                                />
-                                {selectedType === 'weight' && (
-                                    <TouchableOpacity
-                                        style={styles.unitSwitcher}
-                                        onPress={() => {
-                                            setWeightUnit(prevUnit => prevUnit === 'lbs' ? 'kgs' : 'lbs');
-                                        }}
-                                    >
-                                        <Text style={styles.unitText}>{weightUnit}</Text>
-                                    </TouchableOpacity>
-                                )}
-                                {selectedType === 'reps' && (
-                                    <Text style={styles.unitText}>reps</Text>
-                                )}
-                            </View>
-                            <TouchableOpacity
-                                style={styles.adjustButton}
-                                onPress={() => {
-                                    if (selectedType === 'weight') {
-                                        setTempWeight(tempWeight + (weightUnit === 'lbs' ? 5 : 2));
-                                    } else {
-                                        setTempReps(tempReps + 1);
-                                    }
-                                }}
-                            >
-                                <Text style={styles.adjustButtonText}>+</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <Button
-                            title="Save"
-                            onPress={() => {
-                                const newExercises = [...exercises];
-                                if (selectedDropSetIndex !== null) {
-                                    if (selectedType === 'weight') {
-                                        newExercises[selectedExerciseIndex].sets[selectedSetIndex].dropSets[selectedDropSetIndex].weight = tempWeight;
-                                        newExercises[selectedExerciseIndex].sets[selectedSetIndex].dropSets[selectedDropSetIndex].weightUnit = `${weightUnit}`;
-                                    } else {
-                                        newExercises[selectedExerciseIndex].sets[selectedSetIndex].dropSets[selectedDropSetIndex].reps = tempReps;
-                                        //add reps unit change in the future
-                                    }
-                                } else {
-                                    if (selectedType === 'weight') {
-                                        console.log('tempweight', tempWeight);
-                                        console.log('set shit',newExercises[selectedExerciseIndex].sets[selectedSetIndex].weight);
-                                        console.log('set',newExercises[selectedExerciseIndex].sets[selectedSetIndex]);
-                                        newExercises[selectedExerciseIndex].sets[selectedSetIndex].weight = tempWeight;
-                                        newExercises[selectedExerciseIndex].sets[selectedSetIndex].weightUnit = `${weightUnit}`;
-                                    } else {
-                                        newExercises[selectedExerciseIndex].sets[selectedSetIndex].reps = tempReps;
-                                    }
-                                }
-                                setExercises(newExercises);
-                                setModalVisible(false);
-                            }}
-                        />
-                        <Button title="Cancel" onPress={() => setModalVisible(false)} />
-                    </View>
-                </View>
-            </Modal>
         </GestureHandlerRootView>
     );
 }
@@ -1414,7 +1211,7 @@ export default function WorkoutLogScreen({route}) {
 const styles = StyleSheet.create({
     fullScreenContainer: {
         flex: 1,
-        padding: 20,
+        padding: 10,
         backgroundColor: '#f8f9fa',
         width: '100%',
     },
@@ -1446,7 +1243,7 @@ const styles = StyleSheet.create({
     },
     exerciseContainer: {
         marginBottom: 20,
-        padding: 20,
+        padding: 5,
         backgroundColor: '#fff',
         borderRadius: 7,
         position: 'relative',
@@ -1463,10 +1260,7 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: 'bold',
         marginBottom: 10,
-        borderWidth: 1,
-        borderColor: '#ccc',
-        padding: 10,
-        borderRadius: 5,
+        paddingVertical: 3,
     },
     setRow: {
         flexDirection: 'row',
@@ -1784,7 +1578,7 @@ const styles = StyleSheet.create({
     },
     dropSetRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         alignItems: 'center',
         marginBottom: 10,
         marginRight: 50,
@@ -1898,10 +1692,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     checkboxContainer: {
-        marginLeft: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
+        flex: 0.5, // Adjust according to the space needed for the checkbox
         justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 5,
     },
     checkboxUnchecked: {
         width: 40,
@@ -1933,26 +1727,23 @@ const styles = StyleSheet.create({
     },
     indicatorsRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
-        width: '100%',
+        marginBottom: 5,
     },
     indicatorIcon: {
         flex: 1,
         textAlign: 'center',
     },
     repsIndicatorText: {
-        flex: 1,
+        flex: 2, // Adjust according to the space needed for reps input
         textAlign: 'center',
-        fontSize: 16,
         color: '#aaa',
         fontStyle: 'italic',
-        right: 10,
     },
     allCheckboxContainer: {
+        paddingHorizontal: 5,
+        justifyContent: 'center',
         alignItems: 'center',
-        alignSelf: 'flex-end',
     },
     allCheckboxChecked: {
         width: 40,
@@ -2028,6 +1819,37 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#000',
     },
+    setIndicator: {
+        fontSize: 17,
+        fontWeight: 'bold',
+        alignSelf: 'center',
+        paddingLeft: 5,
+        color: '#007bff', // Customize as needed
+        marginRight: 15, // Space between the indicator and the input fields
+    },
+    columnHeader: {
+        flex: 1, // Ensure each column takes up an equal portion of the row
+        textAlign: 'center',
+    },
+    previousAttemptHeader: {
+        color: '#aaa',
+        fontStyle: 'italic',
+    },
+    weightHeader: {
+        flex: 2, // Adjust according to the space needed for weight input
+        textAlign: 'center',
+        fontWeight: "bold",
+        fontSize: 16,
+        fontStyle: 'italic',
+        padding: 10,
+        color: '#4E5760',
+    },
+    weightToggleContainer: {
+        flex: 1,
+        paddingLeft: 30,
+        alignItems: 'center',
+        justifyContent: 'center'
+    }
 });
 
 const pickerSelectStyles = StyleSheet.create({
