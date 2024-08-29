@@ -10,7 +10,8 @@ interface Comment {
   userId: string;
   timestamp: Date;
   likes: string[];
-  userName?: string; // Added userName to Comment interface
+  userName?: string;
+  replies?: Comment[];
 }
 
 const Comments = ({ route, navigation }) => {
@@ -18,6 +19,7 @@ const Comments = ({ route, navigation }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const [userProfiles, setUserProfiles] = useState<{ [key: string]: string }>({});
   const defaultProfilePicture = 'https://firebasestorage.googleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2Fpfp.jpeg?alt=media&token=dd124ee9-6c61-48ad-b41c-97f3acc3350c';
@@ -36,10 +38,12 @@ const Comments = ({ route, navigation }) => {
       const commentsList: Comment[] = await Promise.all(commentsSnapshot.docs.map(async (doc) => {
         const commentData = doc.data() as Comment;
         const commenterProfile = await fetchUserName(commentData.userId);
+        const replies = await fetchReplies(userId, collectionName, postId, doc.id);
         return {
           id: doc.id,
           ...commentData,
-          userName: commenterProfile || 'Anonymous', // add a fallback in case the user profile is not found
+          userName: commenterProfile || 'Anonymous',
+          replies,
         };
       }));
 
@@ -48,6 +52,30 @@ const Comments = ({ route, navigation }) => {
     } catch (error) {
       console.error('Error fetching comments: ', error);
       setLoading(false);
+    }
+  };
+
+  const fetchReplies = async (userId: string, collectionName: string, postId: string, commentId: string) => {
+    try {
+      const repliesRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments', commentId, 'replies');
+      const repliesSnapshot = await getDocs(repliesRef);
+      
+      const repliesList: Comment[] = await Promise.all(repliesSnapshot.docs.map(async (doc) => {
+        const replyData = doc.data() as Comment;
+        const replierProfile = await fetchUserName(replyData.userId);
+        const nestedReplies = await fetchReplies(userId, collectionName, postId, doc.id); // Fetch nested replies
+        return {
+          id: doc.id,
+          ...replyData,
+          userName: replierProfile || 'Anonymous',
+          replies: nestedReplies, // Set nested replies
+        };
+      }));
+
+      return repliesList;
+    } catch (error) {
+      console.error('Error fetching replies: ', error);
+      return [];
     }
   };
 
@@ -64,58 +92,97 @@ const Comments = ({ route, navigation }) => {
 
   const fetchUserName = async (userId: string) => {
     if (userProfiles[userId]) {
-        return userProfiles[userId]; // return cached name if already fetched
+      return userProfiles[userId];
     }
     try {
-        const userRef = doc(db, 'userProfiles', userId);
-        const userDoc = await getDoc(userRef);
-        if (userDoc.exists()) {
-            const profileData = userDoc.data();
-            const firstName = profileData?.firstName || '';
-            const lastName = profileData?.lastName || '';
-            const userName = `${firstName} ${lastName}`.trim() || 'Anonymous';
-            console.log(`Fetched userName: ${userName} for userId: ${userId}`); // Debugging line
-            setUserProfiles(prevState => ({
-                ...prevState,
-                [userId]: userName,
-            }));
-            return userName;
-        } else {
-            console.log(`No document exists for userId: ${userId}`); // Debugging line
-        }
+      const userRef = doc(db, 'userProfiles', userId);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        const profileData = userDoc.data();
+        const firstName = profileData?.firstName || '';
+        const lastName = profileData?.lastName || '';
+        const userName = `${firstName} ${lastName}`.trim() || 'Anonymous';
+        console.log(`Fetched userName: ${userName} for userId: ${userId}`);
+        setUserProfiles(prevState => ({
+          ...prevState,
+          [userId]: userName,
+        }));
+        return userName;
+      } else {
+        console.log(`No document exists for userId: ${userId}`);
+      }
     } catch (error) {
-        console.error('Error fetching user name: ', error);
-        return 'Anonymous';
+      console.error('Error fetching user name: ', error);
+      return 'Anonymous';
     }
-};
-
+  };
 
   const handleAddComment = async () => {
     if (!commentText.trim()) return;
 
     try {
       const collectionName = isWorkout ? 'workouts' : 'highlights';
-      const commentsRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments');
-      
-      const newComment: Omit<Comment, 'id'> = {
-        text: commentText,
-        userId: firebase_auth.currentUser.uid,
-        timestamp: new Date(),
-        likes: [],
-      };
+      if (replyingTo) {
+        const repliesRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments', replyingTo.id, 'replies');
+        
+        const newReply: Omit<Comment, 'id'> = {
+          text: commentText,
+          userId: firebase_auth.currentUser.uid,
+          timestamp: new Date(),
+          likes: [],
+        };
 
-      await addDoc(commentsRef, newComment);
-      const commenterName = await fetchUserName(firebase_auth.currentUser.uid);
-      setComments([...comments, { ...newComment, id: comments.length.toString(), userName: commenterName }]);
+        await addDoc(repliesRef, newReply);
+        const replierName = await fetchUserName(firebase_auth.currentUser.uid);
+        setComments(comments.map(comment => 
+          updateCommentWithReply(comment, replyingTo.id, newReply, replierName)
+        ));
+      } else {
+        const commentsRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments');
+        
+        const newComment: Omit<Comment, 'id'> = {
+          text: commentText,
+          userId: firebase_auth.currentUser.uid,
+          timestamp: new Date(),
+          likes: [],
+        };
+
+        await addDoc(commentsRef, newComment);
+        const commenterName = await fetchUserName(firebase_auth.currentUser.uid);
+        setComments([...comments, { ...newComment, id: comments.length.toString(), userName: commenterName, replies: [] }]);
+      }
       setCommentText('');
+      setReplyingTo(null);
     } catch (error) {
       console.error('Error adding comment: ', error);
     }
   };
 
-  const handleLikeComment = async (commentId: string) => {
+  const updateCommentWithReply = (comment: Comment, parentId: string, reply: Omit<Comment, 'id'>, replierName: string): Comment => {
+    if (comment.id === parentId) {
+      return {
+        ...comment,
+        replies: [...(comment.replies || []), { ...reply, id: comment.replies?.length.toString() || '0', userName: replierName, replies: [] }],
+      };
+    }
+
+    if (comment.replies && comment.replies.length > 0) {
+      return {
+        ...comment,
+        replies: comment.replies.map(subReply =>
+          updateCommentWithReply(subReply, parentId, reply, replierName)
+        ),
+      };
+    }
+
+    return comment;
+  };
+
+  const handleLikeComment = async (commentId: string, isReply = false, parentCommentId = '') => {
     const collectionName = isWorkout ? 'workouts' : 'highlights';
-    const commentRef = doc(db, 'userProfiles', userId, collectionName, postId, 'comments', commentId);
+    const commentRef = isReply 
+      ? doc(db, 'userProfiles', userId, collectionName, postId, 'comments', parentCommentId, 'replies', commentId)
+      : doc(db, 'userProfiles', userId, collectionName, postId, 'comments', commentId);
     const currentUserUid = firebase_auth.currentUser.uid;
 
     try {
@@ -124,16 +191,47 @@ const Comments = ({ route, navigation }) => {
       });
 
       setComments(comments.map(comment => 
-        comment.id === commentId ? { ...comment, likes: [...comment.likes, currentUserUid] } : comment
+        updateCommentWithLike(comment, commentId, isReply, parentCommentId)
       ));
     } catch (error) {
       console.error('Error liking comment: ', error);
     }
   };
 
-  const handleUnlikeComment = async (commentId: string) => {
+  const updateCommentWithLike = (comment: Comment, commentId: string, isReply: boolean, parentCommentId: string): Comment => {
+    if (!isReply && comment.id === commentId) {
+      return {
+        ...comment,
+        likes: [...comment.likes, firebase_auth.currentUser.uid],
+      };
+    }
+
+    if (isReply && comment.id === parentCommentId) {
+      return {
+        ...comment,
+        replies: comment.replies?.map(reply =>
+          reply.id === commentId ? { ...reply, likes: [...reply.likes, firebase_auth.currentUser.uid] } : reply
+        ),
+      };
+    }
+
+    if (comment.replies && comment.replies.length > 0) {
+      return {
+        ...comment,
+        replies: comment.replies.map(subReply =>
+          updateCommentWithLike(subReply, commentId, isReply, parentCommentId)
+        ),
+      };
+    }
+
+    return comment;
+  };
+
+  const handleUnlikeComment = async (commentId: string, isReply = false, parentCommentId = '') => {
     const collectionName = isWorkout ? 'workouts' : 'highlights';
-    const commentRef = doc(db, 'userProfiles', userId, collectionName, postId, 'comments', commentId);
+    const commentRef = isReply 
+      ? doc(db, 'userProfiles', userId, collectionName, postId, 'comments', parentCommentId, 'replies', commentId)
+      : doc(db, 'userProfiles', userId, collectionName, postId, 'comments', commentId);
     const currentUserUid = firebase_auth.currentUser.uid;
 
     try {
@@ -142,26 +240,63 @@ const Comments = ({ route, navigation }) => {
       });
 
       setComments(comments.map(comment => 
-        comment.id === commentId ? { ...comment, likes: comment.likes.filter(uid => uid !== currentUserUid) } : comment
+        updateCommentWithUnlike(comment, commentId, isReply, parentCommentId)
       ));
     } catch (error) {
       console.error('Error unliking comment: ', error);
     }
   };
 
-  const renderItem = ({ item }: { item: Comment & { userName: string } }) => {
-    const liked = item.likes.includes(firebase_auth.currentUser.uid);
+  const updateCommentWithUnlike = (comment: Comment, commentId: string, isReply: boolean, parentCommentId: string): Comment => {
+    if (!isReply && comment.id === commentId) {
+      return {
+        ...comment,
+        likes: comment.likes.filter(uid => uid !== firebase_auth.currentUser.uid),
+      };
+    }
+
+    if (isReply && comment.id === parentCommentId) {
+      return {
+        ...comment,
+        replies: comment.replies?.map(reply =>
+          reply.id === commentId ? { ...reply, likes: reply.likes.filter(uid => uid !== firebase_auth.currentUser.uid) } : reply
+        ),
+      };
+    }
+
+    if (comment.replies && comment.replies.length > 0) {
+      return {
+        ...comment,
+        replies: comment.replies.map(subReply =>
+          updateCommentWithUnlike(subReply, commentId, isReply, parentCommentId)
+        ),
+      };
+    }
+
+    return comment;
+  };
+
+  const renderComment = (comment: Comment, level = 0) => {
+    const liked = comment.likes.includes(firebase_auth.currentUser.uid);
     return (
-      <View style={styles.commentContainer}>
-        <Image source={{ uri: currentUserProfile?.profilePicture || defaultProfilePicture }} style={styles.profilePicture} />
-        <View style={styles.commentContent}>
-          <Text style={styles.commenterName}>{item.userName}</Text>
-          <Text style={styles.commentText}>{item.text}</Text>
+      <View key={comment.id} style={[styles.commentContainer, { marginLeft: level * 20 }]}>
+        <View style={styles.commentRow}>
+          <Image source={{ uri: currentUserProfile?.profilePicture || defaultProfilePicture }} style={styles.profilePicture} />
+          <View style={styles.commentContent}>
+            <Text style={styles.commenterName}>{comment.userName}</Text>
+            <Text style={styles.commentText}>{comment.text}</Text>
+          </View>
         </View>
-        <TouchableOpacity onPress={() => liked ? handleUnlikeComment(item.id) : handleLikeComment(item.id)}>
-          <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color="#000" />
-          <Text style={styles.likeCount}>{item.likes.length}</Text>
-        </TouchableOpacity>
+        <View style={styles.commentActions}>
+          <TouchableOpacity onPress={() => liked ? handleUnlikeComment(comment.id, level > 0, comment.id) : handleLikeComment(comment.id, level > 0, comment.id)}>
+            <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color="#000" />
+            <Text style={styles.likeCount}>{comment.likes.length}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setReplyingTo(comment)}>
+            <Icon name="chatbubble-outline" size={20} color="#000" />
+          </TouchableOpacity>
+        </View>
+        {comment.replies && comment.replies.map(reply => renderComment(reply, level + 1))}
       </View>
     );
   };
@@ -183,10 +318,15 @@ const Comments = ({ route, navigation }) => {
       <FlatList
         data={comments}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+        renderItem={({ item }) => renderComment(item)}
         ListEmptyComponent={<Text style={styles.noCommentsText}>No comments yet. Be the first to comment!</Text>}
       />
       <View style={styles.commentInputContainer}>
+        {replyingTo && (
+          <Text style={styles.replyingToText}>
+            Replying to {replyingTo.userName} - <Text onPress={() => setReplyingTo(null)} style={styles.cancelReplyText}>Cancel</Text>
+          </Text>
+        )}
         <TextInput
           style={styles.commentInput}
           placeholder="Add a comment..."
@@ -222,11 +362,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   commentContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
+  },
+  commentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   profilePicture: {
     width: 40,
@@ -245,6 +387,11 @@ const styles = StyleSheet.create({
   commentText: {
     fontSize: 16,
     color: '#333',
+  },
+  commentActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
   },
   likeCount: {
     fontSize: 12,
@@ -272,6 +419,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#999',
     marginTop: 20,
+  },
+  replyingToText: {
+    marginBottom: 5,
+    fontSize: 14,
+    color: '#666',
+  },
+  cancelReplyText: {
+    color: '#007bff',
   },
 });
 
