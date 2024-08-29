@@ -38,6 +38,7 @@ import TrackedExercise from './src/screens/TrackedExercise';
 import Saved from './src/screens/Saved';
 import Messages from './src/screens/Messages';
 import UserDMs from './src/screens/UserDMs';
+import Comments from './src/screens/Feed/Comments';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -237,6 +238,14 @@ function FeedStack() {
             <Stack.Screen
                 name='WorkoutSummaryScreen'
                 component={WorkoutSummaryScreen}
+                options={{
+                    headerShown: true,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='Comments'
+                component={Comments}
                 options={{
                     headerShown: true,
                     presentation: 'fullScreenModal',

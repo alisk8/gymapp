@@ -54,6 +54,17 @@ const FeedPage = ({ navigation }) => {
     }
   };
 
+  const fetchCommentCount = async (userId, postId, collectionName) => {
+    try {
+      const commentsRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments');
+      const commentsSnapshot = await getDocs(commentsRef);
+      return commentsSnapshot.size;
+    } catch (error) {
+      console.error('Error fetching comment count: ', error);
+      return 0;
+    }
+  };
+
   const fetchHighlights = async (isRefresh = false) => {
     if (isRefresh) {
       setLoading(true);
@@ -114,8 +125,10 @@ const FeedPage = ({ navigation }) => {
             highlight: highlightsSnapshot.docs[highlightsSnapshot.docs.length - 1]
           };
 
-          highlightsSnapshot.docs.forEach(doc => {
+          for (const doc of highlightsSnapshot.docs) {
             const highlightData = doc.data();
+            const commentCount = await fetchCommentCount(userId, doc.id, 'highlights');
+
             if (!loadedHighlightIds.has(doc.id)) {
               allHighlights.push({
                 id: doc.id,
@@ -129,10 +142,11 @@ const FeedPage = ({ navigation }) => {
                 saved: highlightData.savedBy ? highlightData.savedBy.includes(currentUserUid) : false,
                 likes: highlightData.likes ? highlightData.likes.length : 0,
                 savedBy: highlightData.savedBy ? highlightData.savedBy.length : 0,
+                commentCount,
               });
               setLoadedHighlightIds(prevIds => new Set(prevIds).add(doc.id));
             }
-          });
+          }
         }
 
         if (workoutsSnapshot.docs.length > 0) {
@@ -141,8 +155,10 @@ const FeedPage = ({ navigation }) => {
             workout: workoutsSnapshot.docs[workoutsSnapshot.docs.length - 1]
           };
 
-          workoutsSnapshot.docs.forEach(doc => {
+          for (const doc of workoutsSnapshot.docs) {
             const workoutData = doc.data();
+            const commentCount = await fetchCommentCount(userId, doc.id, 'workouts');
+
             if (!loadedHighlightIds.has(doc.id)) {
               allHighlights.push({
                 id: doc.id,
@@ -157,10 +173,11 @@ const FeedPage = ({ navigation }) => {
                 saved: workoutData.savedBy ? workoutData.savedBy.includes(currentUserUid) : false,
                 likes: workoutData.likes ? workoutData.likes.length : 0,
                 savedBy: workoutData.savedBy ? workoutData.savedBy.length : 0,
+                commentCount,
               });
               setLoadedHighlightIds(prevIds => new Set(prevIds).add(doc.id));
             }
-          });
+          }
         }
       }
 
@@ -310,6 +327,10 @@ const FeedPage = ({ navigation }) => {
     }
   };
 
+  const handleComment = (postId, userId, isWorkout) => {
+    navigation.navigate('Comments', { postId, userId, isWorkout });
+  };
+
   const refreshHighlights = async () => {
     setRefreshing(true);
     await fetchHighlights(true);
@@ -327,7 +348,6 @@ const FeedPage = ({ navigation }) => {
       const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.setsNum), 0);
       const elapsedTime  = formatTotalWorkoutTime(item.totalWorkoutTime);
 
-      // Render workout item
       return (
         <View style={styles.highlightContainer}>
           <View style={styles.userInfoContainer}>
@@ -352,9 +372,14 @@ const FeedPage = ({ navigation }) => {
             {item.exercises.map((exercise, index) => (
               <View key={index} style={styles.exerciseItemContainer}>
                 <Text style={styles.exerciseNameText}>{exercise.name}</Text>
-                <Text style={styles.bestSetText}>
-                  {`Best Set: ${exercise.bestSet.weight} ${exercise.bestSet.weightUnit} x ${exercise.bestSet.reps} ${exercise.bestSet.repsUnit}`}
-                </Text>
+                {exercise.bestSet && (
+                  <Text style={styles.bestSetText}>
+                    {`Best Set: ${exercise.bestSet.weight ?? '-'} ${exercise.bestSet.weightUnit ?? ''} x ${exercise.bestSet.reps ?? '-'} ${exercise.bestSet.repsUnit ?? ''}`}
+                  </Text>
+                )}
+                {!exercise.bestSet && (
+                  <Text style={styles.bestSetText}>Best Set: Not available</Text>
+                )}
               </View>
             ))}
           </View>
@@ -378,8 +403,9 @@ const FeedPage = ({ navigation }) => {
               <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
               <Text style={styles.actionText}>{item.likes}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id)}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, true)}>
               <Icon name="chatbubble-outline" size={25} color="#000" />
+              <Text style={styles.actionText}>{item.commentCount}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
               <Icon name="share-outline" size={25} color="#000" />
@@ -392,7 +418,6 @@ const FeedPage = ({ navigation }) => {
         </View>
       )
     } else {
-      // Render highlight item (default case)
       return (
         <View style={styles.highlightContainer}>
           <View style={styles.userInfoContainer}>
@@ -424,8 +449,9 @@ const FeedPage = ({ navigation }) => {
               <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
               <Text style={styles.actionText}>{item.likes}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id)}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, false)}>
               <Icon name="chatbubble-outline" size={25} color="#000" />
+              <Text style={styles.actionText}>{item.commentCount}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
               <Icon name="share-outline" size={25} color="#000" />
