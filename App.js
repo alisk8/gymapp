@@ -10,10 +10,11 @@ import { firebase_auth } from './firebaseConfig'; // Update this path as necessa
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 
 import Home from './src/screens/Home';
 import Account from './src/screens/Account';
-import Progress from './src/screens/Progress';
+import Progress from './src/screens/ProgressLog/Progress';
 import Notifications from './src/screens/Notifications';
 import PersonalDetails from './src/screens/PersonalDetails';
 import WorkoutLogScreen from './src/screens/WorkoutLog/workout-log';
@@ -29,7 +30,6 @@ import communityLandingPage from './src/screens/Community/CommunityLandingPage';
 import CommunityPostScreen from "./src/screens/Community/CommunityPost";
 import CreateEventScreen from "./src/screens/Community/CreateEventScreen";
 import EventDetailScreen from './src/screens/Community/EventDetailScreen';
-import WorkoutLogQuickMode from "./src/screens/WorkoutLog/WorkoutLogQuickMode";
 import UserDetails from './src/screens/UserDetails';
 import Settings from './src/screens/Settings';
 import UserList from './src/screens/UserList';
@@ -38,8 +38,11 @@ import TrackedExercise from './src/screens/TrackedExercise';
 import Saved from './src/screens/Saved';
 import Messages from './src/screens/Messages';
 import UserDMs from './src/screens/UserDMs';
-import ExerciseLogScreen from "./src/screens/ExerciseLog/ExerciseLog";
-import TrackingExerciseScreen from "./src/screens/ExerciseLog/TrackingExerciseScreen";
+import ExerciseLogScreen from "./src/screens/ProgressLog/ExerciseLog";
+import TrackingExerciseScreen from "./src/screens/ProgressLog/TrackingExerciseScreen";
+import TemplateRecords from "./src/screens/ProgressLog/TemplateRecords";
+import ProgressTopTabs from "./src/screens/ProgressLog/ProgressTopTabs";
+import EditTemplateScreen from "./src/screens/ProgressLog/EditTemplateScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -87,11 +90,6 @@ function HomeStack() {
                 })}
             />
             <Stack.Screen name='FeedPage' component={FeedPage} options={{ title: 'Feed Page' }} />
-            <Stack.Screen name='Quickmode' component={WorkoutLogQuickMode}
-                options={{
-                    headerShown: false,
-                    presentation: 'fullScreenModal',
-                }} />
             <Stack.Screen name='Notifications' component={Notifications} />
             <Stack.Screen name="UserDetails" component={UserDetails} options={{ title: "User Details" }} />
             <Stack.Screen name="PostDetails" component={PostDetails} />
@@ -123,6 +121,8 @@ function HomeStack() {
     );
 }
 
+
+
 function AccountStack() {
     return (
         <Stack.Navigator initialRouteName='Account'>
@@ -142,11 +142,6 @@ function AccountStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
-            <Stack.Screen name='QuickMode' component={WorkoutLogQuickMode}
-                options={{
-                    headerShown: false,
-                    presentation: 'fullScreenModal',
-                }} />
             <Stack.Screen
                 name='TemplateScreen'
                 component={TemplateScreen}
@@ -167,9 +162,10 @@ function AccountStack() {
     );
 }
 
-function ExerciseLogStack(){
+/**
+function NewProgressStack(){
     return (
-        <Stack.Navigator initialRouteName='ExerciseLog'>
+        <Stack.Navigator initialRouteName='NewProgress'>
             <Stack.Screen
                 name="ExerciseLogScreen"
                 component={ExerciseLogScreen}
@@ -183,16 +179,24 @@ function ExerciseLogStack(){
                 ...screenOptions({ navigation, iconType: 'AddEntry' }), // Icon for adding a new community
                 title: "Track Exercise"
             })} />
+
         </Stack.Navigator>
     );
 }
+    **/
 
 
 function ProgressStack() {
     return (
-        <Stack.Navigator initialRouteName='Progress'>
+        <Stack.Navigator initialRouteName='ProgressTopTabs'>
+            <Stack.Screen
+                name="ProgressTopTabs"
+                component={ProgressTopTabs}
+                options={{headerShown: false}} // Hide the header if not needed
+            />
             <Stack.Screen name='Progress' component={Progress} options={screenOptions} />
-            <Stack.Screen name='Notifications' component={Notifications} />
+            <Stack.Screen name='TemplateRecords' component={TemplateRecords}/>
+            <Stack.Screen name='EditTemplateScreen' component={EditTemplateScreen}/>
             <Stack.Screen name="TrackedExercise" component={TrackedExercise} />
             <Stack.Screen
                 name='WorkoutLog'
@@ -202,11 +206,6 @@ function ProgressStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
-            <Stack.Screen name='QuickMode' component={WorkoutLogQuickMode}
-                options={{
-                    headerShown: false,
-                    presentation: 'fullScreenModal',
-                }} />
             <Stack.Screen
                 name='TemplateScreen'
                 component={TemplateScreen}
@@ -247,11 +246,6 @@ function FeedStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
-            <Stack.Screen name='QuickMode' component={WorkoutLogQuickMode}
-                options={{
-                    headerShown: false,
-                    presentation: 'fullScreenModal',
-                }} />
             <Stack.Screen
                 name='TemplateScreen'
                 component={TemplateScreen}
@@ -310,11 +304,6 @@ function CommunitiesStack() {
                     presentation: 'fullScreenModal',
                 }}
             />
-            <Stack.Screen name='QuickMode' component={WorkoutLogQuickMode}
-                options={{
-                    headerShown: false,
-                    presentation: 'fullScreenModal',
-                }} />
             <Stack.Screen
                 name='WorkoutLog'
                 component={WorkoutLogScreen}
@@ -373,6 +362,23 @@ function App() {
         );
     }
 
+
+    /**
+
+     <Tab.Screen
+     name='NewProgressStack'
+     component={ExerciseLogStack}
+     options={{
+     headerShown: false,
+     title: 'NewProgress',
+     tabBarIcon: ({ color, size }) => (
+     <Ionicons name="list-outline" color={color} size={size} />
+     )
+     }}
+     />
+
+     **/
+
     return (
         <WorkoutProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
@@ -396,17 +402,6 @@ function App() {
                                 options={{
                                     headerShown: false,
                                     title: 'Feed',
-                                    tabBarIcon: ({ color, size }) => (
-                                        <Ionicons name="list-outline" color={color} size={size} />
-                                    )
-                                }}
-                            />
-                            <Tab.Screen
-                                name='ExerciseLogStack'
-                                component={ExerciseLogStack}
-                                options={{
-                                    headerShown: false,
-                                    title: 'ExerciseLog',
                                     tabBarIcon: ({ color, size }) => (
                                         <Ionicons name="list-outline" color={color} size={size} />
                                     )

@@ -13,8 +13,8 @@ import {
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { useFocusEffect } from "@react-navigation/native";
-import useMarkedDates from "../../hooks/setMarkedDates";
-import { firebase_auth, db } from "../../firebaseConfig";
+import useMarkedDates from "../../../hooks/setMarkedDates";
+import { firebase_auth, db } from "../../../firebaseConfig";
 import {
   doc,
   collection,

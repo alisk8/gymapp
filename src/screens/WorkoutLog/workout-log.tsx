@@ -279,9 +279,14 @@ export default function WorkoutLogScreen({route}) {
     const updateSetData = (text, exerciseIndex, setIndex, type) => {
         const newExercises = [...exercises];
 
-        const newNum = type === 'weight'? parseFloat(text): parseInt(text);
+        if (type === 'weight') {
+            newExercises[exerciseIndex].sets[setIndex][type] = parseFloat(text);
+        } else if (type === 'reps') {
+            newExercises[exerciseIndex].sets[setIndex][type] = parseInt(text);
+        } else if (type === 'time') {
+            newExercises[exerciseIndex].sets[setIndex]['reps'] = text; // Keep as string for time format (mm:ss)
+        }
 
-        newExercises[exerciseIndex].sets[setIndex][type] = newNum;
         setExercises(newExercises);
     };
 
@@ -301,10 +306,10 @@ export default function WorkoutLogScreen({route}) {
             name: selectedExercise,
             sets: [{ key: 'set1', weight: '', reps: '', isFailure: null, completed: false}],
             weightUnit:'lbs',
-            repsUnit: 'reps',
+            repsUnit: exercisePresets[selectedExercise].repsConfig === 'R'? 'reps': 'time',
             supersetExercise: '',
-            weightConfig: 'W',
-            repsConfig: 'reps',
+            weightConfig: exercisePresets[selectedExercise].weightConfig || 'W',
+            repsConfig: exercisePresets[selectedExercise].repsConfig || 'R',
             isSuperset: parentExerciseIndex != null,
         };
 
@@ -458,21 +463,8 @@ export default function WorkoutLogScreen({route}) {
 
         setExercises(newExercises);
     };
-    const loadAllPreviousAttempts = (exerciseIndex) => {
-        const exercise =  exercises[exerciseIndex];
-        const previousSets = showPreviousAttempts[exercise.id];
 
-        if (previousSets) {
-            previousSets.forEach((previousSet, setIndex) => {
-                if (previousSet) {
-                    loadPreviousAttempt(exerciseIndex, setIndex, previousSet, false, null);
-                    previousSet.dropSets?.forEach((dropSet, dropSetIndex) => {
-                        loadPreviousAttempt(exerciseIndex, setIndex, dropSet, true, dropSetIndex);
-                    });
-                }
-            });
-        }
-    };
+
 
 
 
@@ -492,7 +484,8 @@ export default function WorkoutLogScreen({route}) {
                     const parentSetIndex = isDropSet ? set.key.split('_')[0].replace('set', '') : null;
                     let indicator = '';
                     const previousSet = showPreviousAttempts[exerciseId]?.find(prevSet => prevSet.key === set.key) || {};
-
+                    const repsAreTimed = exercise.repsConfig === 'H' || exercise.repsConfig === 'C';
+                    const repsString = repsAreTimed? 'Time': 'Reps';
 
                     if (isDropSet) {
                         indicator = 'D'; // Dropset indicator
@@ -504,10 +497,9 @@ export default function WorkoutLogScreen({route}) {
 
                     const weightPlaceholder = lastFilledWeight? lastFilledWeight.toString():'Weight';
 
-                    const repsPlaceholder = lastFilledRep? lastFilledRep.toString(): 'reps';
+                    const repsPlaceholder = lastFilledRep? lastFilledRep.toString(): repsString;
 
-                    const isWeightDisabled = exercise.weightConfig === 'bodyWeight';
-
+                    const isWeightDisabled = exercise.weightConfig === 'BW';
 
                     const toggleCompleted = () => {
                         const newExercises = [...exercises];
@@ -547,6 +539,34 @@ export default function WorkoutLogScreen({route}) {
                             }));
                         }
                     }
+
+                    const handleTimeInputChange = (text) => {
+                        // Remove any non-digit characters
+                        let digits = text.replace(/\D/g, '');
+
+                        // Limit the length to 4 digits (MMSS)
+                        if (digits.length > 4) {
+                            digits = digits.slice(-4);
+                        }
+
+                        // Pad with leading zeros if necessary
+                        while (digits.length < 4) {
+                            digits = '0' + digits;
+                        }
+
+                        // Format the digits as MM:SS
+                        const minutes = digits.slice(0, 2);
+                        const seconds = digits.slice(2, 4);
+
+                        const formattedTime = `${minutes}:${seconds}`;
+
+                        // Update the input and state
+                        updateSetData(formattedTime, exerciseIndex, setIndex, 'time');
+                        setLastFilledReps((prev) => ({
+                            ...prev,
+                            [exerciseId]: formattedTime,
+                        }));0
+                    };
 
                     return (
                         <GestureHandlerRootView key={set.key}>
@@ -595,16 +615,24 @@ export default function WorkoutLogScreen({route}) {
                                         style={styles.weightInput}
                                         keyboardType="numeric"
                                         placeholder={weightPlaceholder}
-                                        value={set.weight !== '' ? set.weight.toString() : ''}
+                                        value={set.weight !== '' ? set.weight : ''}
                                         onChangeText={text => handleWeightChange(text)}
                                     />
-                                    <TextInput
+                                    {!repsAreTimed? (<TextInput
                                         style={styles.repsInput}
                                         keyboardType="numeric"
                                         placeholder={repsPlaceholder}
-                                        value={set.reps !== '' ? set.reps.toString() : ''}
+                                        value={set.reps !== '' ? set.reps : ''}
                                         onChangeText={text => handleRepsChange(text)}
-                                    />
+                                    />) : (
+                                    <TextInput
+                                    style={styles.repsInput}
+                                    keyboardType="numeric"
+                                    placeholder={repsPlaceholder}
+                                    value={set.reps !== '' ? set.reps : ''}
+                                    onChangeText={(text) => handleTimeInputChange(text)}
+                                         />
+                                    )}
                                     {isFailureTracking && <TouchableOpacity
                                         style={[styles.failureButton, set.isFailure && styles.failureButtonActive]}
                                         onPress={() => toggleFailure(exerciseIndex, setIndex)}
@@ -869,6 +897,8 @@ export default function WorkoutLogScreen({route}) {
             setExercises(newExercises);
         };
 
+        const repsAreTimed = exercise.repsConfig === 'H' || exercise.repsConfig === 'C';
+
         return(
             <View key={exercise.id} style={isSuperset ? styles.supersetContainer : styles.exerciseContainer}>
                 <FontAwesome5
@@ -891,10 +921,10 @@ export default function WorkoutLogScreen({route}) {
 
                     <TouchableOpacity onPress={toggleWeightUnit} style={styles.weightToggleContainer}>
                         <Text style={styles.weightHeader}>
-                            {exercise.weightUnit}
+                            {exercise.weightConfig === 'BW'? '+': ''}{exercise.weightUnit}
                         </Text>
                     </TouchableOpacity>
-                    <Text style={[styles.repsIndicatorText]}>REPS</Text>
+                    <Text style={[styles.repsIndicatorText]}>{repsAreTimed? 'TIME': 'REPS'}</Text>
                     {isFailureTracking && <TouchableOpacity onPress={toggleAllFailure} style={[styles.allFailureButton, styles.failureButtonActive]}>
                         <Text style={styles.failureButtonTextActive}>FF</Text>
                     </TouchableOpacity>}
@@ -1118,7 +1148,7 @@ export default function WorkoutLogScreen({route}) {
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Set Countdown Timer</Text>
+                        <Text style={styles.modalTitle}>Set Rest Timer</Text>
                         <View style={styles.pickerContainer}>
                             <Picker
                                 selectedValue={countdownMinutes}
