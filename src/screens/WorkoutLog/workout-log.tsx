@@ -272,11 +272,11 @@ export default function WorkoutLogScreen({route}) {
         const newExercises = [...exercises];
 
         if (type === 'weight') {
-            newExercises[exerciseIndex].sets[setIndex][type] = parseFloat(text);
+            newExercises[exerciseIndex].sets[setIndex][type] = text ? parseFloat(text): '';
         } else if (type === 'reps') {
-            newExercises[exerciseIndex].sets[setIndex][type] = parseInt(text);
+            newExercises[exerciseIndex].sets[setIndex][type] = text? parseInt(text): '';
         } else if (type === 'time') {
-            newExercises[exerciseIndex].sets[setIndex]['reps'] = text; // Keep as string for time format (mm:ss)
+            newExercises[exerciseIndex].sets[setIndex]['reps'] = text? text: ''; // Keep as string for time format (mm:ss)
         }
 
         setExercises(newExercises);
@@ -481,6 +481,7 @@ export default function WorkoutLogScreen({route}) {
                                 [exerciseId]: newWeight,
                             }));
                         }
+
                         console.log('NEW WEIGHT', newWeight);
                         console.log('FUCK YEAH', lastFilledWeights[exerciseId]);
                     }
