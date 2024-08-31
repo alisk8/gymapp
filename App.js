@@ -44,6 +44,7 @@ import TemplateRecords from "./src/screens/ProgressLog/TemplateRecords";
 import ProgressTopTabs from "./src/screens/ProgressLog/ProgressTopTabs";
 import EditTemplateScreen from "./src/screens/ProgressLog/EditTemplateScreen";
 import EditTemplateScreenUpdated from "./src/screens/ProgressLog/EditTemplateScreenUpdated";
+import Comments from './src/screens/Feed/Comments';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -236,6 +237,14 @@ function FeedStack() {
             <Stack.Screen
                 name='WorkoutSummaryScreen'
                 component={WorkoutSummaryScreen}
+                options={{
+                    headerShown: true,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='Comments'
+                component={Comments}
                 options={{
                     headerShown: true,
                     presentation: 'fullScreenModal',
