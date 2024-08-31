@@ -14,9 +14,7 @@ const TemplateScreen = ({ route }) => {
     const navigation = useNavigation();
     const [previousScreen, setPreviousScreen] = useState(null);
     const {workoutState, setWorkoutState, resetWorkout, handleWorkoutMode} = useWorkout();
-    const [loadWorkoutMode, setLoadWorkoutMode] = useState('Quick');
-    const [workoutModes, setWorkoutModes] = useState([{label: 'Quick Mode', value: 'Quick'}, {label: 'Normal Mode', value: 'Normal'}]);
-    const [openModePicker, setOpenModePicker] = useState(false);
+
 
     useEffect(() => {
         fetchTemplates();
@@ -58,15 +56,8 @@ const TemplateScreen = ({ route }) => {
     };
 
     const startNewWorkout = () => {
-        if (loadWorkoutMode === 'Quick'){
-            handleWorkoutMode('Quick');
-            console.log('quick mode running');
-            navigation.navigate('QuickMode', {previousScreen});
-        }
-        else{
-            handleWorkoutMode('Normal');
-            navigation.navigate('WorkoutLog', {previousScreen});
-        }
+          handleWorkoutMode('Normal');
+          navigation.navigate('WorkoutLog', {previousScreen});
     }
 
     const renderExercise = (exercise, exercises) => (
@@ -118,18 +109,6 @@ const TemplateScreen = ({ route }) => {
                 </ScrollView>
             )}
 
-            <DropDownPicker
-                open={openModePicker}
-                value={loadWorkoutMode}
-                items={workoutModes}
-                setOpen={setOpenModePicker}
-                setValue={setLoadWorkoutMode}
-                setItems={setWorkoutModes}
-                placeholder="Workout Mode"
-                containerStyle={styles.dropdownContainer}
-                style={styles.dropdown}
-                dropDownStyle={styles.dropdown}
-            />
 
             <Button title="Load Template" onPress={handleLoadTemplate} />
             <Button title="Start New Workout" onPress={startNewWorkout} />

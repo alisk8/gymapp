@@ -144,36 +144,28 @@ export default function WorkoutLogScreen({route}) {
             setSuggestions([]);
         });
 
+        if (template) {
+            const mappedExercises = template.exercises.map(ex => ({
+                id: ex.id,
+                name: ex.name,
+                weightUnit: 'lbs', // can adjust to default weight unit preferred by user
+                repsUnit: exercisePresets[ex.name].repsUnit,
+                sets: ex.setsKeys.map((set, index) => ({
+                    key: set.key,
+                    weight: '',
+                    reps: '',
+                })),
+                isSuperset: ex.isSuperset,
+                supersetExercise: ex.supersetExercise,
+        }));
+            setExercises(mappedExercises);
+        }
+
         return () => {
             keyboardDidHideListener.remove();
         };
     }, []);
 
-    useEffect(() => {
-        if (template) {
-            const mappedExercises = template.exercises.map(ex => ({
-                ...ex,
-                weightUnit: 'lbs', // can adjust to default weight unit preferred by user
-                sets: ex.sets.map((set, index) => ({
-                    key: `set${index + 1}`,
-                    weight: '',
-                    reps: '',
-                    dropSets: Array.from({ length: set.dropSetsCount }, (_, dropIndex) => ({ key: `dropset${dropIndex + 1}`, weight: '', reps: '' }))
-                })),
-                supersets: (ex.supersets || []).map(superset => ({
-                    ...superset,
-                    weightUnit: 'lbs',
-                    sets: superset.sets.map((set, index) => ({
-                        key: `set${index + 1}`,
-                        weight: '',
-                        reps: '',
-                        dropSets: Array.from({ length: set.dropSetsCount }, (_, dropIndex) => ({ key: `dropset${dropIndex + 1}`, weight: '', reps: '' }))
-                    }))
-                }))
-            }));
-            setExercises(mappedExercises);
-        }
-    }, [template]);
 
     useEffect(() => {
         let timer;
@@ -786,69 +778,11 @@ export default function WorkoutLogScreen({route}) {
             return;
         }
 
-        try {
-            /**
-            const templateRef = collection(db, "userProfiles", userId, "templates");
-            const querySnapshot = await getDocs(templateRef);
-            const existingTemplates = querySnapshot.docs.map(doc => doc.data().templateName.toLowerCase());
+        pauseWorkout();
 
-            const mapDropSets = (sets) => {
-                return sets.map(set => ({
-                    dropSetsCount: set.dropSets.length, // Only include the count of drop sets
-                }));
-            };
+        nav.navigate('WorkoutSummaryScreen', {previousScreen});
 
 
-            if (isTemplate) {
-                if (!templateName.trim()) {
-                    Alert.alert("Error", "Please provide a name for the template.");
-                    return;
-                }
-
-                if (existingTemplates.includes(templateName.trim().toLowerCase())) {
-                    Alert.alert("Error", "A template with this name already exists. Please choose a different name.");
-                    return;
-                }
-
-                const templateExercises = exercises.map(ex => ({
-                    id: camelCase(ex.name),
-                    name: ex.name,
-                    setsCount: ex.sets.length,
-                    weightConfig: ex.weightConfig,
-                    repsConfig: ex.repsConfig,
-                    sets: mapDropSets(ex.sets),
-                    startTime: startTime,
-                    date: new Date(),
-                    totalWorkoutTime: elapsedTime,
-                    supersetExercise: ex.supersetExercise,
-                    isSuperset: ex.isSuperset,
-                }));
-
-                await addDoc(templateRef, {
-                    templateName: templateName.trim(),
-                    exercises: templateExercises,
-                    createdAt: new Date()
-                });
-            }
-
-
-            await addDoc(collection(db, "userProfiles", userId, "workouts"), {
-                exercises: filteredExercises,
-                createdAt: new Date()
-            });
-
-            finishWorkout();
-
-            **/
-
-            pauseWorkout();
-
-            nav.navigate('WorkoutSummaryScreen', {previousScreen});
-
-        } catch (error) {
-            console.error("Error adding document: ", error);
-            Alert.alert("Error", "Failed to save workouts.");
-        }
     };
 
     const camelCase = (str) => {
