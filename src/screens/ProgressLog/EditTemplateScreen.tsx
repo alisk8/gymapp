@@ -69,7 +69,7 @@ const EditTemplateScreen = ({ route }) => {
         const templateToString = preprocessTemplate(selectedTemplate);
 
         try {
-            const response = await axios.post('http://172.16.13.238:8000/generate/', {
+            const response = await axios.post('http://192.168.9.39:8000/generate/', {
                 workout_template: templateToString,
                 user_goal: userGoal
             });
