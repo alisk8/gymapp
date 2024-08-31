@@ -107,7 +107,7 @@ const TrackedExercise = ({ route }) => {
     let totalVolume = 0;
     instances.forEach((instance) => {
       instance.sets.forEach((set) => {
-        const reps = parseInt(set.reps.replace(/\D/g, ""), 10);
+        const reps = set.reps;
         let weight = 0;
         if (set.weight === "BW") {
           weight = 150;
