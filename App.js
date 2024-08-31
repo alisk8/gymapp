@@ -43,6 +43,7 @@ import TrackingExerciseScreen from "./src/screens/ProgressLog/TrackingExerciseSc
 import TemplateRecords from "./src/screens/ProgressLog/TemplateRecords";
 import ProgressTopTabs from "./src/screens/ProgressLog/ProgressTopTabs";
 import EditTemplateScreen from "./src/screens/ProgressLog/EditTemplateScreen";
+import EditTemplateScreenUpdated from "./src/screens/ProgressLog/EditTemplateScreenUpdated";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -162,28 +163,6 @@ function AccountStack() {
     );
 }
 
-/**
-function NewProgressStack(){
-    return (
-        <Stack.Navigator initialRouteName='NewProgress'>
-            <Stack.Screen
-                name="ExerciseLogScreen"
-                component={ExerciseLogScreen}
-                options={({ navigation }) => ({
-                    ...screenOptions({ navigation }),
-                    title: "Exercise Log"
-                })}
-            />
-            <Stack.Screen name='TrackingExerciseScreen' component={TrackingExerciseScreen}
-                          options={({ navigation }) => ({
-                ...screenOptions({ navigation, iconType: 'AddEntry' }), // Icon for adding a new community
-                title: "Track Exercise"
-            })} />
-
-        </Stack.Navigator>
-    );
-}
-    **/
 
 
 function ProgressStack() {
@@ -196,7 +175,7 @@ function ProgressStack() {
             />
             <Stack.Screen name='Progress' component={Progress} options={screenOptions} />
             <Stack.Screen name='TemplateRecords' component={TemplateRecords}/>
-            <Stack.Screen name='EditTemplateScreen' component={EditTemplateScreen}/>
+            <Stack.Screen name='EditTemplateScreenUpdated' component={EditTemplateScreenUpdated}/>
             <Stack.Screen name="TrackedExercise" component={TrackedExercise} />
             <Stack.Screen
                 name='WorkoutLog'

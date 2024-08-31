@@ -68,7 +68,7 @@ const TemplateRecords = ({ navigation }) => {
                     <TouchableOpacity
                         style={styles.templateItem}
                         onPress={() => {
-                            navigation.navigate('EditTemplateScreen', { template: item });
+                            navigation.navigate('EditTemplateScreenUpdated', { template: item });
                         }}
                     >
                         <Text style={styles.templateName}>{item.templateName}</Text>
