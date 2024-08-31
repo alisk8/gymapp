@@ -12,12 +12,12 @@ const defaultProfilePicture = 'https://firebasestorage.googleapis.com/v0/b/gym-a
 const FeedPage = ({ navigation }) => {
   const [highlights, setHighlights] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [lastVisible, setLastVisible] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadedHighlightIds, setLoadedHighlightIds] = useState(new Set());
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
@@ -67,10 +67,7 @@ const FeedPage = ({ navigation }) => {
 
   const fetchHighlights = async (isRefresh = false) => {
     if (isRefresh) {
-      setLoading(true);
-      setLastVisible({});
-      setHighlights([]);
-      setLoadedHighlightIds(new Set());
+      setRefreshing(true);
     }
 
     if (loadingMore && !isRefresh) return;
@@ -82,6 +79,7 @@ const FeedPage = ({ navigation }) => {
       if (following.length === 0) {
         setLoading(false);
         setLoadingMore(false);
+        setRefreshing(false);
         return;
       }
 
@@ -107,10 +105,10 @@ const FeedPage = ({ navigation }) => {
           limit(10)
         );
 
-        if (lastVisible[userId] && lastVisible[userId].highlight) {
+        if (lastVisible[userId] && lastVisible[userId].highlight && !isRefresh) {
           highlightsQuery = query(highlightsQuery, startAfter(lastVisible[userId].highlight));
         }
-        if (lastVisible[userId] && lastVisible[userId].workout) {
+        if (lastVisible[userId] && lastVisible[userId].workout && !isRefresh) {
           workoutsQuery = query(workoutsQuery, startAfter(lastVisible[userId].workout));
         }
 
@@ -121,7 +119,7 @@ const FeedPage = ({ navigation }) => {
 
         if (highlightsSnapshot.docs.length > 0) {
           newLastVisible[userId] = {
-            ...newLastVisible[userId], 
+            ...newLastVisible[userId],
             highlight: highlightsSnapshot.docs[highlightsSnapshot.docs.length - 1]
           };
 
@@ -151,7 +149,7 @@ const FeedPage = ({ navigation }) => {
 
         if (workoutsSnapshot.docs.length > 0) {
           newLastVisible[userId] = {
-            ...newLastVisible[userId], 
+            ...newLastVisible[userId],
             workout: workoutsSnapshot.docs[workoutsSnapshot.docs.length - 1]
           };
 
@@ -183,17 +181,28 @@ const FeedPage = ({ navigation }) => {
 
       allHighlights.sort((a, b) => b.timestamp - a.timestamp);
       setHighlights(prevHighlights => {
-        const mergedHighlights = isRefresh ? allHighlights : [...prevHighlights, ...allHighlights];
-        return mergedHighlights.sort((a, b) => b.timestamp - a.timestamp);
+        if (isRefresh) {
+          const updatedHighlights = [...allHighlights];
+          prevHighlights.forEach((highlight) => {
+            if (!loadedHighlightIds.has(highlight.id)) {
+              updatedHighlights.push(highlight);
+            }
+          });
+          return updatedHighlights.sort((a, b) => b.timestamp - a.timestamp);
+        } else {
+          return [...prevHighlights, ...allHighlights].sort((a, b) => b.timestamp - a.timestamp);
+        }
       });
       setLastVisible(newLastVisible);
       setLoading(false);
       setLoadingMore(false);
+      setRefreshing(false);
     } catch (error) {
       console.error('Error fetching highlights: ', error);
       setError('Failed to load highlights');
       setLoading(false);
       setLoadingMore(false);
+      setRefreshing(false);
     }
   };
 
@@ -216,7 +225,7 @@ const FeedPage = ({ navigation }) => {
           likes: arrayUnion(userUid),
         });
 
-        setHighlights(prevHighlights => prevHighlights.map(post => 
+        setHighlights(prevHighlights => prevHighlights.map(post =>
           post.id === postId ? { ...post, liked: true, likes: post.likes + 1 } : post
         ));
       } else {
@@ -246,7 +255,7 @@ const FeedPage = ({ navigation }) => {
           likes: arrayRemove(userUid),
         });
 
-        setHighlights(prevHighlights => prevHighlights.map(post => 
+        setHighlights(prevHighlights => prevHighlights.map(post =>
           post.id === postId ? { ...post, liked: false, likes: post.likes - 1 } : post
         ));
       } else {
@@ -281,7 +290,7 @@ const FeedPage = ({ navigation }) => {
           savedPosts: arrayUnion({ collection: collectionName, postId, userId }),
         });
 
-        setHighlights(prevHighlights => prevHighlights.map(post => 
+        setHighlights(prevHighlights => prevHighlights.map(post =>
           post.id === postId ? { ...post, saved: true, savedBy: post.savedBy + 1 } : post
         ));
       } else {
@@ -316,7 +325,7 @@ const FeedPage = ({ navigation }) => {
           savedPosts: arrayRemove({ collection: collectionName, postId, userId }),
         });
 
-        setHighlights(prevHighlights => prevHighlights.map(post => 
+        setHighlights(prevHighlights => prevHighlights.map(post =>
           post.id === postId ? { ...post, saved: false, savedBy: post.savedBy - 1 } : post
         ));
       } else {
@@ -331,12 +340,6 @@ const FeedPage = ({ navigation }) => {
     navigation.navigate('Comments', { postId, userId, isWorkout });
   };
 
-  const refreshHighlights = async () => {
-    setRefreshing(true);
-    await fetchHighlights(true);
-    setRefreshing(false);
-  };
-
   const formatTotalWorkoutTime = (totalTime) => {
     const minutes = Math.floor(totalTime / 60);
     const seconds = totalTime % 60;
@@ -346,7 +349,7 @@ const FeedPage = ({ navigation }) => {
   const renderItem = useCallback(({ item }) => {
     if (item.type === 'workout') {
       const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.setsNum), 0);
-      const elapsedTime  = formatTotalWorkoutTime(item.totalWorkoutTime);
+      const elapsedTime = formatTotalWorkoutTime(item.totalWorkoutTime);
 
       return (
         <View style={styles.highlightContainer}>
@@ -466,7 +469,7 @@ const FeedPage = ({ navigation }) => {
     }
   }, []);
 
-  if (loading && !refreshing) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
@@ -493,10 +496,10 @@ const FeedPage = ({ navigation }) => {
         }
       }}
       onEndReachedThreshold={0.5}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={refreshHighlights} />
-      }
       ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => fetchHighlights(true)} />
+      }
     />
   );
 };
