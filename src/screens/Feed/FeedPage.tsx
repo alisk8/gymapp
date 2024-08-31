@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
 import { db, firebase_auth } from '../../../firebaseConfig';
 import { collection, getDocs, query, orderBy, limit, startAfter, doc, getDoc, updateDoc, arrayUnion, arrayRemove } from '@firebase/firestore';
 import { InteractionManager } from 'react-native';
@@ -18,10 +18,14 @@ const FeedPage = ({ navigation }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadedHighlightIds, setLoadedHighlightIds] = useState(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       fetchUserProfile();
+      fetchUsers();
     });
     return () => task.cancel();
   }, []);
@@ -29,7 +33,7 @@ const FeedPage = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       if (userProfile) {
-        fetchHighlights(true);
+        fetchHighlights(true);  // true indicates it's a refresh
       }
     }, [userProfile])
   );
@@ -54,6 +58,34 @@ const FeedPage = ({ navigation }) => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const userCollection = collection(db, "userProfiles");
+      const userSnapshot = await getDocs(userCollection);
+      const userList = userSnapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .filter((user) => user.id !== firebase_auth.currentUser.uid); // Filter out the current user
+      setUsers(userList);
+    } catch (error) {
+      console.error("Error fetching users: ", error);
+    }
+  };
+
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = users.filter((user) => {
+        const fullName = `${user.firstName?.toLowerCase()} ${user.lastName?.toLowerCase()}`;
+        return fullName.includes(searchQuery.toLowerCase());
+      });
+      setFilteredUsers(filtered);
+    } else {
+      setFilteredUsers([]);
+    }
+  }, [searchQuery, users]);
+
   const fetchCommentCount = async (userId, postId, collectionName) => {
     try {
       const commentsRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments');
@@ -68,6 +100,8 @@ const FeedPage = ({ navigation }) => {
   const fetchHighlights = async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
+      setLastVisible({});
+      setLoadedHighlightIds(new Set());
     }
 
     if (loadingMore && !isRefresh) return;
@@ -190,7 +224,11 @@ const FeedPage = ({ navigation }) => {
           });
           return updatedHighlights.sort((a, b) => b.timestamp - a.timestamp);
         } else {
-          return [...prevHighlights, ...allHighlights].sort((a, b) => b.timestamp - a.timestamp);
+          const postIdSet = new Set(prevHighlights.map(post => post.id));
+          const filteredNewHighlights = allHighlights.filter(
+            (highlight) => !postIdSet.has(highlight.id)
+          );
+          return [...prevHighlights, ...filteredNewHighlights].sort((a, b) => b.timestamp - a.timestamp);
         }
       });
       setLastVisible(newLastVisible);
@@ -487,11 +525,20 @@ const FeedPage = ({ navigation }) => {
 
   return (
     <FlatList
-      data={highlights}
+      data={searchQuery.length > 0 ? filteredUsers : highlights}
       keyExtractor={item => item.id}
-      renderItem={renderItem}
+      renderItem={searchQuery.length > 0 ? ({ item }) => (
+        <TouchableOpacity
+          style={styles.userItem}
+          onPress={() => navigation.navigate("UserDetails", { user: item })}
+        >
+          <Text style={styles.userName}>
+            {item.firstName} {item.lastName}
+          </Text>
+        </TouchableOpacity>
+      ) : renderItem}
       onEndReached={() => {
-        if (!loadingMore) {
+        if (!loadingMore && searchQuery.length === 0) {
           fetchHighlights();
         }
       }}
@@ -499,6 +546,14 @@ const FeedPage = ({ navigation }) => {
       ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => fetchHighlights(true)} />
+      }
+      ListHeaderComponent={
+        <TextInput
+          style={styles.searchBar}
+          placeholder="Search for users..."
+          value={searchQuery}
+          onChangeText={(text) => setSearchQuery(text)}
+        />
       }
     />
   );
@@ -596,9 +651,6 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     color: '#333',
   },
-  exerciseNamesContainer: {
-    marginBottom: 15,
-  },
   exerciseItemContainer: {
     backgroundColor: '#f8f8f8',
     padding: 10,
@@ -629,6 +681,23 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 10,
     alignSelf: 'flex-end',
+  },
+  searchBar: {
+    height: 40,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    marginBottom: 16,
+    marginHorizontal: 15,
+  },
+  userItem: {
+    padding: 12,
+    borderBottomColor: "#ccc",
+    borderBottomWidth: 1,
+  },
+  userName: {
+    fontSize: 16,
   },
 });
 
