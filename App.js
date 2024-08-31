@@ -38,6 +38,7 @@ import TrackedExercise from './src/screens/TrackedExercise';
 import Saved from './src/screens/Saved';
 import Messages from './src/screens/Messages';
 import UserDMs from './src/screens/UserDMs';
+import ExploreScreen from './src/screens/ExploreScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -327,6 +328,15 @@ function MessagesStack() {
     );
 }
 
+function ExploreScreenStack() {
+    return (
+        <Stack.Navigator initialRouteName='ExploreScreen'>
+            <Stack.Screen name='ExploreScreen' component={ExploreScreen} options={screenOptions} />
+        </Stack.Navigator>
+    );
+}
+
+
 function App() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -375,6 +385,18 @@ function App() {
                                     )
                                 }}
                             />
+                            <Tab.Screen
+                                name='ExploreScreen'
+                                component={ExploreScreen}
+                                options={{
+                                    headerShown: false,
+                                    title: 'Explore Screen',
+                                    tabBarIcon: ({ color, size }) => (
+                                        <Ionicons name="list-outline" color={color} size={size} />
+                                    )
+                                }}
+                            />
+
                             <Tab.Screen
                                 name='MessagesStack'
                                 component={MessagesStack}

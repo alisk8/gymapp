@@ -8,6 +8,8 @@ import {
   Alert,
   StyleSheet,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { firebase_auth, db } from "../../firebaseConfig";
@@ -33,18 +35,23 @@ type AdditionalInfo = {
   weight: string;
   age: string;
   sex: string;
+  location: string;
   gym_interests: string[];
   bio: string;
   profilePicture: string;
   followers: string[];
   following: string[];
+  favoriteExercises: string;
+  experienceLevel: string;
 };
 
 export default function Account({ navigation }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [signingUp, setSigningUp] = useState(false);
+  const [step, setStep] = useState(1);
   const [additionalInfo, setAdditionalInfo] = useState<AdditionalInfo>({
     firstName: "",
     lastName: "",
@@ -52,16 +59,19 @@ export default function Account({ navigation }) {
     weight: "",
     age: "",
     sex: "",
+    location: "",
     gym_interests: [],
     bio: "",
     profilePicture: "",
     followers: [],
     following: [],
+    favoriteExercises: "",
+    experienceLevel: "",
   });
   const [showMenu, setShowMenu] = useState(false);
   const [posts, setPosts] = useState([]);
 
-  const { clearMarkedDates } = useMarkedDates(); // use the custom hook
+  const { clearMarkedDates } = useMarkedDates();
 
   const auth = firebase_auth;
 
@@ -136,7 +146,11 @@ export default function Account({ navigation }) {
     }
   };
 
-  const signUp = async () => {
+  const handleSignUp = async () => {
+    if (password !== confirmPassword) {
+      alert("Passwords do not match!");
+      return;
+    }
     try {
       const response = await createUserWithEmailAndPassword(
         auth,
@@ -153,7 +167,7 @@ export default function Account({ navigation }) {
       });
       Alert.alert("Success", "Account Created");
       navigation.navigate("Feed");
-      clearMarkedDates(); // clear marked dates upon signup
+      clearMarkedDates();
     } catch (error) {
       console.error("Signup Error:", error);
       Alert.alert("Error", "Error creating account");
@@ -163,7 +177,7 @@ export default function Account({ navigation }) {
   const handleSignOut = async () => {
     await auth.signOut();
     setUser(null);
-    clearMarkedDates(); // clear marked dates upon sign out
+    clearMarkedDates();
   };
 
   const handlePostPress = (postIndex) => {
@@ -177,6 +191,21 @@ export default function Account({ navigation }) {
     }));
   };
 
+  const handleNextStep = () => {
+    if (step < 3) setStep(step + 1);
+  };
+
+  const handlePrevStep = () => {
+    if (step > 1) setStep(step - 1);
+  };
+
+  const isStepOneComplete = additionalInfo.firstName && additionalInfo.lastName;
+  const isStepTwoComplete = username && password && confirmPassword;
+  const isStepThreeComplete =
+    additionalInfo.location &&
+    additionalInfo.favoriteExercises &&
+    additionalInfo.experienceLevel;
+
   const toggleMenu = () => {
     setShowMenu((prev) => !prev);
   };
@@ -189,421 +218,573 @@ export default function Account({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.headerContainer}>
-        {user && (
-          <TouchableOpacity style={styles.settingsIcon} onPress={toggleMenu}>
-            <Ionicons name="settings-outline" size={24} color="#007BFF" />
-          </TouchableOpacity>
-        )}
-      </View>
-      {showMenu && (
-        <View style={styles.menu}>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              setShowMenu(false);
-              navigation.navigate("Settings", {
-                userId: user.uid,
-                onFieldUpdate: handleFieldUpdate,
-              });
-            }}
-          >
-            <Text style={styles.menuItemText}>Edit Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              setShowMenu(false);
-              navigation.navigate("Saved");
-            }}
-          >
-            <Text style={styles.menuItemText}>My Saved</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              setShowMenu(false);
-              handleSignOut();
-            }}
-          >
-            <Text style={styles.menuItemText}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      {user && (
-        <View style={styles.profileContainer}>
-          {additionalInfo.profilePicture ? (
-            <Image
-              source={{ uri: additionalInfo.profilePicture }}
-              style={styles.profileImage}
-            />
-          ) : (
-            <Image
-              source={require("../../assets/placeholder.jpeg")}
-              style={styles.profileImage}
-            />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView contentContainerStyle={styles.contentContainer}>
+        <View style={styles.headerContainer}>
+          {user && (
+            <TouchableOpacity style={styles.settingsIcon} onPress={toggleMenu}>
+              <Ionicons name="settings-outline" size={24} color="#007BFF" />
+            </TouchableOpacity>
           )}
-          <Text style={styles.name}>
-            {additionalInfo.firstName} {additionalInfo.lastName}
-          </Text>
-          <View style={styles.statsContainer}>
-            <TouchableOpacity onPress={() => navigateToList("followers")}>
-              <Text style={styles.statsText}>
-                {additionalInfo.followers?.length} Followers
-              </Text>
+        </View>
+        {showMenu && (
+          <View style={styles.menu}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                navigation.navigate("Settings", {
+                  userId: user.uid,
+                  onFieldUpdate: handleFieldUpdate,
+                });
+              }}
+            >
+              <Text style={styles.menuItemText}>Edit Profile</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigateToList("following")}>
-              <Text style={styles.statsText}>
-                {additionalInfo.following?.length} Following
-              </Text>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                navigation.navigate("Saved");
+              }}
+            >
+              <Text style={styles.menuItemText}>My Saved</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                handleSignOut();
+              }}
+            >
+              <Text style={styles.menuItemText}>Sign Out</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.bio}>{additionalInfo.bio}</Text>
-          <View style={styles.chipsContainer}>
-            {additionalInfo.gym_interests.map((interest, index) => (
-              <View key={index} style={styles.chip}>
-                <Text style={styles.chipText}>{interest}</Text>
-              </View>
-            ))}
-          </View>
+        )}
+        {user && (
+          <View style={styles.profileContainer}>
+            {additionalInfo.profilePicture ? (
+              <Image
+                source={{ uri: additionalInfo.profilePicture }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <Image
+                source={require("../../assets/placeholder.jpeg")}
+                style={styles.profileImage}
+              />
+            )}
+            <Text style={styles.name}>
+              {additionalInfo.firstName} {additionalInfo.lastName}
+            </Text>
+            <View style={styles.statsContainer}>
+              <TouchableOpacity onPress={() => navigateToList("followers")}>
+                <Text style={styles.statsText}>
+                  {additionalInfo.followers?.length} Followers
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigateToList("following")}>
+                <Text style={styles.statsText}>
+                  {additionalInfo.following?.length} Following
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.bio}>{additionalInfo.bio}</Text>
+            <View style={styles.chipsContainer}>
+              {additionalInfo.gym_interests.map((interest, index) => (
+                <View key={index} style={styles.chip}>
+                  <Text style={styles.chipText}>{interest}</Text>
+                </View>
+              ))}
+            </View>
 
-          <View style={styles.postsContainer}>
-            {posts?.length > 0 ? (
-              posts.map((post, index) => (
-                <View key={index} style={styles.postWrapper}>
-                  {index % 3 === 0 && <View style={styles.row} />}
-                  <TouchableOpacity
-                    style={styles.card}
-                    onPress={() => handlePostPress(index)}
-                  >
-                    {post.type === "workout" ? (
-                      <View style={styles.imageContainer}>
-                        <Image
-                          source={{
-                            uri: "https://cdn.pixabay.com/photo/2018/05/28/13/14/dumbell-3435990_1280.jpg",
-                          }}
-                          style={styles.postImage}
-                        />
-                        <View style={styles.overlay}>
-                          <Text style={styles.workoutTitle}>Workout</Text>
-                        </View>
-                      </View>
-                    ) : post.mediaUrls ? (
-                      <Swiper
-                        autoplay
-                        autoplayTimeout={4}
-                        showsPagination={false}
-                        style={styles.swiper}
-                      >
-                        {post.mediaUrls.map((url, i) => (
+            <View style={styles.postsContainer}>
+              {posts?.length > 0 ? (
+                posts.map((post, index) => (
+                  <View key={index} style={styles.postWrapper}>
+                    {index % 3 === 0 && <View style={styles.row} />}
+                    <TouchableOpacity
+                      style={styles.card}
+                      onPress={() => handlePostPress(index)}
+                    >
+                      {post.type === "workout" ? (
+                        <View style={styles.imageContainer}>
                           <Image
-                            key={i}
-                            source={{ uri: url }}
+                            source={{
+                              uri: "https://cdn.pixabay.com/photo/2018/05/28/13/14/dumbell-3435990_1280.jpg",
+                            }}
                             style={styles.postImage}
                           />
-                        ))}
-                      </Swiper>
-                    ) : (
-                      <Image
-                        source={require("../../assets/placeholder.jpeg")}
-                        style={styles.postImage}
-                      />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.noEntriesText}>No posts found.</Text>
-            )}
+                          <View style={styles.overlay}>
+                            <Text style={styles.workoutTitle}>Workout</Text>
+                          </View>
+                        </View>
+                      ) : post.mediaUrls ? (
+                        <Swiper
+                          autoplay
+                          autoplayTimeout={4}
+                          showsPagination={false}
+                          style={styles.swiperContainer}
+                          removeClippedSubviews={false}
+                        >
+                          {post.mediaUrls.map((url, i) => (
+                            <View key={i} style={styles.slide}>
+                              <Image
+                                source={{ uri: url }}
+                                style={styles.postImage}
+                              />
+                            </View>
+                          ))}
+                        </Swiper>
+                      ) : (
+                        <View style={styles.imageContainer}>
+                          <Image
+                            source={{
+                              uri: "https://cdn.pixabay.com/photo/2017/06/23/19/17/muscle-2435161_1280.jpg",
+                            }}
+                            style={styles.postImage}
+                          />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>
+                  No Posts. Start tracking your workouts today!
+                </Text>
+              )}
+            </View>
           </View>
-        </View>
-      )}
-      {!user && (
-        <View style={styles.profileContainer}>
-          <Text style={styles.title}>{signingUp ? "Sign Up" : "Log In"}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your username"
-            value={username}
-            onChangeText={setUsername}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-          {signingUp && (
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder="First Name"
-                value={additionalInfo.firstName}
-                onChangeText={(text) =>
-                  setAdditionalInfo({ ...additionalInfo, firstName: text })
-                }
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Last Name"
-                value={additionalInfo.lastName}
-                onChangeText={(text) =>
-                  setAdditionalInfo({ ...additionalInfo, lastName: text })
-                }
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Height (e.g., 6'1)"
-                value={additionalInfo.height}
-                onChangeText={(text) =>
-                  setAdditionalInfo({ ...additionalInfo, height: text })
-                }
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Weight (lbs)"
-                value={additionalInfo.weight}
-                onChangeText={(text) =>
-                  setAdditionalInfo({ ...additionalInfo, weight: text })
-                }
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Age"
-                value={additionalInfo.age}
-                onChangeText={(text) =>
-                  setAdditionalInfo({ ...additionalInfo, age: text })
-                }
-                keyboardType="numeric"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Sex"
-                value={additionalInfo.sex}
-                onChangeText={(text) =>
-                  setAdditionalInfo({ ...additionalInfo, sex: text })
-                }
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Gym Interests (comma-separated)"
-                value={additionalInfo.gym_interests.join(", ")}
-                onChangeText={(text) =>
-                  setAdditionalInfo({
-                    ...additionalInfo,
-                    gym_interests: text.split(", "),
-                  })
-                }
-              />
-            </>
-          )}
-          <TouchableOpacity
-            style={styles.button}
-            onPress={signingUp ? signUp : handleLogin}
-          >
-            <Text style={styles.buttonText}>
-              {signingUp ? "Submit Sign Up" : "Log In"}
+        )}
+
+        {!user && (
+          <View style={styles.authContainer}>
+            <Text style={styles.pageHeading}>
+              {signingUp ? "Create Account" : "Log In"}
             </Text>
-          </TouchableOpacity>
-          {!signingUp && (
-            <TouchableOpacity onPress={() => setSigningUp(true)}>
+
+            <View style={styles.formContainer}>
+              {signingUp ? (
+                <>
+                  {step === 1 && (
+                    <View>
+                      <TextInput
+                        placeholder="First Name"
+                        value={additionalInfo.firstName}
+                        onChangeText={(text) =>
+                          handleFieldUpdate("firstName", text)
+                        }
+                        style={styles.input}
+                      />
+                      <TextInput
+                        placeholder="Last Name"
+                        value={additionalInfo.lastName}
+                        onChangeText={(text) =>
+                          handleFieldUpdate("lastName", text)
+                        }
+                        style={styles.input}
+                      />
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          !isStepOneComplete && styles.disabledButton,
+                        ]}
+                        onPress={isStepOneComplete ? handleNextStep : null}
+                        disabled={!isStepOneComplete}
+                      >
+                        <Text style={styles.buttonText}>Next</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {step === 2 && (
+                    <View>
+                      <TextInput
+                        placeholder="Email"
+                        value={username}
+                        onChangeText={setUsername}
+                        style={styles.input}
+                      />
+                      <TextInput
+                        placeholder="Password"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                        style={styles.input}
+                      />
+                      <TextInput
+                        placeholder="Confirm Password"
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        secureTextEntry
+                        style={styles.input}
+                      />
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          !isStepTwoComplete && styles.disabledButton,
+                        ]}
+                        onPress={isStepTwoComplete ? handleNextStep : null}
+                        disabled={!isStepTwoComplete}
+                      >
+                        <Text style={styles.buttonText}>Next</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.button, styles.backButton]}
+                        onPress={handlePrevStep}
+                      >
+                        <Text style={styles.buttonText}>Back</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {step === 3 && (
+                    <View>
+                      <TextInput
+                        placeholder="Location"
+                        value={additionalInfo.location}
+                        onChangeText={(text) =>
+                          handleFieldUpdate("location", text)
+                        }
+                        style={styles.input}
+                      />
+                      <TextInput
+                        placeholder="Favorite Exercise"
+                        value={additionalInfo.favoriteExercises}
+                        onChangeText={(text) =>
+                          handleFieldUpdate("favoriteExercises", text)
+                        }
+                        style={styles.input}
+                      />
+                      <Text style={styles.label}>Experience Level:</Text>
+                      <View style={styles.experienceLevelContainer}>
+                        <TouchableOpacity
+                          style={[
+                            styles.experienceButton,
+                            additionalInfo.experienceLevel === "Beginner" &&
+                              styles.selectedExperienceButton,
+                          ]}
+                          onPress={() =>
+                            handleFieldUpdate("experienceLevel", "Beginner")
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.experienceButtonText,
+                              additionalInfo.experienceLevel === "Beginner" &&
+                                styles.selectedExperienceButtonText,
+                            ]}
+                          >
+                            Beginner
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.experienceButton,
+                            additionalInfo.experienceLevel === "Intermediate" &&
+                              styles.selectedExperienceButton,
+                          ]}
+                          onPress={() =>
+                            handleFieldUpdate("experienceLevel", "Intermediate")
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.experienceButtonText,
+                              additionalInfo.experienceLevel ===
+                                "Intermediate" &&
+                                styles.selectedExperienceButtonText,
+                            ]}
+                          >
+                            Intermediate
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.experienceButton,
+                            additionalInfo.experienceLevel === "Advanced" &&
+                              styles.selectedExperienceButton,
+                          ]}
+                          onPress={() =>
+                            handleFieldUpdate("experienceLevel", "Advanced")
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.experienceButtonText,
+                              additionalInfo.experienceLevel === "Advanced" &&
+                                styles.selectedExperienceButtonText,
+                            ]}
+                          >
+                            Advanced
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          !isStepThreeComplete && styles.disabledButton,
+                        ]}
+                        onPress={isStepThreeComplete ? handleSignUp : null}
+                        disabled={!isStepThreeComplete}
+                      >
+                        <Text style={styles.buttonText}>Create Account</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.button, styles.backButton]}
+                        onPress={handlePrevStep}
+                      >
+                        <Text style={styles.buttonText}>Back</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <>
+                  <TextInput
+                    placeholder="Email"
+                    value={username}
+                    onChangeText={setUsername}
+                    style={styles.input}
+                  />
+                  <TextInput
+                    placeholder="Password"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    style={styles.input}
+                  />
+                  <TouchableOpacity style={styles.button} onPress={handleLogin}>
+                    <Text style={styles.buttonText}>Login</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.switchContainer}
+              onPress={() => setSigningUp((prev) => !prev)}
+            >
               <Text style={styles.switchText}>
-                Don't have an account? Sign Up
+                {signingUp
+                  ? "Already have an account? Log in"
+                  : "Don't have an account? Sign up"}
               </Text>
             </TouchableOpacity>
-          )}
-          {signingUp && (
-            <TouchableOpacity onPress={() => setSigningUp(false)}>
-              <Text style={styles.switchText}>
-                Already have an account? Log In
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-    </ScrollView>
+          </View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
+  },
+  contentContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: 20,
   },
   headerContainer: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    padding: 15,
   },
   settingsIcon: {
-    padding: 10,
-    marginRight: 10,
+    marginRight: 15,
+    marginTop: 10,
   },
   menu: {
-    position: "absolute",
-    top: 50,
-    right: 20,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 5,
-    zIndex: 10,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
   },
   menuItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
+    padding: 10,
   },
   menuItemText: {
     fontSize: 16,
   },
   profileContainer: {
     alignItems: "center",
-    marginVertical: 20,
   },
   profileImage: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     marginBottom: 10,
   },
   name: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
+    marginBottom: 5,
   },
   statsContainer: {
     flexDirection: "row",
-    justifyContent: "center",
-    width: "100%",
-    marginVertical: 10,
+    justifyContent: "space-between",
+    width: "60%",
+    marginBottom: 10,
   },
   statsText: {
-    marginHorizontal: 20,
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
   bio: {
     fontSize: 16,
-    fontStyle: "italic",
     textAlign: "center",
-    marginVertical: 10,
-    paddingHorizontal: 20,
+    marginBottom: 10,
   },
   chipsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    marginVertical: 10,
+    marginBottom: 20,
   },
   chip: {
-    backgroundColor: "#b1b6bd",
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 15,
+    backgroundColor: "#007BFF",
+    borderRadius: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 15,
     margin: 5,
   },
   chipText: {
-    color: "#fff",
-    fontSize: 14,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: "#333",
-  },
-  input: {
-    width: "90%",
-    height: 50,
-    padding: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "#fff",
-    borderRadius: 5,
-    fontSize: 16,
-  },
-  button: {
-    width: "90%",
-    height: 50,
-    backgroundColor: "#007BFF",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  switchText: {
-    marginTop: 20,
-    color: "#007BFF",
-    fontSize: 16,
+    color: "#FFFFFF",
   },
   postsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 20,
+    width: "100%",
   },
   postWrapper: {
-    width: "33%",
-    padding: 5,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
   },
   row: {
     flexDirection: "row",
+    justifyContent: "space-between",
     width: "100%",
   },
   card: {
-    backgroundColor: "#f9f9f9",
-    padding: 10,
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-  },
-  postImage: {
-    width: "100%",
-    height: 100,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  swiper: {
-    height: 100,
-  },
-  noEntriesText: {
-    fontSize: 16,
-    color: "#555",
-    textAlign: "center",
-    marginVertical: 20,
-  },
-  loadingContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 20,
+    marginHorizontal: 5,
   },
   imageContainer: {
     position: "relative",
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 8,
+    overflow: "hidden",
   },
   overlay: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     padding: 5,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
   },
   workoutTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#fff",
+    color: "#FFFFFF",
     textAlign: "center",
+  },
+  swiperContainer: {
+    height: 200,
+  },
+  slide: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  postImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+  },
+  emptyText: {
+    textAlign: "center",
+    fontSize: 16,
+    color: "#999999",
+  },
+  authContainer: {
+    alignItems: "center",
+  },
+  formContainer: {
+    width: "100%",
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#cccccc",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  button: {
+    backgroundColor: "#007BFF",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+  },
+  switchContainer: {
+    marginTop: 10,
+  },
+  switchText: {
+    color: "#007BFF",
+  },
+  pageHeading: {
+    fontSize: 30,
+    marginBottom: 50,
+  },
+  label: {
+    fontSize: 16,
+    color: "#555",
+    marginBottom: 10,
+  },
+  dropdown: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    alignItems: "center",
+  },
+  dropdownText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  backButton: {
+    marginTop: 10,
+  },
+  experienceLevelContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  experienceButton: {
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    width: "30%",
+    alignItems: "center",
+  },
+  selectedExperienceButton: {
+    backgroundColor: "#007BFF",
+  },
+  experienceButtonText: {
+    color: "#333",
+  },
+  selectedExperienceButtonText: {
+    color: "#FFFFFF",
+  },
+  disabledButton: {
+    backgroundColor: "#cccccc",
   },
 });
