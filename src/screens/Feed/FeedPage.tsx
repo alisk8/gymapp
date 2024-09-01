@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl, TextInput, Modal } from 'react-native';
 import { db, firebase_auth } from '../../../firebaseConfig';
 import { collection, getDocs, query, orderBy, limit, startAfter, doc, getDoc, updateDoc, arrayUnion, arrayRemove } from '@firebase/firestore';
 import { InteractionManager } from 'react-native';
@@ -21,6 +21,10 @@ const FeedPage = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
+  
+  // Modal state
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState(null);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
@@ -383,6 +387,17 @@ const FeedPage = ({ navigation }) => {
     const seconds = Math.floor((totalTime % 60000) / 1000); // Get remaining seconds
     return `${minutes} mins ${seconds} secs`;
   };
+
+  const openModal = (mediaUrl) => {
+    setSelectedMedia(mediaUrl);
+    setIsModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setIsModalVisible(false);
+    setSelectedMedia(null);
+  };
+
   const renderItem = useCallback(({ item }) => {
     if (item.type === 'workout') {
         console.log('Item received:', item); // Debugging statement
@@ -442,11 +457,12 @@ const FeedPage = ({ navigation }) => {
                     <View style={styles.imageContainer}>
                         <Swiper style={styles.swiper} showsPagination={true}>
                             {item.mediaUrls.map((mediaUrl, index) => (
-                                <Image
-                                    key={`${item.id}_${index}`}
-                                    source={{ uri: mediaUrl }}
-                                    style={styles.postImage}
-                                />
+                                <TouchableOpacity key={`${item.id}_${index}`} onPress={() => openModal(mediaUrl)}>
+                                  <Image
+                                      source={{ uri: mediaUrl }}
+                                      style={styles.postImage}
+                                  />
+                                </TouchableOpacity>
                             ))}
                         </Swiper>
                     </View>
@@ -486,11 +502,12 @@ const FeedPage = ({ navigation }) => {
                     <View style={styles.imageContainer}>
                         <Swiper style={styles.swiper} showsPagination={true}>
                             {item.mediaUrls.map((mediaUrl, index) => (
-                                <Image
-                                    key={`${item.id}_${index}`}
-                                    source={{ uri: mediaUrl }}
-                                    style={styles.postImage}
-                                />
+                                <TouchableOpacity key={`${item.id}_${index}`} onPress={() => openModal(mediaUrl)}>
+                                  <Image
+                                      source={{ uri: mediaUrl }}
+                                      style={styles.postImage}
+                                  />
+                                </TouchableOpacity>
                             ))}
                         </Swiper>
                     </View>
@@ -532,38 +549,55 @@ const FeedPage = ({ navigation }) => {
   }
 
   return (
-    <FlatList
-      data={searchQuery.length > 0 ? filteredUsers : highlights}
-      keyExtractor={item => item.id}
-      renderItem={searchQuery.length > 0 ? ({ item }) => (
-        <TouchableOpacity
-          style={styles.userItem}
-          onPress={() => navigation.navigate("UserDetails", { user: item })}
-        >
-          <Text style={styles.userName}>
-            {item.firstName} {item.lastName}
-          </Text>
-        </TouchableOpacity>
-      ) : renderItem}
-      onEndReached={() => {
-        if (!loadingMore && searchQuery.length === 0) {
-          fetchHighlights();
+    <View style={{ flex: 1 }}>
+      <FlatList
+        data={searchQuery.length > 0 ? filteredUsers : highlights}
+        keyExtractor={item => item.id}
+        renderItem={searchQuery.length > 0 ? ({ item }) => (
+          <TouchableOpacity
+            style={styles.userItem}
+            onPress={() => navigation.navigate("UserDetails", { user: item })}
+          >
+            <Text style={styles.userName}>
+              {item.firstName} {item.lastName}
+            </Text>
+          </TouchableOpacity>
+        ) : renderItem}
+        onEndReached={() => {
+          if (!loadingMore && searchQuery.length === 0) {
+            fetchHighlights();
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchHighlights(true)} />
         }
-      }}
-      onEndReachedThreshold={0.5}
-      ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => fetchHighlights(true)} />
-      }
-      ListHeaderComponent={
-        <TextInput
-          style={styles.searchBar}
-          placeholder="Search for users..."
-          value={searchQuery}
-          onChangeText={(text) => setSearchQuery(text)}
-        />
-      }
-    />
+        ListHeaderComponent={
+          <TextInput
+            style={styles.searchBar}
+            placeholder="Search for users..."
+            value={searchQuery}
+            onChangeText={(text) => setSearchQuery(text)}
+          />
+        }
+      />
+      
+      {isModalVisible && selectedMedia && (
+        <Modal visible={isModalVisible} transparent={true} animationType="fade">
+          <View style={styles.modalContainer}>
+            <TouchableOpacity style={styles.modalCloseButton} onPress={closeModal}>
+              <Icon name="close" size={30} color="#fff" />
+            </TouchableOpacity>
+            <Image
+              source={{ uri: selectedMedia }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 };
 
@@ -711,6 +745,22 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '80%',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 1,
   },
 });
 
