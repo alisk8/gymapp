@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -10,9 +10,9 @@ import { firebase_auth } from './firebaseConfig'; // Update this path as necessa
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { WorkoutProvider } from './src/contexts/WorkoutContext';
 
-import Home from './src/screens/Home';
+// Import screens
 import Account from './src/screens/Account';
 import Progress from './src/screens/ProgressLog/Progress';
 import Notifications from './src/screens/Notifications';
@@ -22,7 +22,6 @@ import SaveGymHighlightScreen from "./src/screens/Feed/save-gym-highlight";
 import CustomTabBar from "./src/components/CustomTabBar";
 import FeedPage from "./src/screens/Feed/FeedPage";
 import TemplateScreen from "./src/screens/WorkoutLog/TemplateScreen";
-import { WorkoutProvider } from './src/contexts/WorkoutContext';
 import Communities from './src/screens/Community/CommunityFeed';
 import NewCommunity from './src/screens/new-community';
 import WorkoutSummaryScreen from './src/screens/WorkoutLog/WorkoutSummary';
@@ -38,12 +37,9 @@ import TrackedExercise from './src/screens/TrackedExercise';
 import Saved from './src/screens/Saved';
 import Messages from './src/screens/Messages';
 import UserDMs from './src/screens/UserDMs';
-import ExerciseLogScreen from "./src/screens/ProgressLog/ExerciseLog";
-import TrackingExerciseScreen from "./src/screens/ProgressLog/TrackingExerciseScreen";
 import TemplateRecords from "./src/screens/ProgressLog/TemplateRecords";
 import ProgressTopTabs from "./src/screens/ProgressLog/ProgressTopTabs";
 import EditTemplateScreen from "./src/screens/ProgressLog/EditTemplateScreen";
-import EditTemplateScreenUpdated from "./src/screens/ProgressLog/EditTemplateScreenUpdated";
 import Comments from './src/screens/Feed/Comments';
 
 const Stack = createNativeStackNavigator();
@@ -79,51 +75,6 @@ const screenOptions = ({ navigation, iconType }) => ({
         height: 80,
     },
 });
-
-function HomeStack() {
-    return (
-        <Stack.Navigator initialRouteName='Home'>
-            <Stack.Screen
-                name="Home"
-                component={Home}
-                options={({ navigation }) => ({
-                    ...screenOptions({ navigation }),
-                    title: "Home"
-                })}
-            />
-            <Stack.Screen name='FeedPage' component={FeedPage} options={{ title: 'Feed Page' }} />
-            <Stack.Screen name='Notifications' component={Notifications} />
-            <Stack.Screen name="UserDetails" component={UserDetails} options={{ title: "User Details" }} />
-            <Stack.Screen name="PostDetails" component={PostDetails} />
-            <Stack.Screen
-                name='WorkoutLog'
-                component={WorkoutLogScreen}
-                options={{
-                    headerShown: false,
-                    presentation: 'fullScreenModal',
-                }}
-            />
-            <Stack.Screen
-                name='TemplateScreen'
-                component={TemplateScreen}
-                options={{
-                    headerShown: false,
-                    presentation: 'fullScreenModal',
-                }}
-            />
-            <Stack.Screen
-                name='WorkoutSummaryScreen'
-                component={WorkoutSummaryScreen}
-                options={{
-                    headerShown: false,
-                    presentation: 'fullScreenModal',
-                }}
-            />
-        </Stack.Navigator>
-    );
-}
-
-
 
 function AccountStack() {
     return (
@@ -163,8 +114,6 @@ function AccountStack() {
         </Stack.Navigator>
     );
 }
-
-
 
 function ProgressStack() {
     return (
@@ -350,40 +299,12 @@ function App() {
         );
     }
 
-
-    /**
-
-     <Tab.Screen
-     name='NewProgressStack'
-     component={ExerciseLogStack}
-     options={{
-     headerShown: false,
-     title: 'NewProgress',
-     tabBarIcon: ({ color, size }) => (
-     <Ionicons name="list-outline" color={color} size={size} />
-     )
-     }}
-     />
-
-     **/
-
     return (
         <WorkoutProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
                 <NavigationContainer>
                     {user ? (
                         <Tab.Navigator tabBar={props => <CustomTabBar {...props} />}>
-                            <Tab.Screen
-                                name='HomeStack'
-                                component={HomeStack}
-                                options={{
-                                    headerShown: false,
-                                    title: 'Home',
-                                    tabBarIcon: ({ color, size }) => (
-                                        <Ionicons name="home-outline" color={color} size={size} />
-                                    )
-                                }}
-                            />
                             <Tab.Screen
                                 name='FeedStack'
                                 component={FeedStack}
