@@ -61,40 +61,50 @@ const Feed: React.FC = ({ navigation }) => {
       }, [])
   );
 
-  return (
-      <View>
+  const renderEventsHeader = () => (
       <View>
         <Text style={styles.eventsTitle}>Events</Text>
+        <TouchableOpacity
+            style={styles.createEventButton}
+            onPress={() =>
+                navigation.navigate("CreateEventScreen")
+            }
+        >
+          <Text style={styles.createEventText}>Add a lift</Text>
+        </TouchableOpacity>
         {userEvents.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.eventsContainer}>
               {userEvents.map(event => {
                 const isUserJoined = event.joinedUsers?.includes(firebase_auth.currentUser.uid);
-                return(
-                  <TouchableOpacity key={event.id} onPress={() => navigation.navigate('EventDetailScreen', { eventId: event.id })}>
-                    <View style={styles.eventCard}>
-                      <View style={styles.eventDateContainer}>
-                        <Text style={styles.eventDay}>{new Date(event.date.seconds * 1000).getDate()}</Text>
-                        <Text style={styles.eventMonth}>{new Date(event.date.seconds * 1000).toLocaleString('default', { month: 'short' })}</Text>
+                return (
+                    <TouchableOpacity key={event.id} onPress={() => navigation.navigate('EventDetailScreen', { eventId: event.id })}>
+                      <View style={styles.eventCard}>
+                        <View style={styles.eventDateContainer}>
+                          <Text style={styles.eventDay}>{new Date(event.date.seconds * 1000).getDate()}</Text>
+                          <Text style={styles.eventMonth}>{new Date(event.date.seconds * 1000).toLocaleString('default', { month: 'short' })}</Text>
+                        </View>
+                        <View style={styles.eventDetailContainer}>
+                          <Text style={styles.eventName}>{event.name}</Text>
+                          <Text style={styles.eventDetails}>{event.workoutFocus || ''}</Text>
+                          <Text style={styles.eventDetails}>{`People: ${event.joinedUsers?.length || 0}`}</Text>
+                          <Text style={styles.eventStatus}>
+                            {isUserJoined ? 'Joined' : 'Invited'}
+                          </Text>
+                        </View>
                       </View>
-                      <View style={styles.eventDetailContainer}>
-                        <Text style={styles.eventName}>{event.name}</Text>
-                        <Text style={styles.eventDetails}>{event.workoutFocus || ''}</Text>
-                        <Text style={styles.eventDetails}>{`People: ${event.joinedUsers?.length || 0}`}</Text>
-                        <Text style={styles.eventStatus}>
-                          {isUserJoined ? 'Joined' : 'Invited'}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-              );
+                    </TouchableOpacity>
+                );
               })}
             </ScrollView>
         ) : (
             <Text>No events available.</Text>
         )}
+        <Text style={styles.eventsTitle}>Groups</Text>
       </View>
-       <Text style={styles.eventsTitle}>Groups</Text>
+  );
 
+  return (
+      <View>
         <FlatList
           data={communities}
           keyExtractor={item => item.id}
@@ -112,6 +122,7 @@ const Feed: React.FC = ({ navigation }) => {
               </TouchableOpacity>
           )}
           contentContainerStyle={styles.container}
+          ListHeaderComponent={renderEventsHeader}
       />
       </View>
   );
@@ -167,6 +178,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginVertical: 5,
+    padding: 5,
   },
   eventsContainer: {
     paddingVertical: 2,
@@ -178,13 +190,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'column-reverse',
+    flexDirection: 'row',
   },
   eventDateContainer: {
     backgroundColor: '#f5f5f5',
     borderRadius: 5,
     padding: 5,
     marginTop: 10,
+    marginRight: 5,
     marginBottom: 5,
     alignItems: 'center',
   },
@@ -214,6 +227,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'blue', // You can adjust this color as needed
     fontWeight: 'bold',
+  },
+  createEventButton: {
+    borderRadius: 10,
+    padding: 3,
+    margin: 5,
+  },
+  createEventText: {
+    color: "grey",
+    fontWeight: "bold",
   },
 });
 

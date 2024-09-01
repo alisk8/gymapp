@@ -71,11 +71,14 @@ export default function WorkoutLogScreen({route}) {
 
     const template = route?.params?.template;
     const exercisesRef = useRef(exercises);
+    const previousAttemptsRef = useRef(showPreviousAttempts);
     const typingTimeoutRef = useRef(null);
 
     //autofill
     const [lastFilledWeights, setLastFilledWeights] = useState({});
     const [lastFilledReps, setLastFilledReps] = useState({});
+
+
 
 
     const toggleFailureTracking = () => {
@@ -891,18 +894,23 @@ export default function WorkoutLogScreen({route}) {
         exercisesRef.current = exercises;
     }, [exercises]);
 
+    useEffect(() => {
+        previousAttemptsRef.current = showPreviousAttempts;
+    }, [showPreviousAttempts]);
+
     useFocusEffect(
         React.useCallback(() => {
             let isActive = true;
 
             if (isActive && workoutState && workoutState.exercises.length > 0) {
                 setExercises(workoutState.exercises);
+                setShowPreviousAttempts(workoutState.previousAttempts);
             }
 
             return () => {
                 if (isActive) {
                     // Save workout state to context when screen is unfocused
-                    setWorkoutState({ exercises: exercisesRef.current });
+                    setWorkoutState({ exercises: exercisesRef.current, previousAttempts: previousAttemptsRef.current});
                 }
                 isActive = false;
             };
