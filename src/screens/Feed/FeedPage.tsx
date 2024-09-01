@@ -379,131 +379,139 @@ const FeedPage = ({ navigation }) => {
   };
 
   const formatTotalWorkoutTime = (totalTime) => {
-    const minutes = Math.floor(totalTime / 60);
-    const seconds = totalTime % 60;
+    const minutes = Math.floor(totalTime / 60000); // Convert milliseconds to minutes
+    const seconds = Math.floor((totalTime % 60000) / 1000); // Get remaining seconds
     return `${minutes} mins ${seconds} secs`;
   };
-
   const renderItem = useCallback(({ item }) => {
     if (item.type === 'workout') {
-      const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.setsNum), 0);
-      const elapsedTime = formatTotalWorkoutTime(item.totalWorkoutTime);
+        console.log('Item received:', item); // Debugging statement
 
-      return (
-        <View style={styles.highlightContainer}>
-          <View style={styles.userInfoContainer}>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
-            </TouchableOpacity>
-          </View>
+        // Ensure that totalWorkoutTime is defined
+        if (typeof item.totalWorkoutTime === 'undefined' || item.totalWorkoutTime === null) {
+            console.log('totalWorkoutTime is undefined or null for item:', item.id);
+            return null; // Skip rendering this item if time is not available
+        }
 
-          {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
-          {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+        const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.sets ? exercise.sets.length : 0), 0);
+        const elapsedTime = formatTotalWorkoutTime(item.totalWorkoutTime);
 
-          <View style={styles.metricsContainer}>
-            <Text style={styles.metricText}>{`Total Sets: ${totalSets}`}</Text>
-            <Text style={styles.metricText}>{`Workout Time: ${elapsedTime}`}</Text>
-          </View>
+        return (
+            <View style={styles.highlightContainer}>
+                <View style={styles.userInfoContainer}>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+                    </TouchableOpacity>
+                </View>
 
-          <Text style={styles.exerciseHeader}>Exercises:</Text>
-          <View style={styles.exerciseNamesContainer}>
-            {item.exercises.map((exercise, index) => (
-              <View key={index} style={styles.exerciseItemContainer}>
-                <Text style={styles.exerciseNameText}>{exercise.name}</Text>
-                {exercise.bestSet && (
-                  <Text style={styles.bestSetText}>
-                    {`Best Set: ${exercise.bestSet.weight ?? '-'} ${exercise.bestSet.weightUnit ?? ''} x ${exercise.bestSet.reps ?? '-'} ${exercise.bestSet.repsUnit ?? ''}`}
-                  </Text>
+                {item.workoutDescription && <Text style={styles.descriptionText}>{item.workoutDescription}</Text>}
+                <View style={styles.metricsContainer}>
+                    <Text style={styles.metricText}>{`Total Sets: ${totalSets}`}</Text>
+                    <Text style={styles.metricText}>{`Workout Time: ${elapsedTime}`}</Text>
+                </View>
+                <Text style={styles.exerciseHeader}>{item.title}</Text>
+                {item.exercises && item.exercises.length > 0 ? (
+                    <View style={styles.exerciseNamesContainer}>
+                        {item.exercises.map((exercise, index) => (
+                            <View key={index} style={styles.exerciseItemContainer}>
+                                <Text style={styles.exerciseNameText}>{exercise.name}</Text>
+                                {exercise.sets && exercise.sets.length > 0 ? (
+                                    exercise.sets.map((set, setIndex) => (
+                                        <Text key={set.key} style={styles.bestSetText}>
+                                            {`Set ${setIndex + 1}: ${set.weight} ${exercise.weightUnit} x ${exercise.repsUnit === 'time' ? `${Math.floor(set.time / 60000)} mins ${Math.floor((set.time % 60000) / 1000)} secs` : `${set.reps} ${exercise.repsUnit}`}`}
+                                        </Text>
+                                    ))
+                                ) : (
+                                    <Text style={styles.bestSetText}>No sets available</Text>
+                                )}
+                                {exercise.isSuperset && exercise.supersetExercise && (
+                                    <Text style={styles.supersetText}>
+                                        {`Superset with: ${exercise.supersetExercise}`}
+                                    </Text>
+                                )}
+                            </View>
+                        ))}
+                    </View>
+                ) : (
+                    <Text style={styles.bestSetText}>No exercises available</Text>
                 )}
-                {!exercise.bestSet && (
-                  <Text style={styles.bestSetText}>Best Set: Not available</Text>
+                {item.mediaUrls && item.mediaUrls.length > 0 && (
+                    <View style={styles.imageContainer}>
+                        <Swiper style={styles.swiper} showsPagination={true}>
+                            {item.mediaUrls.map((mediaUrl, index) => (
+                                <Image
+                                    key={`${item.id}_${index}`}
+                                    source={{ uri: mediaUrl }}
+                                    style={styles.postImage}
+                                />
+                            ))}
+                        </Swiper>
+                    </View>
                 )}
-              </View>
-            ))}
-          </View>
-          {item.mediaUrls && item.mediaUrls.length > 0 && (
-            <View style={styles.imageContainer}>
-              <Swiper style={styles.swiper} showsPagination={true}>
-                {item.mediaUrls.map((mediaUrl, index) => (
-                  <Image
-                    key={`${item.id}_${index}`}
-                    source={{ uri: mediaUrl }}
-                    style={styles.postImage}
-                  />
-                ))}
-              </Swiper>
+
+                {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+                <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, true) : handleLike(item.id, item.userId, true)}>
+                        <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.likes}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, true)}>
+                        <Icon name="chatbubble-outline" size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.commentCount}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, true) : handleSave(item.id, item.userId, true)}>
+                        <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.savedBy}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-          )}
-
-          {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, true) : handleLike(item.id, item.userId, true)}>
-              <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.likes}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, true)}>
-              <Icon name="chatbubble-outline" size={25} color="#000" />
-              <Text style={styles.actionText}>{item.commentCount}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
-              <Icon name="share-outline" size={25} color="#000" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, true) : handleSave(item.id, item.userId, true)}>
-              <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.savedBy}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )
+        )
     } else {
-      return (
-        <View style={styles.highlightContainer}>
-          <View style={styles.userInfoContainer}>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
-            </TouchableOpacity>
-          </View>
-          {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
-          {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
-          {item.mediaUrls && item.mediaUrls.length > 0 && (
-            <View style={styles.imageContainer}>
-              <Swiper style={styles.swiper} showsPagination={true}>
-                {item.mediaUrls.map((mediaUrl, index) => (
-                  <Image
-                    key={`${item.id}_${index}`}
-                    source={{ uri: mediaUrl }}
-                    style={styles.postImage}
-                  />
-                ))}
-              </Swiper>
+        return (
+            <View style={styles.highlightContainer}>
+                <View style={styles.userInfoContainer}>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+                    </TouchableOpacity>
+                </View>
+                {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
+                {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+                {item.mediaUrls && item.mediaUrls.length > 0 && (
+                    <View style={styles.imageContainer}>
+                        <Swiper style={styles.swiper} showsPagination={true}>
+                            {item.mediaUrls.map((mediaUrl, index) => (
+                                <Image
+                                    key={`${item.id}_${index}`}
+                                    source={{ uri: mediaUrl }}
+                                    style={styles.postImage}
+                                />
+                            ))}
+                        </Swiper>
+                    </View>
+                )}
+                {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+                <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, false) : handleLike(item.id, item.userId, false)}>
+                        <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.likes}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, false)}>
+                        <Icon name="chatbubble-outline" size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.commentCount}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, false) : handleSave(item.id, item.userId, false)}>
+                        <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.savedBy}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-          )}
-          {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, false) : handleLike(item.id, item.userId, false)}>
-              <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.likes}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, false)}>
-              <Icon name="chatbubble-outline" size={25} color="#000" />
-              <Text style={styles.actionText}>{item.commentCount}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
-              <Icon name="share-outline" size={25} color="#000" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, false) : handleSave(item.id, item.userId, false)}>
-              <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.savedBy}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
+        );
     }
   }, []);
 
@@ -666,6 +674,11 @@ const styles = StyleSheet.create({
   bestSetText: {
     fontSize: 14,
     color: '#555',
+    marginTop: 2,
+  },
+  supersetText: {
+    fontSize: 14,
+    color: '#888',
     marginTop: 2,
   },
   imageContainer: {

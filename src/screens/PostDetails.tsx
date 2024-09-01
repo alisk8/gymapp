@@ -1,61 +1,195 @@
-import React, { useRef, useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  Alert,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import Swiper from "react-native-swiper";
-import { firebase_auth, db } from "../../firebaseConfig";
-import {
-  doc,
-  updateDoc,
-  getDoc,
-  arrayUnion,
-  arrayRemove,
-} from "firebase/firestore";
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { db, firebase_auth } from '../../firebaseConfig';
+import { collection, getDocs, query, orderBy, limit, startAfter, doc, getDoc, updateDoc, arrayUnion, arrayRemove } from '@firebase/firestore';
+import { InteractionManager } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
+import Swiper from 'react-native-swiper';
+import { useFocusEffect } from "@react-navigation/native";
 
-const PostDetails = ({ route }) => {
-  const { posts, postIndex, userId } = route.params;
-  const scrollViewRef = useRef(null);
-  const postHeight = 400; // Adjust this value to the height of each post container
-  const [expandedPosts, setExpandedPosts] = useState({});
-  const [localPosts, setLocalPosts] = useState([]);
+const defaultProfilePicture = 'https://firebasestorage.googleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2Fpfp.jpeg?alt=media&token=dd124ee9-6c61-48ad-b41c-97f3acc3350c';
+
+interface LastVisible {
+  highlight?: any;
+  workout?: any;
+}
+
+const PostDetails = ({ navigation, route }) => {
+  const [highlights, setHighlights] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const [lastVisible, setLastVisible] = useState<{ [key: string]: LastVisible }>({});
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadedHighlightIds, setLoadedHighlightIds] = useState(new Set());
+  const [refreshing, setRefreshing] = useState(false);
+
+  const { posts, postIndex, userId } = route.params; // Get the params passed to this screen
 
   useEffect(() => {
-    const currentUser = firebase_auth.currentUser;
-    if (!currentUser) {
-      console.error("User not authenticated");
-      return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchUserProfile();
+    });
+    return () => task.cancel();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (userProfile) {
+        fetchHighlights(true);  // Refresh posts when the page gains focus
+      }
+    }, [userProfile])
+  );
+
+  const fetchUserProfile = async () => {
+    try {
+      const userRef = doc(db, 'userProfiles', userId);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        setUserProfile(userDoc.data());
+        fetchHighlights(true);  // Fetch posts after userProfile is successfully fetched
+      } else {
+        setError('User profile not found');
+      }
+    } catch (error) {
+      console.error('Error fetching user profile: ', error);
+      setError('Failed to load user profile');
+    }
+  };
+
+  const fetchHighlights = async (isRefresh = false) => {
+    if (!userProfile) {
+      return; // Exit if userProfile is null
     }
 
-    const userUid = currentUser.uid;
-    const updatedPosts = posts.map((post) => ({
-      ...post,
-      liked: post.likes ? post.likes.includes(userUid) : false,
-      saved: post.savedBy ? post.savedBy.includes(userUid) : false,
-    }));
-    setLocalPosts(updatedPosts);
-  }, [posts]);
+    if (isRefresh) {
+      setRefreshing(true);
+      setLastVisible({});
+      setLoadedHighlightIds(new Set());
+    }
 
-  useEffect(() => {
-    setTimeout(() => {
-      if (scrollViewRef.current) {
-        scrollViewRef.current.scrollTo({
-          y: postIndex * (postHeight + 100),
-          animated: true,
-        });
+    if (loadingMore && !isRefresh) return;
+
+    setLoadingMore(true);
+
+    try {
+      let allHighlights = [];
+      let newLastVisible = { ...lastVisible };
+
+      let highlightsQuery = query(
+        collection(db, 'userProfiles', userId, 'highlights'),
+        orderBy('timestamp', 'desc'),
+        limit(10)
+      );
+
+      let workoutsQuery = query(
+        collection(db, 'userProfiles', userId, 'workouts'),
+        orderBy('createdAt', 'desc'),
+        limit(10)
+      );
+
+      if (lastVisible[userId]?.highlight && !isRefresh) {
+        highlightsQuery = query(highlightsQuery, startAfter(lastVisible[userId]?.highlight));
       }
-    }, 100);
-  }, [postIndex]);
+      if (lastVisible[userId]?.workout && !isRefresh) {
+        workoutsQuery = query(workoutsQuery, startAfter(lastVisible[userId]?.workout));
+      }
 
-  const handleLike = async (postId, collection, index) => {
-    const postRef = doc(db, "userProfiles", userId, collection, postId);
+      const [highlightsSnapshot, workoutsSnapshot] = await Promise.all([
+        getDocs(highlightsQuery),
+        getDocs(workoutsQuery)
+      ]);
+
+      if (highlightsSnapshot.docs.length > 0) {
+        newLastVisible[userId] = {
+          ...newLastVisible[userId],
+          highlight: highlightsSnapshot.docs[highlightsSnapshot.docs.length - 1]
+        };
+
+        for (const doc of highlightsSnapshot.docs) {
+          const highlightData = doc.data();
+          const commentCount = await fetchCommentCount(userId, doc.id, 'highlights');
+
+          if (!loadedHighlightIds.has(doc.id)) {
+            allHighlights.push({
+              id: doc.id,
+              ...highlightData,
+              userId,
+              firstName: userProfile.firstName,
+              lastName: userProfile.lastName,
+              profilePicture: userProfile.profilePicture || defaultProfilePicture,
+              timestamp: highlightData.timestamp ? highlightData.timestamp.toDate() : null,
+              liked: highlightData.likes ? highlightData.likes.includes(firebase_auth.currentUser.uid) : false,
+              saved: highlightData.savedBy ? highlightData.savedBy.includes(firebase_auth.currentUser.uid) : false,
+              likes: highlightData.likes ? highlightData.likes.length : 0,
+              savedBy: highlightData.savedBy ? highlightData.savedBy.length : 0,
+              commentCount,
+            });
+            setLoadedHighlightIds(prevIds => new Set(prevIds).add(doc.id));
+          }
+        }
+      }
+
+      if (workoutsSnapshot.docs.length > 0) {
+        newLastVisible[userId] = {
+          ...newLastVisible[userId],
+          workout: workoutsSnapshot.docs[workoutsSnapshot.docs.length - 1]
+        };
+
+        for (const doc of workoutsSnapshot.docs) {
+          const workoutData = doc.data();
+          const commentCount = await fetchCommentCount(userId, doc.id, 'workouts');
+
+          if (!loadedHighlightIds.has(doc.id)) {
+            allHighlights.push({
+              id: doc.id,
+              ...workoutData,
+              type: 'workout',
+              userId,
+              firstName: userProfile.firstName,
+              lastName: userProfile.lastName,
+              profilePicture: userProfile.profilePicture || defaultProfilePicture,
+              timestamp: workoutData.createdAt ? workoutData.createdAt.toDate() : null,
+              liked: workoutData.likes ? workoutData.likes.includes(firebase_auth.currentUser.uid) : false,
+              saved: workoutData.savedBy ? workoutData.savedBy.includes(firebase_auth.currentUser.uid) : false,
+              likes: workoutData.likes ? workoutData.likes.length : 0,
+              savedBy: workoutData.savedBy ? workoutData.savedBy.length : 0,
+              commentCount,
+            });
+            setLoadedHighlightIds(prevIds => new Set(prevIds).add(doc.id));
+          }
+        }
+      }
+
+      allHighlights.sort((a, b) => b.timestamp - a.timestamp);
+      setHighlights(isRefresh ? allHighlights : [...highlights, ...allHighlights]);
+      setLastVisible(newLastVisible);
+      setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
+    } catch (error) {
+      console.error('Error fetching highlights: ', error);
+      setError('Failed to load highlights');
+      setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
+    }
+  };
+
+  const fetchCommentCount = async (userId, postId, collectionName) => {
+    try {
+      const commentsRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments');
+      const commentsSnapshot = await getDocs(commentsRef);
+      return commentsSnapshot.size;
+    } catch (error) {
+      console.error('Error fetching comment count: ', error);
+      return 0;
+    }
+  };
+
+  const handleLike = async (postId, userId, isWorkout) => {
+    const collectionName = isWorkout ? 'workouts' : 'highlights';
+    const postRef = doc(db, 'userProfiles', userId, collectionName, postId);
     const currentUser = firebase_auth.currentUser;
 
     if (!currentUser) {
@@ -72,15 +206,9 @@ const PostDetails = ({ route }) => {
           likes: arrayUnion(userUid),
         });
 
-        setLocalPosts((prevPosts) => {
-          const updatedPosts = [...prevPosts];
-          updatedPosts[index] = {
-            ...updatedPosts[index],
-            likes: [...(updatedPosts[index].likes || []), userUid],
-            liked: true,
-          };
-          return updatedPosts;
-        });
+        setHighlights(prevHighlights => prevHighlights.map(post =>
+          post.id === postId ? { ...post, liked: true, likes: post.likes + 1 } : post
+        ));
       } else {
         console.error("Post does not exist");
       }
@@ -89,8 +217,9 @@ const PostDetails = ({ route }) => {
     }
   };
 
-  const handleUnlike = async (postId, collection, index) => {
-    const postRef = doc(db, "userProfiles", userId, collection, postId);
+  const handleUnlike = async (postId, userId, isWorkout) => {
+    const collectionName = isWorkout ? 'workouts' : 'highlights';
+    const postRef = doc(db, 'userProfiles', userId, collectionName, postId);
     const currentUser = firebase_auth.currentUser;
 
     if (!currentUser) {
@@ -107,34 +236,29 @@ const PostDetails = ({ route }) => {
           likes: arrayRemove(userUid),
         });
 
-        setLocalPosts((prevPosts) => {
-          const updatedPosts = [...prevPosts];
-          updatedPosts[index] = {
-            ...updatedPosts[index],
-            likes: updatedPosts[index].likes.filter((uid) => uid !== userUid),
-            liked: false,
-          };
-          return updatedPosts;
-        });
+        setHighlights(prevHighlights => prevHighlights.map(post =>
+          post.id === postId ? { ...post, liked: false, likes: post.likes - 1 } : post
+        ));
       } else {
         console.error("Post does not exist");
       }
     } catch (error) {
       console.error("Error unliking post: ", error);
-      Alert.alert("Error", "Error unliking post. Please try again.");
     }
   };
 
-  const handleSave = async (postId, collection, index) => {
+  const handleSave = async (postId, userId, isWorkout) => {
+    const collectionName = isWorkout ? 'workouts' : 'highlights';
+    const postRef = doc(db, 'userProfiles', userId, collectionName, postId);
     const currentUser = firebase_auth.currentUser;
+    const userRef = doc(db, 'userProfiles', currentUser.uid);
+
     if (!currentUser) {
       console.error("User not authenticated");
       return;
     }
 
     const userUid = currentUser.uid;
-    const postRef = doc(db, "userProfiles", userId, collection, postId);
-    const userRef = doc(db, "userProfiles", userUid);
 
     try {
       const postDoc = await getDoc(postRef);
@@ -144,37 +268,32 @@ const PostDetails = ({ route }) => {
         });
 
         await updateDoc(userRef, {
-          savedPosts: arrayUnion({ collection, postId, userId }),
+          savedPosts: arrayUnion({ collection: collectionName, postId, userId }),
         });
 
-        setLocalPosts((prevPosts) => {
-          const updatedPosts = [...prevPosts];
-          updatedPosts[index] = {
-            ...updatedPosts[index],
-            savedBy: [...(updatedPosts[index].savedBy || []), userUid],
-            saved: true,
-          };
-          return updatedPosts;
-        });
+        setHighlights(prevHighlights => prevHighlights.map(post =>
+          post.id === postId ? { ...post, saved: true, savedBy: post.savedBy + 1 } : post
+        ));
       } else {
         console.error("Post does not exist");
       }
     } catch (error) {
       console.error("Error saving post: ", error);
-      Alert.alert("Error", "Error saving post. Please try again.");
     }
   };
 
-  const handleUnsave = async (postId, collection, index) => {
+  const handleUnsave = async (postId, userId, isWorkout) => {
+    const collectionName = isWorkout ? 'workouts' : 'highlights';
+    const postRef = doc(db, 'userProfiles', userId, collectionName, postId);
     const currentUser = firebase_auth.currentUser;
+    const userRef = doc(db, 'userProfiles', currentUser.uid);
+
     if (!currentUser) {
       console.error("User not authenticated");
       return;
     }
 
     const userUid = currentUser.uid;
-    const postRef = doc(db, "userProfiles", userId, collection, postId);
-    const userRef = doc(db, "userProfiles", userUid);
 
     try {
       const postDoc = await getDoc(postRef);
@@ -184,354 +303,325 @@ const PostDetails = ({ route }) => {
         });
 
         await updateDoc(userRef, {
-          savedPosts: arrayRemove({ collection, postId, userId }),
+          savedPosts: arrayRemove({ collection: collectionName, postId, userId }),
         });
 
-        setLocalPosts((prevPosts) => {
-          const updatedPosts = [...prevPosts];
-          updatedPosts[index] = {
-            ...updatedPosts[index],
-            savedBy: updatedPosts[index].savedBy.filter(
-              (uid) => uid !== userUid
-            ),
-            saved: false,
-          };
-          return updatedPosts;
-        });
+        setHighlights(prevHighlights => prevHighlights.map(post =>
+          post.id === postId ? { ...post, saved: false, savedBy: post.savedBy - 1 } : post
+        ));
       } else {
         console.error("Post does not exist");
       }
     } catch (error) {
       console.error("Error unsaving post: ", error);
-      Alert.alert("Error", "Error unsaving post. Please try again.");
     }
   };
 
-  const getSetsAndSupersetsInfo = (exercises) => {
-    return exercises
-      .map((exercise) => {
-        if (exercise.repsConfig === "reps") {
-          const setsCount = exercise.sets.length;
-          const supersetsCount = exercise.supersets
-            ? exercise.supersets.reduce(
-                (acc, superset) => acc + superset.sets.length,
-                0
-              )
-            : 0;
-          return {
-            name: exercise.name,
-            setsCount,
-            supersetsCount,
-            dropSetsCount: exercise.sets[0]?.dropSetsCount || 0,
-            weightConfig: exercise.weightConfig,
-            supersets: exercise.supersets
-              ? exercise.supersets.map((superset) => ({
-                  name: superset.name,
-                  setsCount: superset.sets.length,
-                  weightConfig: superset.weightConfig,
-                }))
-              : [],
-          };
-        }
-        return null;
-      })
-      .filter((info) => info !== null);
+  const handleComment = (postId, userId, isWorkout) => {
+    navigation.navigate('Comments', { postId, userId, isWorkout });
   };
 
-  const toggleExpandPost = (index) => {
-    setExpandedPosts((prevState) => ({
-      ...prevState,
-      [index]: !prevState[index],
-    }));
+  const formatTotalWorkoutTime = (totalTime) => {
+    const minutes = Math.floor(totalTime / 60000); // Convert milliseconds to minutes
+    const seconds = Math.floor((totalTime % 60000) / 1000); // Get remaining seconds
+    return `${minutes} mins ${seconds} secs`;
   };
+
+  const renderItem = useCallback(({ item }) => {
+    if (item.type === 'workout') {
+        console.log('Item received:', item); // Debugging statement
+
+        // Ensure that totalWorkoutTime is defined
+        if (typeof item.totalWorkoutTime === 'undefined' || item.totalWorkoutTime === null) {
+            console.log('totalWorkoutTime is undefined or null for item:', item.id);
+            return null; // Skip rendering this item if time is not available
+        }
+
+        const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.sets ? exercise.sets.length : 0), 0);
+        const elapsedTime = formatTotalWorkoutTime(item.totalWorkoutTime);
+
+        return (
+            <View style={styles.highlightContainer}>
+                <View style={styles.userInfoContainer}>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {item.workoutDescription && <Text style={styles.descriptionText}>{item.workoutDescription}</Text>}
+                <View style={styles.metricsContainer}>
+                    <Text style={styles.metricText}>{`Total Sets: ${totalSets}`}</Text>
+                    <Text style={styles.metricText}>{`Workout Time: ${elapsedTime}`}</Text>
+                </View>
+                <Text style={styles.exerciseHeader}>{item.title}</Text>
+                {item.exercises && item.exercises.length > 0 ? (
+                    <View style={styles.exerciseNamesContainer}>
+                        {item.exercises.map((exercise, index) => (
+                            <View key={index} style={styles.exerciseItemContainer}>
+                                <Text style={styles.exerciseNameText}>{exercise.name}</Text>
+                                {exercise.sets && exercise.sets.length > 0 ? (
+                                    exercise.sets.map((set, setIndex) => (
+                                        <Text key={set.key} style={styles.bestSetText}>
+                                            {`Set ${setIndex + 1}: ${set.weight} ${exercise.weightUnit} x ${exercise.repsUnit === 'time' ? `${Math.floor(set.time / 60000)} mins ${Math.floor((set.time % 60000) / 1000)} secs` : `${set.reps} ${exercise.repsUnit}`}`}
+                                        </Text>
+                                    ))
+                                ) : (
+                                    <Text style={styles.bestSetText}>No sets available</Text>
+                                )}
+                                {exercise.isSuperset && exercise.supersetExercise && (
+                                    <Text style={styles.supersetText}>
+                                        {`Superset with: ${exercise.supersetExercise}`}
+                                    </Text>
+                                )}
+                            </View>
+                        ))}
+                    </View>
+                ) : (
+                    <Text style={styles.bestSetText}>No exercises available</Text>
+                )}
+                {item.mediaUrls && item.mediaUrls.length > 0 && (
+                    <View style={styles.imageContainer}>
+                        <Swiper style={styles.swiper} showsPagination={true}>
+                            {item.mediaUrls.map((mediaUrl, index) => (
+                                <Image
+                                    key={`${item.id}_${index}`}
+                                    source={{ uri: mediaUrl }}
+                                    style={styles.postImage}
+                                />
+                            ))}
+                        </Swiper>
+                    </View>
+                )}
+
+                {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+                <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, true) : handleLike(item.id, item.userId, true)}>
+                        <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.likes}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, true)}>
+                        <Icon name="chatbubble-outline" size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.commentCount}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, true) : handleSave(item.id, item.userId, true)}>
+                        <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.savedBy}</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        )
+    } else {
+        return (
+            <View style={styles.highlightContainer}>
+                <View style={styles.userInfoContainer}>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+                    </TouchableOpacity>
+                </View>
+                {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
+                {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+                {item.mediaUrls && item.mediaUrls.length > 0 && (
+                    <View style={styles.imageContainer}>
+                        <Swiper style={styles.swiper} showsPagination={true}>
+                            {item.mediaUrls.map((mediaUrl, index) => (
+                                <Image
+                                    key={`${item.id}_${index}`}
+                                    source={{ uri: mediaUrl }}
+                                    style={styles.postImage}
+                                />
+                            ))}
+                        </Swiper>
+                    </View>
+                )}
+                {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+                <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, false) : handleLike(item.id, item.userId, false)}>
+                        <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.likes}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, false)}>
+                        <Icon name="chatbubble-outline" size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.commentCount}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, false) : handleSave(item.id, item.userId, false)}>
+                        <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.savedBy}</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container} ref={scrollViewRef}>
-      {localPosts &&
-        localPosts.map((post, index) => (
-          <View key={index} style={styles.postContainer}>
-            <View style={styles.imageContainer}>
-              <Swiper style={styles.swiper}>
-                {post.mediaUrls ? (
-                  post.mediaUrls.map((url, i) => (
-                    <Image
-                      key={i}
-                      source={{ uri: url }}
-                      style={styles.postImage}
-                    />
-                  ))
-                ) : (
-                  <Image
-                    source={{
-                      uri: "https://cdn.pixabay.com/photo/2018/05/28/13/14/dumbell-3435990_1280.jpg",
-                    }}
-                    style={styles.postImage}
-                  />
-                )}
-              </Swiper>
-              {post.type === "workout" && (
-                <View style={styles.overlay}>
-                  <Text style={styles.workoutTitle}>{post.templateName}</Text>
-                </View>
-              )}
-            </View>
-            <View
-              style={[
-                styles.contentContainer,
-                !expandedPosts[index] && styles.blurredContent,
-              ]}
-            >
-              <View style={styles.postActions}>
-                <TouchableOpacity
-                  onPress={async () => {
-                    try {
-                      post.liked
-                        ? await handleUnlike(post.id, post.collection, index)
-                        : await handleLike(post.id, post.collection, index);
-                    } catch (error) {
-                      console.error("Error handling like/unlike: ", error);
-                    }
-                  }}
-                >
-                  <Ionicons
-                    name={post.liked ? "heart" : "heart-outline"}
-                    size={24}
-                    color="black"
-                  />
-                  <Text style={styles.likesDisplayed}>
-                    {post.likes ? post.likes.length : 0} likes
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={async () => {
-                    try {
-                      post.saved
-                        ? await handleUnsave(post.id, post.collection, index)
-                        : await handleSave(post.id, post.collection, index);
-                    } catch (error) {
-                      console.error("Error handling save/unsave: ", error);
-                    }
-                  }}
-                  style={styles.savedDisplayed}
-                >
-                  <Ionicons
-                    name={post.saved ? "bookmark" : "bookmark-outline"}
-                    size={24}
-                    color="black"
-                  />
-                  <Text>{post.savedBy ? post.savedBy.length : 0} saved</Text>
-                </TouchableOpacity>
-              </View>
-              {post.exercises &&
-                getSetsAndSupersetsInfo(post.exercises).map(
-                  (exerciseInfo, idx) => (
-                    <View key={idx} style={styles.exerciseContainer}>
-                      <Text style={styles.exerciseName}>
-                        {exerciseInfo.name}
-                      </Text>
-                      <Text style={styles.exerciseDetail}>
-                        Sets: {exerciseInfo.setsCount}
-                      </Text>
-                      <Text style={styles.exerciseDetail}>
-                        Supersets: {exerciseInfo.supersetsCount}
-                      </Text>
-                      <Text style={styles.exerciseDetail}>
-                        Drop Sets: {exerciseInfo.dropSetsCount}
-                      </Text>
-                      <Text style={styles.exerciseDetail}>
-                        Weight Config: {exerciseInfo.weightConfig}
-                      </Text>
-                      {exerciseInfo.supersets.map((superset, i) => (
-                        <View key={i} style={styles.supersetContainer}>
-                          <Text style={styles.supersetName}>
-                            Superset: {superset.name}
-                          </Text>
-                          <Text style={styles.supersetDetail}>
-                            Sets: {superset.setsCount}
-                          </Text>
-                          <Text style={styles.supersetDetail}>
-                            Weight Config: {superset.weightConfig}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  )
-                )}
-              <View style={styles.commentSection}>
-                <Text style={styles.commentTitle}>Comments</Text>
-                <View style={styles.commentsContainer}>
-                  {/* Example of existing comments */}
-                  <View style={styles.comment}>
-                    <Text style={styles.commentAuthor}>User1</Text>
-                    <Text style={styles.commentText}>Great workout!</Text>
-                  </View>
-                  <View style={styles.comment}>
-                    <Text style={styles.commentAuthor}>User2</Text>
-                    <Text style={styles.commentText}>Keep it up!</Text>
-                  </View>
-                </View>
-                <View style={styles.commentInputContainer}>
-                  <TextInput
-                    style={styles.commentInput}
-                    placeholder="Add a comment..."
-                  />
-                  <TouchableOpacity style={styles.commentButton}>
-                    <Text style={styles.commentButtonText}>Post</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-            {!expandedPosts[index] && (
-              <TouchableOpacity
-                style={styles.seeMoreButton}
-                onPress={() => toggleExpandPost(index)}
-              >
-                <Text style={styles.seeMoreText}>See More</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ))}
-    </ScrollView>
+    <FlatList
+      data={highlights}
+      keyExtractor={item => item.id}
+      renderItem={renderItem}
+      onEndReached={() => {
+        if (!loadingMore) {
+          fetchHighlights();
+        }
+      }}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => fetchHighlights(true)} />
+      }
+    />
   );
 };
 
-export default PostDetails;
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    padding: 10,
+  profilePicture: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
   },
-  postContainer: {
-    marginBottom: 20,
-    overflow: "hidden",
-  },
-  imageContainer: {
-    position: "relative",
-  },
-  postImage: {
-    width: "100%",
-    height: 300,
-    borderRadius: 10,
+  userNameText: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   swiper: {
     height: 300,
   },
-  overlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 10,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#ccc',
   },
-  workoutTitle: {
-    fontSize: 50,
-    fontWeight: "bold",
-    color: "#fff",
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
   },
-  postActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginVertical: 10,
+  actionText: {
+    marginLeft: 5,
+    fontSize: 14,
+    color: '#000',
   },
-  exerciseContainer: {
-    marginVertical: 5,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  exerciseName: {
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: 'black',
     fontSize: 16,
-    fontWeight: "bold",
   },
-  exerciseDetail: {
-    fontSize: 14,
+  exerciseNamesContainer: {
+    paddingHorizontal: 10,
+    marginBottom: 10,
   },
-  supersetContainer: {
-    marginVertical: 5,
-    marginLeft: 10,
+  highlightContainer: {
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 2,
   },
-  supersetName: {
-    fontSize: 14,
-    fontWeight: "bold",
+  userInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  supersetDetail: {
-    fontSize: 12,
-  },
-  commentSection: {
-    marginTop: 20,
-  },
-  commentTitle: {
+  captionText: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: 'bold',
+    marginVertical: 5,
+    color: '#333',
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 10,
   },
-  commentsContainer: {
+  metricsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 10,
   },
-  comment: {
-    flexDirection: "row",
+  metricText: {
+    fontSize: 14,
+    color: '#007bff',
+    fontWeight: '600',
+  },
+  exerciseHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#333',
+  },
+  exerciseItemContainer: {
+    backgroundColor: '#f8f8f8',
+    padding: 10,
+    borderRadius: 5,
     marginBottom: 5,
   },
-  commentAuthor: {
-    fontWeight: "bold",
-    marginRight: 5,
+  exerciseNameText: {
+    fontSize: 16,
+    color: '#007bff',
+    fontWeight: 'bold',
+    marginBottom: 3,
   },
-  commentText: {
-    color: "#555",
+  bestSetText: {
+    fontSize: 14,
+    color: '#555',
+    marginTop: 2,
   },
-  commentInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+  supersetText: {
+    fontSize: 14,
+    color: '#888',
+    marginTop: 2,
   },
-  commentInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 5,
-    padding: 10,
-    marginRight: 10,
+  imageContainer: {
+    marginTop: 10,
   },
-  commentButton: {
-    backgroundColor: "#1e90ff",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
+  postImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 10,
   },
-  commentButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  likesDisplayed: {
-    marginLeft: 3,
-  },
-  savedDisplayed: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-end",
-    justifyContent: "flex-end",
-  },
-  contentContainer: {
-    paddingBottom: 10,
-  },
-  blurredContent: {
-    maxHeight: 150,
-    overflow: "hidden",
-    position: "relative",
-  },
-  seeMoreButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    padding: 10,
-    alignItems: "center",
-  },
-  seeMoreText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  expanded: {
-    maxHeight: "100%",
-  },
-  collapsed: {
-    maxHeight: 150,
+  timestampText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 10,
+    alignSelf: 'flex-end',
   },
 });
+
+export default PostDetails;
