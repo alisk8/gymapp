@@ -288,11 +288,11 @@ const Comments = ({ route, navigation }) => {
           </View>
         </View>
         <View style={styles.commentActions}>
-          <TouchableOpacity onPress={() => liked ? handleUnlikeComment(comment.id) : handleLikeComment(comment.id)}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => liked ? handleUnlikeComment(comment.id) : handleLikeComment(comment.id)}>
             <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color="#000" />
             <Text style={styles.likeCount}>{comment.likes.length}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setReplyingTo(comment)}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setReplyingTo(comment)}>
             <Icon name="chatbubble-outline" size={20} color="#000" />
           </TouchableOpacity>
         </View>
@@ -392,6 +392,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 5,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 15,  // Adds space between the like and reply buttons
   },
   likeCount: {
     fontSize: 12,
