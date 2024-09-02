@@ -411,6 +411,19 @@ const FeedPage = ({ navigation }) => {
         const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.sets ? exercise.sets.length : 0), 0);
         const elapsedTime = formatTotalWorkoutTime(item.totalWorkoutTime);
 
+        const getBestSet = (sets) => {
+            if (!sets || sets.length === 0) return null;
+
+            return sets.reduce((bestSet, currentSet) => {
+                if (currentSet.weight > bestSet.weight) {
+                    return currentSet;
+                } else if (currentSet.weight === bestSet.weight && currentSet.reps > bestSet.reps) {
+                    return currentSet;
+                }
+                return bestSet;
+            });
+        };
+
         return (
             <View style={styles.highlightContainer}>
                 <View style={styles.userInfoContainer}>
@@ -430,25 +443,34 @@ const FeedPage = ({ navigation }) => {
                 <Text style={styles.exerciseHeader}>{item.title}</Text>
                 {item.exercises && item.exercises.length > 0 ? (
                     <View style={styles.exerciseNamesContainer}>
-                        {item.exercises.map((exercise, index) => (
-                            <View key={index} style={styles.exerciseItemContainer}>
-                                <Text style={styles.exerciseNameText}>{exercise.name}</Text>
-                                {exercise.sets && exercise.sets.length > 0 ? (
-                                    exercise.sets.map((set, setIndex) => (
-                                        <Text key={set.key} style={styles.bestSetText}>
-                                            {`Set ${setIndex + 1}: ${set.weight} ${exercise.weightUnit} x ${exercise.repsUnit === 'time' ? `${Math.floor(set.time / 60000)} mins ${Math.floor((set.time % 60000) / 1000)} secs` : `${set.reps} ${exercise.repsUnit}`}`}
-                                        </Text>
-                                    ))
-                                ) : (
-                                    <Text style={styles.bestSetText}>No sets available</Text>
-                                )}
-                                {exercise.isSuperset && exercise.supersetExercise && (
-                                    <Text style={styles.supersetText}>
-                                        {`Superset with: ${exercise.supersetExercise}`}
+                        {item.exercises.map((exercise, index) => {
+                            const bestSet = getBestSet(exercise.sets);
+                            if (!bestSet) {
+                                return (
+                                    <Text key={index} style={styles.bestSetText}>
+                                        No sets available
                                     </Text>
-                                )}
-                            </View>
-                        ))}
+                                );
+                            }
+
+                            return (
+                                <View key={index} style={styles.exerciseItemContainer}>
+                                    <Text style={styles.exerciseNameText}>{exercise.name}</Text>
+                                    <Text style={styles.bestSetText}>
+                                        {`Total Sets: ${exercise.sets.length}`}
+                                    </Text>
+                                    <Text style={styles.bestSetText}>
+                                        {`Best Set: ${bestSet.weight} ${exercise.weightUnit} x ${exercise.repsUnit === 'time' ? `${Math.floor(bestSet.reps / 60000)} mins ${Math.floor((bestSet.reps % 60000) / 1000)} secs` : `${bestSet.reps} ${exercise.repsUnit}`}`}
+                                    </Text>
+                                    
+                                    {exercise.isSuperset && exercise.supersetExercise && (
+                                        <Text style={styles.supersetText}>
+                                            {`Superset with: ${exercise.supersetExercise}`}
+                                        </Text>
+                                    )}
+                                </View>
+                            );
+                        })}
                     </View>
                 ) : (
                     <Text style={styles.bestSetText}>No exercises available</Text>
@@ -530,7 +552,7 @@ const FeedPage = ({ navigation }) => {
             </View>
         );
     }
-  }, []);
+}, []);
 
   if (loading) {
     return (
@@ -709,6 +731,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#555',
     marginTop: 2,
+    fontWeight: 'bold',
   },
   supersetText: {
     fontSize: 14,
