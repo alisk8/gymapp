@@ -276,10 +276,10 @@ const Comments = ({ route, navigation }) => {
     return comment;
   };
 
-  const renderComment = (comment: Comment, level = 0) => {
+  const renderComment = (comment: Comment) => {
     const liked = comment.likes.includes(firebase_auth.currentUser.uid);
     return (
-      <View key={comment.id} style={[styles.commentContainer, { marginLeft: level * 20 }]}>
+      <View key={comment.id} style={styles.commentContainer}>
         <View style={styles.commentRow}>
           <Image source={{ uri: currentUserProfile?.profilePicture || defaultProfilePicture }} style={styles.profilePicture} />
           <View style={styles.commentContent}>
@@ -288,7 +288,7 @@ const Comments = ({ route, navigation }) => {
           </View>
         </View>
         <View style={styles.commentActions}>
-          <TouchableOpacity onPress={() => liked ? handleUnlikeComment(comment.id, level > 0, comment.id) : handleLikeComment(comment.id, level > 0, comment.id)}>
+          <TouchableOpacity onPress={() => liked ? handleUnlikeComment(comment.id) : handleLikeComment(comment.id)}>
             <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color="#000" />
             <Text style={styles.likeCount}>{comment.likes.length}</Text>
           </TouchableOpacity>
@@ -296,7 +296,7 @@ const Comments = ({ route, navigation }) => {
             <Icon name="chatbubble-outline" size={20} color="#000" />
           </TouchableOpacity>
         </View>
-        {comment.replies && comment.replies.map(reply => renderComment(reply, level + 1))}
+        {comment.replies && comment.replies.map(reply => renderComment(reply))}
       </View>
     );
   };

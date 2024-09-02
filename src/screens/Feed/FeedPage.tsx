@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl, TextInput, Modal } from 'react-native';
 import { db, firebase_auth } from '../../../firebaseConfig';
 import { collection, getDocs, query, orderBy, limit, startAfter, doc, getDoc, updateDoc, arrayUnion, arrayRemove } from '@firebase/firestore';
 import { InteractionManager } from 'react-native';
@@ -18,10 +18,18 @@ const FeedPage = ({ navigation }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadedHighlightIds, setLoadedHighlightIds] = useState(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+
+  // Modal state
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState(null);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       fetchUserProfile();
+      fetchUsers();
     });
     return () => task.cancel();
   }, []);
@@ -29,7 +37,7 @@ const FeedPage = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       if (userProfile) {
-        fetchHighlights(true);
+        fetchHighlights(true);  // true indicates it's a refresh
       }
     }, [userProfile])
   );
@@ -54,6 +62,34 @@ const FeedPage = ({ navigation }) => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const userCollection = collection(db, "userProfiles");
+      const userSnapshot = await getDocs(userCollection);
+      const userList = userSnapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .filter((user) => user.id !== firebase_auth.currentUser.uid); // Filter out the current user
+      setUsers(userList);
+    } catch (error) {
+      console.error("Error fetching users: ", error);
+    }
+  };
+
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = users.filter((user) => {
+        const fullName = `${user.firstName?.toLowerCase()} ${user.lastName?.toLowerCase()}`;
+        return fullName.includes(searchQuery.toLowerCase());
+      });
+      setFilteredUsers(filtered);
+    } else {
+      setFilteredUsers([]);
+    }
+  }, [searchQuery, users]);
+
   const fetchCommentCount = async (userId, postId, collectionName) => {
     try {
       const commentsRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments');
@@ -68,6 +104,8 @@ const FeedPage = ({ navigation }) => {
   const fetchHighlights = async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
+      setLastVisible({});
+      setLoadedHighlightIds(new Set());
     }
 
     if (loadingMore && !isRefresh) return;
@@ -190,7 +228,11 @@ const FeedPage = ({ navigation }) => {
           });
           return updatedHighlights.sort((a, b) => b.timestamp - a.timestamp);
         } else {
-          return [...prevHighlights, ...allHighlights].sort((a, b) => b.timestamp - a.timestamp);
+          const postIdSet = new Set(prevHighlights.map(post => post.id));
+          const filteredNewHighlights = allHighlights.filter(
+            (highlight) => !postIdSet.has(highlight.id)
+          );
+          return [...prevHighlights, ...filteredNewHighlights].sort((a, b) => b.timestamp - a.timestamp);
         }
       });
       setLastVisible(newLastVisible);
@@ -341,14 +383,24 @@ const FeedPage = ({ navigation }) => {
   };
 
   const formatTotalWorkoutTime = (totalTime) => {
-    const minutes = Math.floor(totalTime / 60);
-    const seconds = totalTime % 60;
+    const minutes = Math.floor(totalTime / 60000); // Convert milliseconds to minutes
+    const seconds = Math.floor((totalTime % 60000) / 1000); // Get remaining seconds
     return `${minutes} mins ${seconds} secs`;
+  };
+
+  const openModal = (mediaUrl) => {
+    setSelectedMedia(mediaUrl);
+    setIsModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setIsModalVisible(false);
+    setSelectedMedia(null);
   };
 
   const renderItem = useCallback(({ item }) => {
     if (item.type === 'workout') {
-      const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.setsNum), 0);
+      const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.sets ? exercise.sets.length : 0), 0);
       const elapsedTime = formatTotalWorkoutTime(item.totalWorkoutTime);
 
       return (
@@ -362,39 +414,50 @@ const FeedPage = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
-          {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+          {item.workoutDescription && <Text style={styles.descriptionText}>{item.workoutDescription}</Text>}
 
           <View style={styles.metricsContainer}>
             <Text style={styles.metricText}>{`Total Sets: ${totalSets}`}</Text>
             <Text style={styles.metricText}>{`Workout Time: ${elapsedTime}`}</Text>
           </View>
 
-          <Text style={styles.exerciseHeader}>Exercises:</Text>
-          <View style={styles.exerciseNamesContainer}>
-            {item.exercises.map((exercise, index) => (
-              <View key={index} style={styles.exerciseItemContainer}>
-                <Text style={styles.exerciseNameText}>{exercise.name}</Text>
-                {exercise.bestSet && (
-                  <Text style={styles.bestSetText}>
-                    {`Best Set: ${exercise.bestSet.weight ?? '-'} ${exercise.bestSet.weightUnit ?? ''} x ${exercise.bestSet.reps ?? '-'} ${exercise.bestSet.repsUnit ?? ''}`}
-                  </Text>
-                )}
-                {!exercise.bestSet && (
-                  <Text style={styles.bestSetText}>Best Set: Not available</Text>
-                )}
-              </View>
-            ))}
-          </View>
+          <Text style={styles.exerciseHeader}>{item.title}</Text>
+          
+          {item.exercises && item.exercises.length > 0 ? (
+            <View style={styles.exerciseNamesContainer}>
+              {item.exercises.map((exercise, index) => (
+                <View key={index} style={styles.exerciseItemContainer}>
+                  <Text style={styles.exerciseNameText}>{exercise.name}</Text>
+                  {exercise.sets && exercise.sets.length > 0 ? (
+                    exercise.sets.map((set, setIndex) => (
+                      <Text key={set.key} style={styles.bestSetText}>
+                        {`Set ${setIndex + 1}: ${set.weight} ${exercise.weightUnit} x ${exercise.repsUnit === 'time' ? `${Math.floor(set.time / 60000)} mins ${Math.floor((set.time % 60000) / 1000)} secs` : `${set.reps} ${exercise.repsUnit}`}`}
+                      </Text>
+                    ))
+                  ) : (
+                    <Text style={styles.bestSetText}>No sets available</Text>
+                  )}
+                  {exercise.isSuperset && exercise.supersetExercise && (
+                    <Text style={styles.supersetText}>
+                      {`Superset with: ${exercise.supersetExercise}`}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.bestSetText}>No exercises available</Text>
+          )}
           {item.mediaUrls && item.mediaUrls.length > 0 && (
             <View style={styles.imageContainer}>
               <Swiper style={styles.swiper} showsPagination={true}>
                 {item.mediaUrls.map((mediaUrl, index) => (
-                  <Image
-                    key={`${item.id}_${index}`}
-                    source={{ uri: mediaUrl }}
-                    style={styles.postImage}
-                  />
+                  <TouchableOpacity key={`${item.id}_${index}`} onPress={() => openModal(mediaUrl)}>
+                    <Image
+                      source={{ uri: mediaUrl }}
+                      style={styles.postImage}
+                    />
+                  </TouchableOpacity>
                 ))}
               </Swiper>
             </View>
@@ -410,16 +473,13 @@ const FeedPage = ({ navigation }) => {
               <Icon name="chatbubble-outline" size={25} color="#000" />
               <Text style={styles.actionText}>{item.commentCount}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
-              <Icon name="share-outline" size={25} color="#000" />
-            </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, true) : handleSave(item.id, item.userId, true)}>
               <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
               <Text style={styles.actionText}>{item.savedBy}</Text>
             </TouchableOpacity>
           </View>
         </View>
-      )
+      );
     } else {
       return (
         <View style={styles.highlightContainer}>
@@ -437,11 +497,12 @@ const FeedPage = ({ navigation }) => {
             <View style={styles.imageContainer}>
               <Swiper style={styles.swiper} showsPagination={true}>
                 {item.mediaUrls.map((mediaUrl, index) => (
-                  <Image
-                    key={`${item.id}_${index}`}
-                    source={{ uri: mediaUrl }}
-                    style={styles.postImage}
-                  />
+                  <TouchableOpacity key={`${item.id}_${index}`} onPress={() => openModal(mediaUrl)}>
+                    <Image
+                      source={{ uri: mediaUrl }}
+                      style={styles.postImage}
+                    />
+                  </TouchableOpacity>
                 ))}
               </Swiper>
             </View>
@@ -455,9 +516,6 @@ const FeedPage = ({ navigation }) => {
             <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, false)}>
               <Icon name="chatbubble-outline" size={25} color="#000" />
               <Text style={styles.actionText}>{item.commentCount}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
-              <Icon name="share-outline" size={25} color="#000" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, false) : handleSave(item.id, item.userId, false)}>
               <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
@@ -486,21 +544,55 @@ const FeedPage = ({ navigation }) => {
   }
 
   return (
-    <FlatList
-      data={highlights}
-      keyExtractor={item => item.id}
-      renderItem={renderItem}
-      onEndReached={() => {
-        if (!loadingMore) {
-          fetchHighlights();
+    <View style={{ flex: 1, backgroundColor: '#D4DEE7' }}>
+      <FlatList
+        data={searchQuery.length > 0 ? filteredUsers : highlights}
+        keyExtractor={item => item.id}
+        renderItem={searchQuery.length > 0 ? ({ item }) => (
+          <TouchableOpacity
+            style={styles.userItem}
+            onPress={() => navigation.navigate("UserDetails", { user: item })}
+          >
+            <Text style={styles.userName}>
+              {item.firstName} {item.lastName}
+            </Text>
+          </TouchableOpacity>
+        ) : renderItem}
+        onEndReached={() => {
+          if (!loadingMore && searchQuery.length === 0) {
+            fetchHighlights();
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchHighlights(true)} />
         }
-      }}
-      onEndReachedThreshold={0.5}
-      ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => fetchHighlights(true)} />
-      }
-    />
+        ListHeaderComponent={
+          <TextInput
+            style={styles.searchBar}
+            placeholder="Search for users..."
+            value={searchQuery}
+            onChangeText={(text) => setSearchQuery(text)}
+          />
+        }
+      />
+      
+      {isModalVisible && selectedMedia && (
+        <Modal visible={isModalVisible} transparent={true} animationType="fade">
+          <View style={styles.modalContainer}>
+            <TouchableOpacity style={styles.modalCloseButton} onPress={closeModal}>
+              <Icon name="close" size={30} color="#fff" />
+            </TouchableOpacity>
+            <Image
+              source={{ uri: selectedMedia }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 };
 
@@ -513,7 +605,9 @@ const styles = StyleSheet.create({
   },
   userNameText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Rubik-Bold',
+    color: '#000',
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   swiper: {
     height: 300,
@@ -533,21 +627,27 @@ const styles = StyleSheet.create({
   actionText: {
     marginLeft: 5,
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#000',
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#D4DEE7',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#D4DEE7',
   },
   errorText: {
-    color: 'black',
+    color: '#000',
     fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   exerciseNamesContainer: {
     paddingHorizontal: 10,
@@ -571,50 +671,60 @@ const styles = StyleSheet.create({
   },
   captionText: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: 'Rubik-Bold',
     marginVertical: 5,
     color: '#333',
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   descriptionText: {
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#666',
     marginBottom: 10,
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   metricsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 10,
+    flexDirection: 'column', // Display metrics in a column
   },
   metricText: {
     fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
     color: '#007bff',
-    fontWeight: '600',
+    marginBottom: 2, // Add some space between the two lines
   },
   exerciseHeader: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Rubik-Bold',
     marginBottom: 5,
     color: '#333',
-  },
-  exerciseNamesContainer: {
-    marginBottom: 15,
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   exerciseItemContainer: {
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#D4DEE7', // Set the background color to #D4DEE7
     padding: 10,
     borderRadius: 5,
     marginBottom: 5,
   },
   exerciseNameText: {
     fontSize: 16,
+    fontFamily: 'Rubik-Bold',
     color: '#007bff',
-    fontWeight: 'bold',
-    marginBottom: 3,
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   bestSetText: {
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#555',
     marginTop: 2,
+    flex: 1, // Ensure the text takes up available space and wraps
+  },
+  supersetText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+    marginTop: 2,
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   imageContainer: {
     marginTop: 10,
@@ -623,12 +733,55 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 300,
     borderRadius: 10,
+    borderWidth: 1, // Add 1px border
+    borderColor: '#000', // Black border color
   },
   timestampText: {
     fontSize: 12,
+    fontFamily: 'Inter-Regular',
     color: '#888',
     marginTop: 10,
     alignSelf: 'flex-end',
+    flex: 1, // Ensure the text takes up available space and wraps
+  },
+  searchBar: {
+    height: 40,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    marginBottom: 16,
+    marginHorizontal: 15,
+    fontFamily: 'Inter-Regular',
+    color: '#000',
+    backgroundColor: '#f8f8f8',
+  },
+  userItem: {
+    padding: 12,
+    borderBottomColor: "#ccc",
+    borderBottomWidth: 1,
+  },
+  userName: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#000',
+    flex: 1, // Ensure the text takes up available space and wraps
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '80%',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 1,
   },
 });
 
