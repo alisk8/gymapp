@@ -176,7 +176,7 @@ function ProgressStack() {
             />
             <Stack.Screen name='Progress' component={Progress} options={screenOptions} />
             <Stack.Screen name='TemplateRecords' component={TemplateRecords}/>
-            <Stack.Screen name='EditTemplateScreen' component={EditTemplateScreen}/>
+            <Stack.Screen name='EditTemplateScreenUpdated' component={EditTemplateScreenUpdated}/>
             <Stack.Screen name="TrackedExercise" component={TrackedExercise} />
             <Stack.Screen
                 name='WorkoutLog'

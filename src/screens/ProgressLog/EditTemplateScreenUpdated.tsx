@@ -10,7 +10,7 @@ import {
     Keyboard,
     Pressable,
     FlatList,
-    Modal, KeyboardAvoidingView, Platform, Switch
+    Modal, KeyboardAvoidingView, Platform, Switch, ScrollView
 } from 'react-native';
 import { db, firebase_auth } from '../../../firebaseConfig';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
@@ -25,6 +25,7 @@ import Animated, {useSharedValue, useAnimatedStyle, withTiming, withSpring } fro
 import { useWorkout } from '../../contexts/WorkoutContext';
 import ExercisePickerModal from "../WorkoutLog/ExercisePickerModal";
 import findLastIndex from "@react-navigation/stack/lib/typescript/src/utils/findLastIndex";
+import axios from 'axios';
 
 
 export default function EditTemplateScreenUpdated({route}) {
@@ -45,6 +46,9 @@ export default function EditTemplateScreenUpdated({route}) {
     const previousScreen = route.params?.previousScreen;
     const [showPreviousAttempts, setShowPreviousAttempts] = useState({});
     const [exercisePresetsLoaded, setExercisePresetsLoaded] = useState(false);
+    const [userGoal, setUserGoal] = useState('');  // State to store the user goal
+    const [feedback, setFeedback] = useState('');  // State to store the feedback from the server
+
 
     const [selectedExerciseIndex, setSelectedExerciseIndex] = useState(null);
     const [proceedWithSave, setProceedWithSave] = useState(false);
@@ -55,6 +59,57 @@ export default function EditTemplateScreenUpdated({route}) {
 
     const template = route?.params?.template;
 
+
+    const sendWorkoutDetails = async () => {
+        const templateToString = preprocessTemplate();
+
+        try {
+            const response = await axios.post('http://192.168.9.39:8000/generate/', {
+                workout_template: templateToString,
+                user_goal: userGoal
+            });
+
+            const feedback = response.data.response.content;
+            console.log('LLM Feedback:', feedback);
+            setFeedback(feedback);
+        } catch (error) {
+            console.error('Error:', error);
+            return null;
+        }
+    };
+
+    const preprocessTemplate = () => {
+        let result = '';
+
+        exercises.forEach((exercise) => {
+            const setsCount = exercise.sets.filter((set) => !set.key.includes('_dropset')).length;
+            const dropSetsCount = exercise.sets.filter((set) => set.key.includes('_dropset')).length;
+            let exerciseDescription = `${exercise.name}: ${setsCount} sets`;
+
+            if (dropSetsCount > 0) {
+                exerciseDescription += `, ${dropSetsCount} drop sets`;
+            }
+
+            if (exercise.isSuperset && exercise.supersetExercise) {
+                const supersetExercise = template.exercises.find(ex => ex.id === exercise.supersetExercise);
+                if (supersetExercise) {
+                    const supersetSetsCount = supersetExercise.sets.filter((set) => !set.key.includes('_dropset')).length;
+                    const supersetDropSetsCount = supersetExercise.key.filter((set) => set.key.includes('_dropset')).length;
+                    let supersetDescription = `${supersetExercise.name}: ${supersetSetsCount} sets`;
+
+                    if (supersetDropSetsCount > 0) {
+                        supersetDescription += `, ${supersetDropSetsCount} drop sets`;
+                    }
+
+                    exerciseDescription += ` (superset with ${supersetDescription})`;
+                }
+            }
+
+            result += `${exerciseDescription}\n`;
+        });
+
+        return result.trim();
+    };
 
 
 
@@ -86,35 +141,50 @@ export default function EditTemplateScreenUpdated({route}) {
     };
 
     useEffect(() => {
-
-        (async () => {
-            await fetchExercisePresets();
-            await fetchUserExercises();
-
-            if (template) {
-                const mappedExercises = template.exercises.map(ex => ({
-                    id: ex.id,
-                    name: ex.name,
-                    weightUnit: 'lbs', // can adjust to default weight unit preferred by user
-                    repsUnit: exercisePresets[ex.name].repsUnit,
-                    sets: ex.setsKeys.map((set, index) => ({
-                        key: set.key,
-                        weight: '',
-                        reps: '',
-                    })),
-                    isSuperset: ex.isSuperset,
-                    supersetExercise: ex.supersetExercise,
-                }));
-                setExercises(mappedExercises);
-            }
-            console.log('presets', exercisePresets);
-            console.log('exercises', exercises);
-        } )();
-
-        return () => {
-        };
+        fetchExercisePresets()
     }, []);
 
+    useEffect(() => {
+        nav.setOptions({
+            title: 'Edit Template',  // Set your desired title here
+        headerRight: () => (
+            <TouchableOpacity onPress={() => {
+                saveTemplate();
+            }} style={styles.hideButton}>
+                <Text style={styles.hideButtonText}>Save</Text>
+            </TouchableOpacity>
+        )
+        });
+    }, [nav]);
+
+    useEffect(() => {
+        const loadTemplate = async () => {
+            try {
+                const mappedExercises = await Promise.all(template.exercises.map(async ex => {
+                    return {
+                        id: ex.id,
+                        name: ex.name,
+                        weightUnit: 'lbs', // can adjust to default weight unit preferred by user
+                        repsUnit: exercisePresets[ex.name].repsConfig === 'R' ? 'reps' : 'time',
+                        sets: ex.setsKeys.map((setKey, index) => {
+                            return {
+                                key: setKey,
+                            };
+                        }),
+                        isSuperset: ex.isSuperset,
+                        supersetExercise: ex.supersetExercise,
+                        weightConfig: exercisePresets[ex.name].weightConfig || 'W',
+                        repsConfig: exercisePresets[ex.name].repsConfig || 'R',
+                    };
+                }));
+                setExercises(mappedExercises);
+            } catch (error) {
+                console.log('Error loading template:', error);
+            }
+        };
+
+        loadTemplate();
+    }, [exercisePresets]);
 
 
     const fetchUserExercises = async () => {
@@ -290,12 +360,9 @@ export default function EditTemplateScreenUpdated({route}) {
 
 
 
-
     const renderSets = (sets, exerciseIndex) => {
         const exercise = exercises[exerciseIndex];
         const exerciseId = exercise.id;
-
-
 
         return (
             <View>
@@ -356,7 +423,6 @@ export default function EditTemplateScreenUpdated({route}) {
                                     </View>
                                     <Text style={styles.weightInput}></Text>
                                     <Text style={styles.repsInput}></Text>
-                                    )}
                                 </View>
                             </Swipeable>
                         </GestureHandlerRootView>
@@ -490,11 +556,6 @@ export default function EditTemplateScreenUpdated({route}) {
             return;
         }
 
-        pauseWorkout();
-
-        nav.navigate('WorkoutSummaryScreen', {previousScreen});
-
-
     };
 
     const camelCase = (str) => {
@@ -553,10 +614,6 @@ export default function EditTemplateScreenUpdated({route}) {
                         color="black"
                         style={isSuperset ? styles.deleteSupersetButton : styles.deleteExerciseButton}
                     />
-                    <TouchableOpacity onPress={() => openEditModal(exerciseIndex)} style={styles.editButton}>
-                        <FontAwesome5 name="ellipsis-h" size={20} color="black" />
-                    </TouchableOpacity>
-
 
                     <Text style={styles.header}>{exercise.name}</Text>
 
@@ -611,17 +668,9 @@ export default function EditTemplateScreenUpdated({route}) {
 
     return (
         <GestureHandlerRootView style={styles.fullScreenContainer}>
-            <View style={styles.modalHeader}>
-                <Text style={styles.headerText}>Edit Template</Text>
-                <TouchableOpacity onPress={() => {
-                    saveTemplate();
-                }} style={styles.hideButton}>
-                    <Text style={styles.hideButtonText}>Save</Text>
-                </TouchableOpacity>
-            </View>
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
-                style={{ flex: 1 }}
+                style={{ flex: 1}}
             >
                 <FlatList
                     data={exercises.filter(exercise => !exercise.isSuperset)}
@@ -633,13 +682,25 @@ export default function EditTemplateScreenUpdated({route}) {
                                 setSelectedExerciseIndex(null);
                                 setPickerModalVisible(true);
                             }} />
-                            <View style={{height: 200}}/>
+                            {feedback !== '' && (
+                                <View style={styles.feedbackContainer}>
+                                    <Text style={styles.feedbackText}>Feedback:</Text>
+                                    <Text style={styles.feedbackContent}>{feedback}</Text>
+                                </View>
+                            )}
                         </View>
                     )}
                     keyboardShouldPersistTaps="handled"
-                    style={{ zIndex: 1, flex: 1 }}
+                    style={{ zIndex: 1, flex: 1, height: '80%' }}
                     nestedScrollEnabled={true}
                 />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Enter your goal"
+                        value={userGoal}
+                        onChangeText={setUserGoal}
+                    />
+                    <Button title="Get Feedback" onPress={sendWorkoutDetails} />
             </KeyboardAvoidingView>
 
             <ExercisePickerModal
@@ -648,28 +709,6 @@ export default function EditTemplateScreenUpdated({route}) {
                 onSelectExercise={(exerciseName) => addExercise(exerciseName, selectedExerciseIndex)}
             />
 
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={confirmationModalVisible}
-                onRequestClose={() => setConfirmationModalVisible(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Incomplete Exercises</Text>
-                        <Text style={{ marginBottom: 20 }}>Some exercises are not marked as completed. Do you want to proceed?</Text>
-                        <Button
-                            title="Yes, Proceed"
-                            onPress={() => {
-                                setProceedWithSave(true);
-                                setConfirmationModalVisible(false);
-                                saveWorkout(); // Recursively call saveWorkout
-                            }}
-                        />
-                        <Button title="No, Go Back" onPress={() => setConfirmationModalVisible(false)} />
-                    </View>
-                </View>
-            </Modal>
         </GestureHandlerRootView>
     );
 }
@@ -1316,7 +1355,30 @@ const styles = StyleSheet.create({
         paddingLeft: 30,
         alignItems: 'center',
         justifyContent: 'center'
-    }
+    },
+    input: {
+        height: 40,
+        borderColor: 'gray',
+        borderWidth: 1,
+        borderRadius: 5,
+        paddingHorizontal: 10,
+        marginTop: 10,
+        marginBottom: 10,
+    },
+    feedbackContainer: {
+        marginTop: 20,
+        padding: 10,
+        backgroundColor: '#e0f7fa',
+        borderRadius: 5,
+    },
+    feedbackText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 5,
+    },
+    feedbackContent: {
+        fontSize: 16,
+    },
 });
 
 const pickerSelectStyles = StyleSheet.create({
