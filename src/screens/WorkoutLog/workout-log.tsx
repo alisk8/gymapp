@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {
     Button,
     StyleSheet,
@@ -52,6 +52,7 @@ export default function WorkoutLogScreen({route}) {
     const previousScreen = route.params?.previousScreen;
     const [showPreviousAttempts, setShowPreviousAttempts] = useState({});
     const [isFailureTracking, setIsFailureTracking] = useState(false);
+    const [templateLoaded, setTemplateLoaded] = useState(false);
 
     const [selectedExerciseIndex, setSelectedExerciseIndex] = useState(null);
     const [proceedWithSave, setProceedWithSave] = useState(false);
@@ -81,6 +82,20 @@ export default function WorkoutLogScreen({route}) {
 
 
 
+
+
+
+
+/**
+    useFocusEffect(() => {
+        console.log('reset');
+        nav.navigate(previousScreen);
+        resetWorkout();
+    });
+**/
+
+
+    /**
     const toggleFailureTracking = () => {
         setIsFailureTracking(!isFailureTracking);
     };
@@ -91,18 +106,8 @@ export default function WorkoutLogScreen({route}) {
         newExercises[exerciseIndex].sets[setIndex].isFailure = currentFailureState === null ? true : null;
         setExercises(newExercises);
     };
+        **/
 
-    useEffect(() => {
-        let timer;
-        if (startTime && !workoutFinished) {
-            timer = setInterval(() => {
-                const currentTime = new Date();
-                const updatedElapsedTime = Math.floor((currentTime - startTime) / 1000);
-                setElapsedTime(updatedElapsedTime);
-            }, 1000);
-        }
-        return () => clearInterval(timer);
-    }, [startTime, workoutFinished]);
 
     const formatTime = (seconds) => {
         const hours = Math.floor(seconds / 3600);
@@ -111,6 +116,22 @@ export default function WorkoutLogScreen({route}) {
 
         return `${hours > 0 ? `${hours}:` : ''}${hours > 0 ? minutes.toString().padStart(2, '0') : minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
+
+    const formatTimeMilliseconds = (milliseconds) => {
+        // Convert milliseconds to total seconds
+        const totalSeconds = Math.floor(milliseconds / 1000);
+
+        // Calculate minutes and remaining seconds
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+
+        // Format the time as mm:ss, ensuring two digits for minutes and seconds
+        const formattedMinutes = String(minutes).padStart(2, '0');
+        const formattedSeconds = String(seconds).padStart(2, '0');
+
+        return `${formattedMinutes}:${formattedSeconds}`;
+    };
+
 
 
     const fetchLatestAttempt = async (exerciseName) => {
@@ -141,33 +162,54 @@ export default function WorkoutLogScreen({route}) {
     };
 
     useEffect(() => {
-        fetchExercisePresets();
-        fetchUserExercises();
-        const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
-            setSuggestions([]);
-        });
-
-        if (template) {
-            const mappedExercises = template.exercises.map(ex => ({
-                id: ex.id,
-                name: ex.name,
-                weightUnit: 'lbs', // can adjust to default weight unit preferred by user
-                repsUnit: exercisePresets[ex.name].repsUnit,
-                sets: ex.setsKeys.map((set, index) => ({
-                    key: set.key,
-                    weight: '',
-                    reps: '',
-                })),
-                isSuperset: ex.isSuperset,
-                supersetExercise: ex.supersetExercise,
-        }));
-            setExercises(mappedExercises);
-        }
-
-        return () => {
-            keyboardDidHideListener.remove();
-        };
+        fetchExercisePresets()
     }, []);
+    useEffect(() => {
+        const loadTemplate = async () => {
+            console.log("exercisePresets", exercisePresets);
+            try {
+                const mappedExercises = await Promise.all(template.exercises.map(async ex => {
+                    const latestAttempt = await fetchLatestAttempt(ex.name); // Fetch the latest attempt for this exercise
+
+                    if (latestAttempt) {
+                        setShowPreviousAttempts(prev => ({
+                            ...prev,
+                            [ex.id]: latestAttempt
+                        }));
+                        console.log("prev attempts", showPreviousAttempts);
+                    }
+                    return {
+                        id: ex.id,
+                        name: ex.name,
+                        weightUnit: 'lbs', // can adjust to default weight unit preferred by user
+                        repsUnit: exercisePresets[ex.name].repsConfig === 'R' ? 'reps' : 'time',
+                        sets: ex.setsKeys.map((setKey, index) => {
+                            return {
+                                key: setKey,
+                                weight: '',
+                                reps: '',
+                            };
+                        }),
+                        isSuperset: ex.isSuperset,
+                        supersetExercise: ex.supersetExercise,
+                        weightConfig: exercisePresets[ex.name].weightConfig || 'W',
+                        repsConfig: exercisePresets[ex.name].repsConfig || 'R',
+                    };
+                }));
+                setExercises(mappedExercises);
+            } catch (error) {
+                console.log('Error loading template:', error);
+            }
+        };
+
+        if (exercisePresets) {
+            loadTemplate();
+        }
+    }, [exercisePresets]);
+
+
+
+
 
 
     useEffect(() => {
@@ -206,6 +248,7 @@ export default function WorkoutLogScreen({route}) {
         setTimeRemaining(prevTime => Math.max(0, prevTime + amount));
     };
 
+    /**
     const fetchUserExercises = async () => {
         if (!firebase_auth.currentUser) return;
 
@@ -215,6 +258,7 @@ export default function WorkoutLogScreen({route}) {
         const exercises = querySnapshot.docs.map(doc => doc.data().name);
         setUserExercises(exercises);
     };
+        **/
 
     const fetchExercisePresets = async () => {
         const exercisePresetsRef = collection(db, "exercisePresets");
@@ -229,6 +273,8 @@ export default function WorkoutLogScreen({route}) {
         });
         setExercisePresets(presets);
     };
+
+
 
     const getSuggestions = (text) => {
         const allExercises = [...new Set([...commonExercises, ...userExercises])];
@@ -415,11 +461,15 @@ export default function WorkoutLogScreen({route}) {
 
         const conversionFactor = prevWeightUnit === 'lbs' && exercise.weightUnit === 'kgs' ? 0.453592 : (prevWeightUnit === 'kgs' && exercise.weightUnit === 'lbs' ? 2.20462 : 1);
         const convertedValue = previousSet.weight * conversionFactor;
-
         exercise.sets[setIndex].weight = convertedValue;
-        exercise.sets[setIndex].reps = previousSet.reps;
 
-        console.log('update', exercise)
+        if (exercise.repsUnit === 'time'){
+            exercise.sets[setIndex].reps = formatTimeMilliseconds (previousSet.reps);
+        }
+        else{
+            exercise.sets[setIndex].reps = previousSet.reps;
+
+        }
 
         setExercises(newExercises);
     };
@@ -461,6 +511,8 @@ export default function WorkoutLogScreen({route}) {
 
                     const isWeightDisabled = exercise.weightConfig === 'BW';
 
+                    const previousReps = exercise.repsUnit === 'time'? formatTimeMilliseconds(previousSet.reps) : previousSet.reps;
+
                     const toggleCompleted = () => {
                         const newExercises = [...exercises];
                         if (set.weight === '' && lastFilledWeight) {
@@ -485,7 +537,6 @@ export default function WorkoutLogScreen({route}) {
                             }));
                         }
 
-                        console.log('NEW WEIGHT', newWeight);
                         console.log('FUCK YEAH', lastFilledWeights[exerciseId]);
                     }
 
@@ -527,6 +578,8 @@ export default function WorkoutLogScreen({route}) {
                             ...prev,
                             [exerciseId]: formattedTime,
                         }));0
+
+                        console.log('what reps look like', set.reps);
                     };
 
                     return (
@@ -557,7 +610,7 @@ export default function WorkoutLogScreen({route}) {
                                                 onPress={() => loadPreviousAttempt(exerciseIndex, setIndex, previousSet, showPreviousAttempts[exerciseId].weightUnit)}
                                                 style={styles.previousAttemptRow}
                                             >
-                                                <Text>{`${previousSet?.weight || ''} x ${previousSet?.reps || ''}`}</Text>
+                                                <Text>{`${previousSet?.weight || ''} x ${previousReps || ''}`}</Text>
                                             </TouchableOpacity>
                                         ) : (
                                             <View style={styles.previousAttemptRow}>
@@ -921,6 +974,9 @@ export default function WorkoutLogScreen({route}) {
         console.log("Exercises state updated: ", JSON.stringify(exercises, null, 2));
     }, [exercises]);
 
+
+
+    //marks when the screen is up/down
     useEffect(() => {
         startWorkoutLog();
         return () => stopWorkoutLog();
@@ -1779,7 +1835,8 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
         fontSize: 16,
         fontStyle: 'italic',
-        padding: 10,
+        paddingHorizontal: 5,
+        paddingVertical: 9,
         color: '#4E5760',
     },
     weightToggleContainer: {

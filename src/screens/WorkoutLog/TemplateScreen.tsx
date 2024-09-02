@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useCallback} from 'react';
-import { View, Text, Button, FlatList, StyleSheet, ScrollView } from 'react-native';
+import {View, Text, Button, FlatList, StyleSheet, ScrollView, Alert} from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { db, firebase_auth } from '../../../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
@@ -48,39 +48,33 @@ const TemplateScreen = ({ route }) => {
     const handleLoadTemplate = () => {
         const selected = templates.find(template => template.id === selectedTemplate);
         if (selected) {
-            console.log('template loading state', workoutState);
             navigation.navigate('WorkoutLog', { template: selected, previousScreen});
         } else {
-            console.log('No template selected');
+            Alert.alert('No template selected');
         }
     };
 
     const startNewWorkout = () => {
-          handleWorkoutMode('Normal');
           navigation.navigate('WorkoutLog', {previousScreen});
     }
 
-    const renderExercise = (exercise, exercises) => (
-        <View key={exercise.id} style={exercise.isSuperset ? styles.supersetContainer : styles.previewItem}>
-            <Text style={styles.exerciseName}>
-                {exercise.name}
-            </Text>
-            <Text style={styles.setsCount}>
-                Sets: {exercise.sets.length}
-            </Text>
-            {exercise.sets.map((set, setIndex) => (
-                <View key={setIndex}>
-                    {set.dropSetsCount > 0 && (
-                        <Text style={styles.setItem}>
-                            Set {setIndex + 1} - Drop Sets: {set.dropSetsCount}
-                        </Text>
-                    )}
-                </View>
-            ))}
-            {exercise.supersetExercise && exercises.find(ex => ex.id === exercise.supersetExercise) &&
-                renderExercise(exercises.find(ex => ex.id === exercise.supersetExercise), exercises)}
-        </View>
-    );
+    const renderExercise = (exercise, exercises) => {
+        const sets = exercise.setsKeys.filter((setKey) => !setKey.includes('_dropset')).length;
+        const dropSets = exercise.setsKeys.filter((setKey) => setKey.includes('_dropset')).length;
+
+        return(
+            <View key={exercise.id} style={exercise.isSuperset ? styles.supersetContainer : styles.previewItem}>
+                <Text style={styles.exerciseName}>{exercise.name}</Text>
+                <Text style={styles.setsCount}>Sets: {sets}</Text>
+                {dropSets > 0 && (
+                    <Text style={styles.setItem}>
+                        Drop Sets: {dropSets}
+                    </Text>
+                )}
+                {exercise.isSuperset && exercises.find(ex => ex.id === exercise.supersetExercise) &&
+                    renderExercise(exercises.find(ex => ex.id === exercise.supersetExercise), exercises)}
+            </View>
+        )};
 
     return (
         <View style={styles.container}>
@@ -100,12 +94,14 @@ const TemplateScreen = ({ route }) => {
             {selectedTemplate && (
                 <ScrollView style={styles.templatePreview}>
                     <Text style={styles.previewTitle}>Template Preview:</Text>
-                    {templates.find(template => template.id === selectedTemplate)?.exercises.map((exercise, index, exercises) => {
-                        if (!exercise.isSuperset) {
-                            return renderExercise(exercise, exercises);
-                        }
-                        return null;
-                    })}
+                    <ScrollView style={styles.templatePreview}>
+                        {templates.find(template => template.id === selectedTemplate)?.exercises.map((exercise, index, exercises) => {
+                            if (!exercise.isSuperset) {
+                                return renderExercise(exercise, exercises);
+                            }
+                            return null;
+                        })}
+                    </ScrollView>
                 </ScrollView>
             )}
 
@@ -138,7 +134,7 @@ const styles = StyleSheet.create({
     },
     templatePreview: {
         marginTop: 20,
-        maxHeight: '50%',
+        maxHeight: '90%',
         paddingHorizontal: 10,
     },
     previewTitle: {

@@ -51,9 +51,6 @@ const WorkoutSummaryScreen = ({ route }) => {
     };
 
 
-    useEffect(() => {
-        finishWorkout();
-    }, []);
 
 
     const calculate1RM = (weight, reps) => {

@@ -7,6 +7,7 @@ const WorkoutContext = createContext();
 export const WorkoutProvider = ({ children }) => {
     const [workoutState, setWorkoutState] = useState(null);
     const [isWorkoutLogActive, setIsWorkoutLogActive] = useState(false);
+    //when the workout is loaded
     const [isLoaded, setIsLoaded] = useState(false);
     const [startTime, setStartTime] = useState(null);
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -14,8 +15,8 @@ export const WorkoutProvider = ({ children }) => {
     const [isPaused, setIsPaused] = useState(false);
     const [pausedTime, setPausedTime] = useState(0);  // Total time the workout has been paused
     const [pauseStart, setPauseStart] = useState(null);  // The time when the pause started
+    //lo
     const [loadedFromTemplate, setLoadedFromTemplate] = ('');
-    const [workoutMode, setWorkoutMode] = useState('');
 
     useEffect(() => {
         const loadWorkout = async () => {
@@ -69,11 +70,12 @@ export const WorkoutProvider = ({ children }) => {
 
 
     useEffect(() => {
+        //saves workout to storage when there is an existing workout state going on
         if (isLoaded) {
             const saveWorkout = async () => {
                 try {
-                    if (workoutState.exercises.length > 0) {
-                        await AsyncStorage.setItem('currentWorkout', JSON.stringify(workoutState));
+                    if (workoutState && workoutState.exercises.length > 0) {
+                        await AsyncStorage.setItem('currentWorkout', JSON.stringify(workoutState.exercises));
                     } else {
                         await AsyncStorage.removeItem('currentWorkout');
                     }
@@ -83,7 +85,8 @@ export const WorkoutProvider = ({ children }) => {
                         await AsyncStorage.removeItem('startTime');
                     }
                 } catch (error) {
-                    console.error('Failed to save workout to storage:', error);
+                    console.error('Failed in saveworkout function:', error);
+                    console.log('workoutstate',workoutState);
                 }
             };
 
@@ -99,7 +102,8 @@ export const WorkoutProvider = ({ children }) => {
             setWorkoutState(null);
             setStartTime(null);
             setElapsedTime(0);
-            setWorkoutFinished(false);
+            setWorkoutFinished(true);
+            setIsWorkoutLogActive(false);
             console.log('called here');
         } catch (error) {
             console.error('Failed to reset workout:', error);
@@ -132,7 +136,6 @@ export const WorkoutProvider = ({ children }) => {
 
     const stopWorkoutLog = () => setIsWorkoutLogActive(false);
 
-    const handleWorkoutMode = (mode) => setWorkoutMode(mode);
 
     const finishWorkout = () => {setWorkoutFinished(true);
                                         console.log('workout finished state', workoutFinished)};
@@ -143,8 +146,7 @@ export const WorkoutProvider = ({ children }) => {
                                         resetWorkout, isWorkoutLogActive, startWorkoutLog,
                                         stopWorkoutLog,  startTime, setStartTime, elapsedTime,
                                         setElapsedTime, workoutFinished, finishWorkout, pauseWorkout,
-                                        resumeWorkout, loadedFromTemplate, handleWorkoutMode,
-                                        workoutMode}}>
+                                        resumeWorkout, loadedFromTemplate,}}>
             {children}
         </WorkoutContext.Provider>
     );
