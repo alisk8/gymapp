@@ -26,6 +26,7 @@ import { useWorkout } from '../../contexts/WorkoutContext';
 import ExercisePickerModal from "../WorkoutLog/ExercisePickerModal";
 import findLastIndex from "@react-navigation/stack/lib/typescript/src/utils/findLastIndex";
 import axios from 'axios';
+import {doc, updateDoc} from "@firebase/firestore";
 
 
 export default function EditTemplateScreenUpdated({route}) {
@@ -42,7 +43,6 @@ export default function EditTemplateScreenUpdated({route}) {
     const [timerConfigured, setTimerConfigured] = useState(false); // New state variable
     const [comparisonModalVisible, setComparisonModalVisible] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState(null);
-    const { workoutState, setWorkoutState, resetWorkout, startWorkoutLog, stopWorkoutLog, startTime, elapsedTime, setElapsedTime, pauseWorkout, finishWorkout, workoutFinished} = useWorkout();
     const previousScreen = route.params?.previousScreen;
     const [showPreviousAttempts, setShowPreviousAttempts] = useState({});
     const [exercisePresetsLoaded, setExercisePresetsLoaded] = useState(false);
@@ -522,39 +522,32 @@ export default function EditTemplateScreenUpdated({route}) {
 
     const saveTemplate = async () => {
         if (!firebase_auth.currentUser) {
-            Alert.alert("Error", "You must be logged in to save workouts.");
-            return;
-        }
-
-        const incompleteExercises = exercises.some(exercise =>
-            exercise.sets.some(set => !set.completed)
-        );
-
-        if (incompleteExercises && !proceedWithSave) {
-            setConfirmationModalVisible(true);
+            Alert.alert("Error", "You must be logged in to save the template.");
             return;
         }
 
         const userId = firebase_auth.currentUser.uid;
-        const filteredExercises = exercises.map(ex => ({
+
+        const templateRef = collection(db, "userProfiles", userId, "templates");
+
+        const templateExercises = exercises.map(ex => ({
             id: camelCase(ex.name),
             name: ex.name,
-            sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'bodyWeight') && (set.reps !== '')).map(set => ({
-                ...set,
-                weight: set.weight,
-                reps: set.reps,
-                key: set.key,
-            })),
-            isSuperset: ex.isSuperset,
+            setsKeys: ex.sets.map(set => set.key),
             supersetExercise: ex.supersetExercise,
-            weightUnit: ex.weightUnit,
-            repsUnit: ex.repsUnit,
-        })).filter(ex => ex.sets.length > 0);
+            isSuperset: ex.isSuperset,
+        }));
 
-        if (filteredExercises.length === 0) {
-            Alert.alert("Error", "Please add reps/failure to all sets and mark completed.");
-            return;
-        }
+        const existingTemplateRef = doc(templateRef, template.id);
+
+        await updateDoc(existingTemplateRef, {
+            templateName: template.templateName,
+            exercises: templateExercises,
+            updatedAt: new Date()  // You can add an updatedAt field to track changes
+        });
+
+        Alert.alert('Template updated!');
+        nav.goBack();
 
     };
 

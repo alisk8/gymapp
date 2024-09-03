@@ -86,13 +86,14 @@ export default function WorkoutLogScreen({route}) {
 
 
 
-/**
+
+    /**
     useFocusEffect(() => {
         console.log('reset');
         nav.navigate(previousScreen);
         resetWorkout();
     });
-**/
+    **/
 
 
     /**

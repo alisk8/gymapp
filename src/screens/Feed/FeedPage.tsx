@@ -6,6 +6,7 @@ import { InteractionManager } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Swiper from 'react-native-swiper';
 import { useFocusEffect } from "@react-navigation/native";
+import {Ionicons} from "@expo/vector-icons";
 
 const defaultProfilePicture = 'https://firebasestorage.googleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2Fpfp.jpeg?alt=media&token=dd124ee9-6c61-48ad-b41c-97f3acc3350c';
 
@@ -33,6 +34,34 @@ const FeedPage = ({ navigation }) => {
     });
     return () => task.cancel();
   }, []);
+
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: 'Custom Header Title',
+      headerRight: () => <CustomHeaderView />,
+    });
+  }, [navigation]);
+
+
+  const CustomHeaderView = () => (
+      <View style={{flexDirection: 'row', padding: 2,}}>
+        <TouchableOpacity
+            onPress={navigation.navigate('Messages')}
+            style={{ marginRight: 10}}
+        >
+          <Ionicons name="chatbox-ellipses-outline" size={24} color="black" />
+        </TouchableOpacity>
+      <TouchableOpacity
+          onPress={() => {
+            navigation.navigate('SaveGymHighlightScreen');
+          }}
+          style={{ marginRight: 5, marginBottom: 5, }} // Adjust margin as needed
+      >
+        <Ionicons name="create-outline" size={24} color="black" />
+      </TouchableOpacity>
+      </View>
+  );
 
   useFocusEffect(
     useCallback(() => {
