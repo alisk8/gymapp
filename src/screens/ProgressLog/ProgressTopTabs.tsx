@@ -9,8 +9,8 @@ function ProgressTopTabs() {
         <TopTab.Navigator
             initialRouteName="Progress"
             screenOptions={{
-                tabBarIndicatorStyle: { backgroundColor: '#000'}, // Customize as needed
-                tabBarLabelStyle: { fontSize: 14 }, // Customize as needed
+                tabBarIndicatorStyle: { backgroundColor: '#6A0DAD'}, // Customize as needed
+                tabBarLabelStyle: { fontSize: 14, color: '#6A0DAD',}, // Customize as needed
                 tabBarStyle: { backgroundColor: '#fff', paddingTop: 30 }, // Customize as needed
             }}
         >
@@ -22,7 +22,7 @@ function ProgressTopTabs() {
             <TopTab.Screen
                 name="TemplateRecords"
                 component={TemplateRecords}
-                options={{ title: 'Template Records' }}
+                options={{ title: 'Workouts' }}
             />
         </TopTab.Navigator>
     );

@@ -1,7 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -45,6 +44,8 @@ import EditTemplateScreenUpdated from "./src/screens/ProgressLog/EditTemplateScr
 import Comments from './src/screens/Feed/Comments';
 
 import { LogBox } from 'react-native';
+import CustomTabBar from "./src/components/CustomTabBar";
+import CommunityTopTabs from "./src/screens/CommunityTopTabs";
 LogBox.ignoreLogs(['Warning: ...']); // Ignore log notification by message
 LogBox.ignoreAllLogs();//Ignore all log notifications
 
@@ -101,6 +102,37 @@ function HomeStack() {
             <Stack.Screen name='WorkoutLog' component={WorkoutLogScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
             <Stack.Screen name='TemplateScreen' component={TemplateScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
             <Stack.Screen name='WorkoutSummaryScreen' component={WorkoutSummaryScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+        </Stack.Navigator>
+    );
+}
+
+function WorkoutLogStack(){
+    return(
+        <Stack.Navigator initialRouteName='TemplateScreen'>
+            <Stack.Screen
+                name='TemplateScreen'
+                component={TemplateScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='WorkoutSummaryScreen'
+                component={WorkoutSummaryScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
         </Stack.Navigator>
     );
 }
@@ -187,6 +219,7 @@ function ProgressStack() {
 function FeedStack() {
     return (
         <Stack.Navigator initialRouteName='Feed'>
+
             <Stack.Screen name='Feed' component={FeedPage}
                 options={({ navigation }) => ({
                     ...screenOptions({ navigation, iconType: 'CreateOutline' }), // Icon for adding a new community
@@ -196,6 +229,9 @@ function FeedStack() {
                 name='SaveGymHighlightScreen'
                 component={SaveGymHighlightScreen}
             />
+            <Stack.Screen name='Messages' component={Messages} options={screenOptions} />
+            <Stack.Screen name="UserDMs" component={UserDMs} />
+            <Stack.Screen name='UserDetails' component={UserDetails} />
             <Stack.Screen
                 name='WorkoutLog'
                 component={WorkoutLogScreen}
@@ -234,16 +270,22 @@ function FeedStack() {
 
 function CommunitiesStack() {
     return (
-        <Stack.Navigator initialRouteName='Communities'>
-            <Stack.Screen name='Communities' component={Communities} options={({ navigation }) => ({
-                ...screenOptions({ navigation, iconType: 'newCommunity' }), 
-                title: "Communities"
-            })} />
+        <Stack.Navigator initialRouteName='CommunityTopTabs'>
+            <Stack.Screen
+                name="CommunityTopTabs"
+                component={CommunityTopTabs}
+                options={({ navigation }) => ({
+                    ...screenOptions({ navigation, iconType: 'newCommunity' }),
+                    title: "Community"
+                })}
+            />
+            <Stack.Screen name='ExploreScreen' component={ExploreScreen} options={screenOptions} />
+            <Stack.Screen name='Communities' component={Communities} />
             <Stack.Screen name="EventDetailScreen" component={EventDetailScreen} />
             <Stack.Screen
                 name='NewCommunity'
                 component={NewCommunity}
-                options={{ title: "NewCommunity" }}
+                options={{ title: "New Group" }}
             />
             <Stack.Screen
                 name='CommunityLandingPage'
@@ -333,29 +375,38 @@ function App() {
         );
     }
 
+    /**
+
+     <Tab.Screen
+     name='MessagesStack'
+     component={MessagesStack}
+     options={{
+     headerShown: false,
+     title: 'Messages',
+     tabBarIcon: ({ color, size }) => (
+     <Ionicons name="chatbubbles-outline" color={color} size={size} />
+     )
+     }}
+     />
+
+     <Tab.Screen
+     name='ExploreScreen'
+     component={ExploreScreen}
+     options={{
+     headerShown: false,
+     title: 'Explore',
+     }}
+     />
+
+     **/
+
     return (
         <WorkoutProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
                 <NavigationContainer>
                     {user ? (
                         <Tab.Navigator
-                            screenOptions={{
-                                tabBarActiveTintColor: '#007BFF',
-                                tabBarInactiveTintColor: '#8e8e93',
-                                tabBarStyle: {
-                                    backgroundColor: '#ffffff',
-                                    borderTopWidth: 0,
-                                    elevation: 0,
-                                    height: 60,
-                                    paddingBottom: 10,
-                                    paddingTop: 5,
-                                },
-                                tabBarLabelStyle: {
-                                    fontSize: 12,
-                                    margin: 0,
-                                    padding: 0,
-                                },
-                            }}
+                            tabBar={props => <CustomTabBar {...props} />}
                         >
                             <Tab.Screen
                                 name='FeedStack'
@@ -363,31 +414,6 @@ function App() {
                                 options={{
                                     headerShown: false,
                                     title: 'Feed',
-                                    tabBarIcon: ({ color, size }) => (
-                                        <Ionicons name="list-outline" color={color} size={size} />
-                                    )
-                                }}
-                            />
-                            <Tab.Screen
-                                name='ExploreScreen'
-                                component={ExploreScreen}
-                                options={{
-                                    headerShown: false,
-                                    title: 'Explore',
-                                    tabBarIcon: ({ color, size }) => (
-                                        <Ionicons name="compass-outline" color={color} size={size} />
-                                    )
-                                }}
-                            />
-                            <Tab.Screen
-                                name='MessagesStack'
-                                component={MessagesStack}
-                                options={{
-                                    headerShown: false,
-                                    title: 'Messages',
-                                    tabBarIcon: ({ color, size }) => (
-                                        <Ionicons name="chatbubbles-outline" color={color} size={size} />
-                                    )
                                 }}
                             />
                             <Tab.Screen
@@ -396,9 +422,6 @@ function App() {
                                 options={{
                                     headerShown: false,
                                     title: 'Progress',
-                                    tabBarIcon: ({ color, size }) => (
-                                        <Ionicons name="bar-chart-outline" color={color} size={size} />
-                                    )
                                 }}
                             />
                             <Tab.Screen
@@ -407,9 +430,6 @@ function App() {
                                 options={{
                                     headerShown: false,
                                     title: 'Account',
-                                    tabBarIcon: ({ color, size }) => (
-                                        <Ionicons name="person-outline" color={color} size={size} />
-                                    )
                                 }}
                             />
                             <Tab.Screen
@@ -417,10 +437,7 @@ function App() {
                                 component={CommunitiesStack}
                                 options={{
                                     headerShown: false,
-                                    title: 'Communities',
-                                    tabBarIcon: ({ color, size }) => (
-                                        <Ionicons name="people-outline" color={color} size={size} />
-                                    )
+                                    title: 'Community',
                                 }}
                             />
                         </Tab.Navigator>

@@ -38,7 +38,7 @@ const FeedPage = ({ navigation }) => {
 
   useEffect(() => {
     navigation.setOptions({
-      title: 'Feed Page',
+      title: 'Feed',
       headerRight: () => <CustomHeaderView />,
     });
   }, [navigation]);
@@ -46,14 +46,24 @@ const FeedPage = ({ navigation }) => {
 
   const CustomHeaderView = () => (
 
+      <View style={{flexDirection:'row'}}>
+      <TouchableOpacity
+          onPress={() => {
+            navigation.navigate('Messages');
+          }}
+          style={{ marginRight: 20, marginBottom: 5,  }} // Adjust margin as needed
+      >
+        <Ionicons name="chatbubbles-outline" size={24} color="black" />
+      </TouchableOpacity>
       <TouchableOpacity
           onPress={() => {
             navigation.navigate('SaveGymHighlightScreen');
           }}
-          style={{ marginRight: 5, marginBottom: 5, }} // Adjust margin as needed
+          style={{ marginRight: 10, marginBottom: 5, }} // Adjust margin as needed
       >
         <Ionicons name="create-outline" size={24} color="black" />
       </TouchableOpacity>
+      </View>
   );
 
   useFocusEffect(

@@ -437,7 +437,7 @@ export default function Account({ navigation }) {
               <Text style={styles.infoText}>Age: {additionalInfo.age}</Text>
             )}
           </View>
-          {displaySettings.favoriteExercises &&
+          {displaySettings.favoriteExercises && additionalInfo.favoriteExercises &&
             additionalInfo.favoriteExercises.length > 0 && (
               <>
                 <Text style={styles.sectionTitle}>Favorite Exercises:</Text>
