@@ -143,14 +143,15 @@ const CommunityLandingPage = ({ route, navigation }) => {
             const exercise = workoutData.exercises.find(
               (exercise) => exercise.name.toLowerCase() === "bench press"
             );
-            if (exercise && exercise.bestSet) {
+            if (exercise && exercise.sets) {
+              console.log('bench',exercise);
               const estimated1RM =
-                exercise.bestSet.weight * (1 + 0.0333 * exercise.bestSet.reps);
+                exercise.sets[0].weight * (1 + 0.0333 * exercise.sets[0].reps);
 
               if (!latestBenchPress || workoutDoc.id > latestBenchPress.date) {
                 latestBenchPress = {
                   userId,
-                  ...exercise.bestSet,
+                  ...exercise.sets[0],
                   estimated1RM,
                   date: workoutDoc.id,
                   userName: `${userProfileData.firstName} ${userProfileData.lastName}`,
@@ -395,6 +396,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
           <Text>No bench press data available.</Text>
         )}
 
+        <View>
         <TouchableOpacity
           style={styles.createPostButton}
           onPress={() =>
@@ -406,7 +408,6 @@ const CommunityLandingPage = ({ route, navigation }) => {
         >
           <Text style={styles.createPostText}>Post an announcement...</Text>
         </TouchableOpacity>
-
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
@@ -445,6 +446,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
           )}
           contentContainerStyle={styles.feed}
         />
+        </View>
       </ScrollView>
     </View>
   );
@@ -472,7 +474,6 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   feed: {
-    paddingTop: 70, // To avoid overlap with the profile picture
     paddingHorizontal: 10,
   },
   communityImage: {
@@ -498,7 +499,7 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 10,
     padding: 15,
-    margin: 10,
+    marginTop: 20,
     backgroundColor: "#fff",
   },
   postActions: {
@@ -583,6 +584,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginVertical: 10,
+    marginTop: 20,
   },
   leaderboardItem: {
     flexDirection: "row",

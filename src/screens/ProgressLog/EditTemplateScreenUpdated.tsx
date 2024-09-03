@@ -64,7 +64,7 @@ export default function EditTemplateScreenUpdated({route}) {
         const templateToString = preprocessTemplate();
 
         try {
-            const response = await axios.post('http://192.168.9.39:8000/generate/', {
+            const response = await axios.post('http://172.16.16.168:8000/generate/', {
                 workout_template: templateToString,
                 user_goal: userGoal
             });
@@ -625,8 +625,8 @@ export default function EditTemplateScreenUpdated({route}) {
                     {renderSets(exercise.sets, exerciseIndex)}
 
                     <View style={styles.buttonsRow}>
-                        <Button title="+ add set" onPress={() => addSet(exerciseIndex)} />
-                        {!item.supersetExercise && <Button title="+ add superset" onPress={() => {
+                        <Button title="+ add set" onPress={() => addSet(exerciseIndex)} color='#016e03' />
+                        {!item.supersetExercise && <Button title="+ add superset" color='#016e03' onPress={() => {
                             setSelectedExerciseIndex(exerciseIndex);
                             setPickerModalVisible(true);
                         }} />}
@@ -671,7 +671,7 @@ export default function EditTemplateScreenUpdated({route}) {
                     keyExtractor={(item) => item.id}
                     ListFooterComponent={() => (
                         <View>
-                            <Button title="Add Exercise" onPress={() => {
+                            <Button title="Add Exercise" color='#016e03' onPress={() => {
                                 setSelectedExerciseIndex(null);
                                 setPickerModalVisible(true);
                             }} />
@@ -693,7 +693,7 @@ export default function EditTemplateScreenUpdated({route}) {
                         value={userGoal}
                         onChangeText={setUserGoal}
                     />
-                    <Button title="Get Feedback" onPress={sendWorkoutDetails} />
+                    <Button title="Get Feedback" onPress={sendWorkoutDetails} color='#016e03'/>
             </KeyboardAvoidingView>
 
             <ExercisePickerModal
@@ -729,7 +729,7 @@ const styles = StyleSheet.create({
     },
     hideButton: {
         padding: 10,
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
         borderRadius: 5,
     },
     hideButtonText: {
@@ -950,7 +950,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f9fa',
     },
     configOptionSelected: {
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
         color: '#fff',
     },
     timerContainer: {
@@ -1011,7 +1011,7 @@ const styles = StyleSheet.create({
         alignSelf: 'center'
     },
     setTimerButton: {
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
         paddingVertical: 12,
         paddingHorizontal: 32,
         borderRadius: 8,
@@ -1172,7 +1172,7 @@ const styles = StyleSheet.create({
     workoutTimeText: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#007bff',
+        color: '#016e03',
     },
     toggleContainer: {
         flexDirection: 'row',
@@ -1271,7 +1271,7 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
     },
     adjustButtonText: {
         fontSize: 30,
@@ -1323,7 +1323,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         alignSelf: 'center',
         paddingLeft: 5,
-        color: '#007bff', // Customize as needed
+        color: '#016e03', // Customize as needed
         marginRight: 15, // Space between the indicator and the input fields
     },
     columnHeader: {

@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   showButton: {
-    backgroundColor: "#6A0DAD",
+    backgroundColor: '#016e03',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 25,
@@ -806,10 +806,10 @@ const styles = StyleSheet.create({
   cumulativeValue: {
     fontSize: 32,
     fontWeight: "bold",
-    color: "#6A0DAD",
+    color: '#016e03',
   },
   customTimelineButton: {
-    backgroundColor: "#6A0DAD",
+    backgroundColor: '#016e03',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 25,
@@ -866,7 +866,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   modalButton: {
-    backgroundColor: "#6A0DAD",
+    backgroundColor: '#016e03',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 25,

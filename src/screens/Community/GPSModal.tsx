@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     top: 30, // Adjusted top value to bring the box slightly down
     left: 10,
     right: 10,
-    zIndex: 1,
+    zIndex: 10,
     width: "95%",
     alignSelf: "center",
     backgroundColor: "#fff",

@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
   eventStatus: {
     marginTop: 5,
     fontSize: 14,
-    color: 'blue', // You can adjust this color as needed
+    color: '#016e03', // You can adjust this color as needed
     fontWeight: 'bold',
   },
   createEventButton: {

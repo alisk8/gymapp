@@ -244,12 +244,12 @@ const Progress = ({ navigation }) => {
                 markedDates={markedDates}
                 onDayPress={(day) => setSelectedDate(day.dateString)}
                 theme={{
-                    selectedDayBackgroundColor: "#6A0DAD",
-                    todayTextColor: "#6A0DAD",
-                    arrowColor: "#6A0DAD",
-                    dotColor: "#6A0DAD",
+                    selectedDayBackgroundColor: '#016e03',
+                    todayTextColor: '#016e03',
+                    arrowColor: '#016e03',
+                    dotColor: '#016e03',
                     selectedDotColor: "#ffffff",
-                    monthTextColor: "#6A0DAD",
+                    monthTextColor: '#016e03',
                 }}
             />
             <View style={styles.detailsContainer}>
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     subHeading: {
         fontSize: 20,
         fontWeight: "bold",
-        color: "#6A0DAD",
+        color: '#016e03',
         marginTop: 20,
         marginBottom: 10,
     },
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
     workoutTitle: {
         fontSize: 18,
         fontWeight: "bold",
-        color: "#6A0DAD",
+        color: '#016e03',
         marginBottom: 5,
     },
     exerciseContainer: {
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     addDiaryButton: {
-        backgroundColor: "#6A0DAD",
+        backgroundColor: '#016e03',
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 25,
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
         textAlignVertical: "top",
     },
     modalButton: {
-        backgroundColor: "#6A0DAD",
+        backgroundColor: '#016e03',
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 25,

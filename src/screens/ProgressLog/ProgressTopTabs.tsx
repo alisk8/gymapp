@@ -9,8 +9,8 @@ function ProgressTopTabs() {
         <TopTab.Navigator
             initialRouteName="Progress"
             screenOptions={{
-                tabBarIndicatorStyle: { backgroundColor: '#6A0DAD'}, // Customize as needed
-                tabBarLabelStyle: { fontSize: 14, color: '#6A0DAD',}, // Customize as needed
+                tabBarIndicatorStyle: { backgroundColor: '#016e03'}, // Customize as needed
+                tabBarLabelStyle: { fontSize: 14, color: '#016e03',}, // Customize as needed
                 tabBarStyle: { backgroundColor: '#fff', paddingTop: 30 }, // Customize as needed
             }}
         >

@@ -11,7 +11,7 @@ import {
   Image,
   ScrollView,
 } from "react-native";
-import { db, firebase_auth, storage } from "../../firebaseConfig";
+import { db, firebase_auth, storage } from "../../../firebaseConfig";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import {
@@ -241,7 +241,7 @@ const CreateCommunity = () => {
         onChangeText={setCommunityDescription}
       />
       <View style={styles.switchContainer}>
-        <Text style={styles.label}>Private Community</Text>
+        <Text style={styles.label}>Private Group</Text>
         <Switch
           trackColor={{ false: "#767577", true: "#81b0ff" }}
           thumbColor={isPrivate ? "#f5dd4b" : "#f4f3f4"}
@@ -251,7 +251,7 @@ const CreateCommunity = () => {
         />
       </View>
       <TouchableOpacity style={styles.createButton} onPress={handleCreate}>
-        <Text style={styles.createButtonText}>Create Community</Text>
+        <Text style={styles.createButtonText}>Create Group</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   createButton: {
-    backgroundColor: "#007bff",
+    backgroundColor: '#016e03',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 25,

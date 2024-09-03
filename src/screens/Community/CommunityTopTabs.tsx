@@ -1,8 +1,8 @@
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import Progress from "./Progress";
 import TemplateRecords from "./TemplateRecords";
-import CommunityFeed from "./Community/CommunityFeed";
-import ExploreScreen from "./ExploreScreen";
+import CommunityFeed from "./CommunityFeed";
+import ExploreScreen from "../ExploreScreen";
 
 const TopTab = createMaterialTopTabNavigator();
 
@@ -11,8 +11,8 @@ function CommunityTopTabs() {
         <TopTab.Navigator
             initialRouteName="CommunityFeed"
             screenOptions={{
-                tabBarIndicatorStyle: { backgroundColor: '#0A78DC'}, // Customize as needed
-                tabBarLabelStyle: { fontSize: 14, color: '#0A78DC',}, // Customize as needed
+                tabBarIndicatorStyle: { backgroundColor: '#016e03'}, // Customize as needed
+                tabBarLabelStyle: { fontSize: 14, color: '#016e03',}, // Customize as needed
                 tabBarStyle: { backgroundColor: '#fff' }, // Customize as needed
             }}
         >

@@ -9,7 +9,8 @@ import {
     Image,
     Modal,
     TextInput,
-    ScrollView
+    ScrollView,
+    KeyboardAvoidingView, Platform
 } from 'react-native';
 import { db, firebase_auth, storage } from '../../../firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
@@ -50,8 +51,11 @@ const WorkoutSummaryScreen = ({ route }) => {
         }));
     };
 
-
-
+    useEffect(() => {
+        navigation.setOptions({
+            headerShown: false,
+        });
+    }, [navigation]);
 
     const calculate1RM = (weight, reps) => {
         return weight * (1 + 0.0333 * reps);
@@ -105,10 +109,6 @@ const WorkoutSummaryScreen = ({ route }) => {
            return false
         }
     };
-
-    useEffect(() => {
-        console.log('isPaused state changed:', isPaused);
-    }, [isPaused]);
 
     const getBestAttempts = (exercise) => {
 
@@ -315,9 +315,6 @@ const WorkoutSummaryScreen = ({ route }) => {
         );
     }
 
-    useEffect(() => {
-        console.log('im here bro');
-    }, []);
 
 
 

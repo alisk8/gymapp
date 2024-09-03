@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   connectButton: {
-    backgroundColor: "#007BFF",
+    backgroundColor: '#016e03',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,

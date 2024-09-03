@@ -757,7 +757,8 @@ const styles = StyleSheet.create({
   metricText: {
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
-    color: '#007bff',
+    color: '#016e03',
+    fontWeight: 'bold',
     marginBottom: 2, // Add some space between the two lines
   },
   exerciseHeader: {
@@ -771,13 +772,17 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginBottom: 5,
-    backgroundColor: '#D4DEE7',
-
+    backgroundColor: '#F3F3F3',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
   },
   exerciseNameText: {
     fontSize: 16,
     fontFamily: 'Rubik-Bold',
-    color: '#007bff',
+    fontWeight: 'bold',
+    color: '#016e03',
     flex: 1, // Ensure the text takes up available space and wraps
   },
   bestSetText: {

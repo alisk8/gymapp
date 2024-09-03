@@ -217,8 +217,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 5,
     },
-    tabBarActiveTintColor: '#007BFF',
+    tabBarActiveTintColor: '#016e03',
     tabBarInactiveTintColor: '#8e8e93',
+    workoutLogActiveColor: '#016e03',
 });
 
 

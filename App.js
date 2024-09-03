@@ -22,7 +22,7 @@ import SaveGymHighlightScreen from "./src/screens/Feed/save-gym-highlight";
 import FeedPage from "./src/screens/Feed/FeedPage";
 import TemplateScreen from "./src/screens/WorkoutLog/TemplateScreen";
 import Communities from './src/screens/Community/CommunityFeed';
-import NewCommunity from './src/screens/new-community';
+import NewCommunity from './src/screens/Community/new-community';
 import WorkoutSummaryScreen from './src/screens/WorkoutLog/WorkoutSummary';
 import communityLandingPage from './src/screens/Community/CommunityLandingPage';
 import CommunityPostScreen from "./src/screens/Community/CommunityPost";
@@ -45,7 +45,7 @@ import Comments from './src/screens/Feed/Comments';
 
 import { LogBox } from 'react-native';
 import CustomTabBar from "./src/components/CustomTabBar";
-import CommunityTopTabs from "./src/screens/CommunityTopTabs";
+import CommunityTopTabs from "./src/screens/Community/CommunityTopTabs";
 LogBox.ignoreLogs(['Warning: ...']); // Ignore log notification by message
 LogBox.ignoreAllLogs();//Ignore all log notifications
 
@@ -228,6 +228,9 @@ function FeedStack() {
             <Stack.Screen
                 name='SaveGymHighlightScreen'
                 component={SaveGymHighlightScreen}
+                options={({ navigation }) => ({
+                        title: "Highlight"
+                    })}
             />
             <Stack.Screen name='Messages' component={Messages} options={screenOptions} />
             <Stack.Screen name="UserDMs" component={UserDMs} />
@@ -407,6 +410,7 @@ function App() {
                     {user ? (
                         <Tab.Navigator
                             tabBar={props => <CustomTabBar {...props} />}
+                            screenOptions={{headerTintColor:'#016e03'}}
                         >
                             <Tab.Screen
                                 name='FeedStack'

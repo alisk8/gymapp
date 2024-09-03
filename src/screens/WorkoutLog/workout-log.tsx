@@ -87,13 +87,13 @@ export default function WorkoutLogScreen({route}) {
 
 
 
-    /**
+/**
     useFocusEffect(() => {
         console.log('reset');
-        nav.navigate(previousScreen);
+        nav.navigate('CommunityTopTabs');
         resetWorkout();
     });
-    **/
+        **/
 
 
     /**
@@ -888,8 +888,8 @@ export default function WorkoutLogScreen({route}) {
                 {renderSets(exercise.sets, exerciseIndex)}
 
                 <View style={styles.buttonsRow}>
-                    <Button title="+ add set" onPress={() => addSet(exerciseIndex)} />
-                    {!item.supersetExercise && <Button title="+ add superset" onPress={() => {
+                    <Button title="+ add set" color='#016e03' onPress={() => addSet(exerciseIndex)} />
+                    {!item.supersetExercise && <Button title="+ add superset" color='#016e03' onPress={() => {
                         setSelectedExerciseIndex(exerciseIndex);
                         setPickerModalVisible(true);
                     }} />}
@@ -1071,8 +1071,9 @@ export default function WorkoutLogScreen({route}) {
                     {formatTime(elapsedTime)}
                 </Text>
                 <TouchableOpacity onPress={() => {
+                    console.log('prev screen', previousScreen);
                     if (previousScreen) {
-                        console.log(workoutState);
+                        console.log('im here');
                         nav.navigate(previousScreen);
                     } else {
                         nav.goBack();
@@ -1091,11 +1092,11 @@ export default function WorkoutLogScreen({route}) {
                     keyExtractor={(item) => item.id}
                     ListFooterComponent={() => (
                         <View>
-                            <Button title="Add Exercise" onPress={() => {
+                            <Button title="Add Exercise" color='#016e03' onPress={() => {
                                     setSelectedExerciseIndex(null);
                                     setPickerModalVisible(true);
                             }} />
-                            <Button title="Save Workouts" onPress={() => saveWorkout()} />
+                            <Button title="Save Workouts" color='#016e03' onPress={() => saveWorkout()} />
                             <View style={{height: 200}}/>
                         </View>
                     )}
@@ -1225,7 +1226,7 @@ const styles = StyleSheet.create({
     },
     hideButton: {
         padding: 10,
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
         borderRadius: 5,
     },
     hideButtonText: {
@@ -1290,7 +1291,7 @@ const styles = StyleSheet.create({
         marginVertical: 20,
     },
     saveButton: {
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
         paddingVertical: 12,
         paddingHorizontal: 32,
         borderRadius: 8,
@@ -1446,7 +1447,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f9fa',
     },
     configOptionSelected: {
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
         color: '#fff',
     },
     timerContainer: {
@@ -1507,7 +1508,7 @@ const styles = StyleSheet.create({
         alignSelf: 'center'
     },
     setTimerButton: {
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
         paddingVertical: 12,
         paddingHorizontal: 32,
         borderRadius: 8,
@@ -1668,7 +1669,7 @@ const styles = StyleSheet.create({
     workoutTimeText: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#007bff',
+        color: '#016e03',
     },
     toggleContainer: {
         flexDirection: 'row',
@@ -1767,7 +1768,7 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
     },
     adjustButtonText: {
         fontSize: 30,
@@ -1819,7 +1820,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         alignSelf: 'center',
         paddingLeft: 5,
-        color: '#007bff', // Customize as needed
+        color: '#016e03', // Customize as needed
         marginRight: 15, // Space between the indicator and the input fields
     },
     columnHeader: {

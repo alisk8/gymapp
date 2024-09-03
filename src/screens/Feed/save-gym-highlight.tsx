@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     saveButton: {
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
         paddingVertical: 12,
         paddingHorizontal: 32,
         borderRadius: 8,
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 4,
     },
     unitButtonSelected: {
-        backgroundColor: '#007bff',
+        backgroundColor: '#016e03',
     },
     unitButtonText: {
         color: '#fff',

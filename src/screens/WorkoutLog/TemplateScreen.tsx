@@ -106,9 +106,9 @@ const TemplateScreen = ({ route }) => {
             )}
 
 
-            <Button title="Load Template" onPress={handleLoadTemplate} />
-            <Button title="Start New Workout" onPress={startNewWorkout} />
-            <Button title="Cancel" onPress={() => navigation.goBack()} />
+            <Button title="Load Template" color='#016e03' onPress={handleLoadTemplate} />
+            <Button title="Start New Workout" color='#016e03' onPress={startNewWorkout} />
+            <Button title="Cancel" color='#CE2029' onPress={() => navigation.goBack()} />
         </View>
     );
 };
