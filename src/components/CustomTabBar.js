@@ -33,7 +33,6 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                     return (
                         <React.Fragment key="workout-log">
                             {/* Render the first half of the tabs */}
-                            <View style={styles.tabItemsContainerLeft}>
                                 {state.routes.slice(0, middleIndex).map((route, idx) => {
                                     const { options } = descriptors[route.key];
                                     const isFocused = state.index === idx;
@@ -97,7 +96,6 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                                         </TouchableOpacity>
                                     );
                                 })}
-                            </View>
 
                             {/* Workout Log Button in the Middle */}
                             <TouchableOpacity
@@ -109,7 +107,6 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                             </TouchableOpacity>
 
                             {/* Render the second half of the tabs */}
-                            <View style={styles.tabItemsContainerRight}>
                                 {state.routes.slice(middleIndex).map((route, idx) => {
                                     const { options } = descriptors[route.key];
                                     const isFocused = state.index === middleIndex + idx;
@@ -173,7 +170,6 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                                         </TouchableOpacity>
                                     );
                                 })}
-                            </View>
                         </React.Fragment>
                     );
                 }
@@ -219,7 +215,7 @@ const styles = StyleSheet.create({
         fontSize: 10,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 7,
+        paddingHorizontal: 5,
     },
     tabBarActiveTintColor: '#007BFF',
     tabBarInactiveTintColor: '#8e8e93',
