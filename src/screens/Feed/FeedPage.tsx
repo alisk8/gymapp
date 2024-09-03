@@ -1,35 +1,65 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, FlatList, TouchableOpacity, RefreshControl, TextInput, Modal } from 'react-native';
 import { db, firebase_auth } from '../../../firebaseConfig';
 import { collection, getDocs, query, orderBy, limit, startAfter, doc, getDoc, updateDoc, arrayUnion, arrayRemove } from '@firebase/firestore';
 import { InteractionManager } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Swiper from 'react-native-swiper';
 import { useFocusEffect } from "@react-navigation/native";
+import {Ionicons} from "@expo/vector-icons";
 
 const defaultProfilePicture = 'https://firebasestorage.googleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2Fpfp.jpeg?alt=media&token=dd124ee9-6c61-48ad-b41c-97f3acc3350c';
 
 const FeedPage = ({ navigation }) => {
   const [highlights, setHighlights] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [lastVisible, setLastVisible] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadedHighlightIds, setLoadedHighlightIds] = useState(new Set());
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+
+  // Modal state
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState(null);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       fetchUserProfile();
+      fetchUsers();
     });
     return () => task.cancel();
   }, []);
 
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: 'Feed Page',
+      headerRight: () => <CustomHeaderView />,
+    });
+  }, [navigation]);
+
+
+  const CustomHeaderView = () => (
+
+      <TouchableOpacity
+          onPress={() => {
+            navigation.navigate('SaveGymHighlightScreen');
+          }}
+          style={{ marginRight: 5, marginBottom: 5, }} // Adjust margin as needed
+      >
+        <Ionicons name="create-outline" size={24} color="black" />
+      </TouchableOpacity>
+  );
+
   useFocusEffect(
     useCallback(() => {
       if (userProfile) {
-        fetchHighlights(true);
+        fetchHighlights(true);  // true indicates it's a refresh
       }
     }, [userProfile])
   );
@@ -54,22 +84,60 @@ const FeedPage = ({ navigation }) => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const userCollection = collection(db, "userProfiles");
+      const userSnapshot = await getDocs(userCollection);
+      const userList = userSnapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .filter((user) => user.id !== firebase_auth.currentUser.uid); // Filter out the current user
+      setUsers(userList);
+    } catch (error) {
+      console.error("Error fetching users: ", error);
+    }
+  };
+
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = users.filter((user) => {
+        const fullName = `${user.firstName?.toLowerCase()} ${user.lastName?.toLowerCase()}`;
+        return fullName.includes(searchQuery.toLowerCase());
+      });
+      setFilteredUsers(filtered);
+    } else {
+      setFilteredUsers([]);
+    }
+  }, [searchQuery, users]);
+
   const fetchCommentCount = async (userId, postId, collectionName) => {
     try {
       const commentsRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments');
       const commentsSnapshot = await getDocs(commentsRef);
-      return commentsSnapshot.size;
+  
+      let totalCount = commentsSnapshot.size;
+  
+      // For each comment, fetch the number of replies
+      for (const commentDoc of commentsSnapshot.docs) {
+        const repliesRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments', commentDoc.id, 'replies');
+        const repliesSnapshot = await getDocs(repliesRef);
+        totalCount += repliesSnapshot.size;
+      }
+  
+      return totalCount;
     } catch (error) {
       console.error('Error fetching comment count: ', error);
       return 0;
     }
   };
+  
 
   const fetchHighlights = async (isRefresh = false) => {
     if (isRefresh) {
-      setLoading(true);
+      setRefreshing(true);
       setLastVisible({});
-      setHighlights([]);
       setLoadedHighlightIds(new Set());
     }
 
@@ -82,6 +150,7 @@ const FeedPage = ({ navigation }) => {
       if (following.length === 0) {
         setLoading(false);
         setLoadingMore(false);
+        setRefreshing(false);
         return;
       }
 
@@ -107,10 +176,10 @@ const FeedPage = ({ navigation }) => {
           limit(10)
         );
 
-        if (lastVisible[userId] && lastVisible[userId].highlight) {
+        if (lastVisible[userId] && lastVisible[userId].highlight && !isRefresh) {
           highlightsQuery = query(highlightsQuery, startAfter(lastVisible[userId].highlight));
         }
-        if (lastVisible[userId] && lastVisible[userId].workout) {
+        if (lastVisible[userId] && lastVisible[userId].workout && !isRefresh) {
           workoutsQuery = query(workoutsQuery, startAfter(lastVisible[userId].workout));
         }
 
@@ -121,7 +190,7 @@ const FeedPage = ({ navigation }) => {
 
         if (highlightsSnapshot.docs.length > 0) {
           newLastVisible[userId] = {
-            ...newLastVisible[userId], 
+            ...newLastVisible[userId],
             highlight: highlightsSnapshot.docs[highlightsSnapshot.docs.length - 1]
           };
 
@@ -151,7 +220,7 @@ const FeedPage = ({ navigation }) => {
 
         if (workoutsSnapshot.docs.length > 0) {
           newLastVisible[userId] = {
-            ...newLastVisible[userId], 
+            ...newLastVisible[userId],
             workout: workoutsSnapshot.docs[workoutsSnapshot.docs.length - 1]
           };
 
@@ -183,17 +252,32 @@ const FeedPage = ({ navigation }) => {
 
       allHighlights.sort((a, b) => b.timestamp - a.timestamp);
       setHighlights(prevHighlights => {
-        const mergedHighlights = isRefresh ? allHighlights : [...prevHighlights, ...allHighlights];
-        return mergedHighlights.sort((a, b) => b.timestamp - a.timestamp);
+        if (isRefresh) {
+          const updatedHighlights = [...allHighlights];
+          prevHighlights.forEach((highlight) => {
+            if (!loadedHighlightIds.has(highlight.id)) {
+              updatedHighlights.push(highlight);
+            }
+          });
+          return updatedHighlights.sort((a, b) => b.timestamp - a.timestamp);
+        } else {
+          const postIdSet = new Set(prevHighlights.map(post => post.id));
+          const filteredNewHighlights = allHighlights.filter(
+            (highlight) => !postIdSet.has(highlight.id)
+          );
+          return [...prevHighlights, ...filteredNewHighlights].sort((a, b) => b.timestamp - a.timestamp);
+        }
       });
       setLastVisible(newLastVisible);
       setLoading(false);
       setLoadingMore(false);
+      setRefreshing(false);
     } catch (error) {
       console.error('Error fetching highlights: ', error);
       setError('Failed to load highlights');
       setLoading(false);
       setLoadingMore(false);
+      setRefreshing(false);
     }
   };
 
@@ -216,7 +300,7 @@ const FeedPage = ({ navigation }) => {
           likes: arrayUnion(userUid),
         });
 
-        setHighlights(prevHighlights => prevHighlights.map(post => 
+        setHighlights(prevHighlights => prevHighlights.map(post =>
           post.id === postId ? { ...post, liked: true, likes: post.likes + 1 } : post
         ));
       } else {
@@ -246,7 +330,7 @@ const FeedPage = ({ navigation }) => {
           likes: arrayRemove(userUid),
         });
 
-        setHighlights(prevHighlights => prevHighlights.map(post => 
+        setHighlights(prevHighlights => prevHighlights.map(post =>
           post.id === postId ? { ...post, liked: false, likes: post.likes - 1 } : post
         ));
       } else {
@@ -281,7 +365,7 @@ const FeedPage = ({ navigation }) => {
           savedPosts: arrayUnion({ collection: collectionName, postId, userId }),
         });
 
-        setHighlights(prevHighlights => prevHighlights.map(post => 
+        setHighlights(prevHighlights => prevHighlights.map(post =>
           post.id === postId ? { ...post, saved: true, savedBy: post.savedBy + 1 } : post
         ));
       } else {
@@ -316,7 +400,7 @@ const FeedPage = ({ navigation }) => {
           savedPosts: arrayRemove({ collection: collectionName, postId, userId }),
         });
 
-        setHighlights(prevHighlights => prevHighlights.map(post => 
+        setHighlights(prevHighlights => prevHighlights.map(post =>
           post.id === postId ? { ...post, saved: false, savedBy: post.savedBy - 1 } : post
         ));
       } else {
@@ -331,142 +415,179 @@ const FeedPage = ({ navigation }) => {
     navigation.navigate('Comments', { postId, userId, isWorkout });
   };
 
-  const refreshHighlights = async () => {
-    setRefreshing(true);
-    await fetchHighlights(true);
-    setRefreshing(false);
+  const formatTotalWorkoutTime = (totalTime) => {
+    const minutes = Math.floor(totalTime / 60000); // Convert milliseconds to minutes
+    const seconds = Math.floor((totalTime % 60000) / 1000); // Get remaining seconds
+    return `${minutes} mins ${seconds} secs`;
   };
 
-  const formatTotalWorkoutTime = (totalTime) => {
-    const minutes = Math.floor(totalTime / 60);
-    const seconds = totalTime % 60;
-    return `${minutes} mins ${seconds} secs`;
+  const openModal = (mediaUrl) => {
+    setSelectedMedia(mediaUrl);
+    setIsModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setIsModalVisible(false);
+    setSelectedMedia(null);
   };
 
   const renderItem = useCallback(({ item }) => {
     if (item.type === 'workout') {
-      const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.setsNum), 0);
-      const elapsedTime  = formatTotalWorkoutTime(item.totalWorkoutTime);
+        console.log('Item received:', item); // Debugging statement
 
-      return (
-        <View style={styles.highlightContainer}>
-          <View style={styles.userInfoContainer}>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
-            </TouchableOpacity>
-          </View>
+        // Ensure that totalWorkoutTime is defined
+        if (typeof item.totalWorkoutTime === 'undefined' || item.totalWorkoutTime === null) {
+            console.log('totalWorkoutTime is undefined or null for item:', item.id);
+            return null; // Skip rendering this item if time is not available
+        }
 
-          {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
-          {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+        const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.sets ? exercise.sets.length : 0), 0);
+        const elapsedTime = formatTotalWorkoutTime(item.totalWorkoutTime);
 
-          <View style={styles.metricsContainer}>
-            <Text style={styles.metricText}>{`Total Sets: ${totalSets}`}</Text>
-            <Text style={styles.metricText}>{`Workout Time: ${elapsedTime}`}</Text>
-          </View>
+        const getBestSet = (sets) => {
+            if (!sets || sets.length === 0) return null;
 
-          <Text style={styles.exerciseHeader}>Exercises:</Text>
-          <View style={styles.exerciseNamesContainer}>
-            {item.exercises.map((exercise, index) => (
-              <View key={index} style={styles.exerciseItemContainer}>
-                <Text style={styles.exerciseNameText}>{exercise.name}</Text>
-                {exercise.bestSet && (
-                  <Text style={styles.bestSetText}>
-                    {`Best Set: ${exercise.bestSet.weight ?? '-'} ${exercise.bestSet.weightUnit ?? ''} x ${exercise.bestSet.reps ?? '-'} ${exercise.bestSet.repsUnit ?? ''}`}
-                  </Text>
+            return sets.reduce((bestSet, currentSet) => {
+                if (currentSet.weight > bestSet.weight) {
+                    return currentSet;
+                } else if (currentSet.weight === bestSet.weight && currentSet.reps > bestSet.reps) {
+                    return currentSet;
+                }
+                return bestSet;
+            });
+        };
+
+        return (
+            <View style={styles.highlightContainer}>
+                <View style={styles.userInfoContainer}>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {item.workoutDescription && <Text style={styles.descriptionText}>{item.workoutDescription}</Text>}
+                <View style={styles.metricsContainer}>
+                    <Text style={styles.metricText}>{`Total Sets: ${totalSets}`}</Text>
+                    <Text style={styles.metricText}>{`Workout Time: ${elapsedTime}`}</Text>
+                </View>
+                <Text style={styles.exerciseHeader}>{item.title}</Text>
+                {item.exercises && item.exercises.length > 0 ? (
+                    <View style={styles.exerciseNamesContainer}>
+                        {item.exercises.map((exercise, index) => {
+                            const bestSet = getBestSet(exercise.sets);
+                            if (!bestSet) {
+                                return (
+                                    <Text key={index} style={styles.bestSetText}>
+                                        No sets available
+                                    </Text>
+                                );
+                            }
+
+                            return (
+                                <View key={index} style={styles.exerciseItemContainer}>
+                                    <Text style={styles.exerciseNameText}>{exercise.name}</Text>
+                                    <Text style={styles.bestSetText}>
+                                        {`Total Sets: ${exercise.sets.length}`}
+                                    </Text>
+                                    <Text style={styles.bestSetText}>
+                                        {`Best Set: ${bestSet.weight} ${exercise.weightUnit} x ${exercise.repsUnit === 'time' ? `${Math.floor(bestSet.reps / 60000)} mins ${Math.floor((bestSet.reps % 60000) / 1000)} secs` : `${bestSet.reps} ${exercise.repsUnit}`}`}
+                                    </Text>
+                                    
+                                    {exercise.isSuperset && exercise.supersetExercise && (
+                                        <Text style={styles.supersetText}>
+                                            {`Superset with: ${exercise.supersetExercise}`}
+                                        </Text>
+                                    )}
+                                </View>
+                            );
+                        })}
+                    </View>
+                ) : (
+                    <Text style={styles.bestSetText}>No exercises available</Text>
                 )}
-                {!exercise.bestSet && (
-                  <Text style={styles.bestSetText}>Best Set: Not available</Text>
+                {item.mediaUrls && item.mediaUrls.length > 0 && (
+                    <View style={styles.imageContainer}>
+                        <Swiper style={styles.swiper} showsPagination={true}>
+                            {item.mediaUrls.map((mediaUrl, index) => (
+                                <TouchableOpacity key={`${item.id}_${index}`} onPress={() => openModal(mediaUrl)}>
+                                  <Image
+                                      source={{ uri: mediaUrl }}
+                                      style={styles.postImage}
+                                  />
+                                </TouchableOpacity>
+                            ))}
+                        </Swiper>
+                    </View>
                 )}
-              </View>
-            ))}
-          </View>
-          {item.mediaUrls && item.mediaUrls.length > 0 && (
-            <View style={styles.imageContainer}>
-              <Swiper style={styles.swiper} showsPagination={true}>
-                {item.mediaUrls.map((mediaUrl, index) => (
-                  <Image
-                    key={`${item.id}_${index}`}
-                    source={{ uri: mediaUrl }}
-                    style={styles.postImage}
-                  />
-                ))}
-              </Swiper>
+
+                {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+                <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, true) : handleLike(item.id, item.userId, true)}>
+                        <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.likes}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, true)}>
+                        <Icon name="chatbubble-outline" size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.commentCount}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, true) : handleSave(item.id, item.userId, true)}>
+                        <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.savedBy}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-          )}
-
-          {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, true) : handleLike(item.id, item.userId, true)}>
-              <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.likes}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, true)}>
-              <Icon name="chatbubble-outline" size={25} color="#000" />
-              <Text style={styles.actionText}>{item.commentCount}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
-              <Icon name="share-outline" size={25} color="#000" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, true) : handleSave(item.id, item.userId, true)}>
-              <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.savedBy}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )
+        );
     } else {
-      return (
-        <View style={styles.highlightContainer}>
-          <View style={styles.userInfoContainer}>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
-            </TouchableOpacity>
-          </View>
-          {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
-          {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
-          {item.mediaUrls && item.mediaUrls.length > 0 && (
-            <View style={styles.imageContainer}>
-              <Swiper style={styles.swiper} showsPagination={true}>
-                {item.mediaUrls.map((mediaUrl, index) => (
-                  <Image
-                    key={`${item.id}_${index}`}
-                    source={{ uri: mediaUrl }}
-                    style={styles.postImage}
-                  />
-                ))}
-              </Swiper>
+        return (
+            <View style={styles.highlightContainer}>
+                <View style={styles.userInfoContainer}>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+                    </TouchableOpacity>
+                </View>
+                {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
+                {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+                {item.mediaUrls && item.mediaUrls.length > 0 && (
+                    <View style={styles.imageContainer}>
+                        <Swiper style={styles.swiper} showsPagination={true}>
+                            {item.mediaUrls.map((mediaUrl, index) => (
+                                <TouchableOpacity key={`${item.id}_${index}`} onPress={() => openModal(mediaUrl)}>
+                                  <Image
+                                      source={{ uri: mediaUrl }}
+                                      style={styles.postImage}
+                                  />
+                                </TouchableOpacity>
+                            ))}
+                        </Swiper>
+                    </View>
+                )}
+                {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+                <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, false) : handleLike(item.id, item.userId, false)}>
+                        <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.likes}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, false)}>
+                        <Icon name="chatbubble-outline" size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.commentCount}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, false) : handleSave(item.id, item.userId, false)}>
+                        <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.savedBy}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-          )}
-          {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, false) : handleLike(item.id, item.userId, false)}>
-              <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.likes}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, false)}>
-              <Icon name="chatbubble-outline" size={25} color="#000" />
-              <Text style={styles.actionText}>{item.commentCount}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleShare(item.id)}>
-              <Icon name="share-outline" size={25} color="#000" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, false) : handleSave(item.id, item.userId, false)}>
-              <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.savedBy}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
+        );
     }
-  }, []);
+}, []);
 
-  if (loading && !refreshing) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
@@ -483,21 +604,55 @@ const FeedPage = ({ navigation }) => {
   }
 
   return (
-    <FlatList
-      data={highlights}
-      keyExtractor={item => item.id}
-      renderItem={renderItem}
-      onEndReached={() => {
-        if (!loadingMore) {
-          fetchHighlights();
+    <View style={{ flex: 1 }}>
+      <FlatList
+        data={searchQuery.length > 0 ? filteredUsers : highlights}
+        keyExtractor={item => item.id}
+        renderItem={searchQuery.length > 0 ? ({ item }) => (
+          <TouchableOpacity
+            style={styles.userItem}
+            onPress={() => navigation.navigate("UserDetails", { user: item })}
+          >
+            <Text style={styles.userName}>
+              {item.firstName} {item.lastName}
+            </Text>
+          </TouchableOpacity>
+        ) : renderItem}
+        onEndReached={() => {
+          if (!loadingMore && searchQuery.length === 0) {
+            fetchHighlights();
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchHighlights(true)} />
         }
-      }}
-      onEndReachedThreshold={0.5}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={refreshHighlights} />
-      }
-      ListFooterComponent={loadingMore && <ActivityIndicator size="large" color="#0000ff" />}
-    />
+        ListHeaderComponent={
+          <TextInput
+            style={styles.searchBar}
+            placeholder="Search for users..."
+            value={searchQuery}
+            onChangeText={(text) => setSearchQuery(text)}
+          />
+        }
+      />
+      
+      {isModalVisible && selectedMedia && (
+        <Modal visible={isModalVisible} transparent={true} animationType="fade">
+          <View style={styles.modalContainer}>
+            <TouchableOpacity style={styles.modalCloseButton} onPress={closeModal}>
+              <Icon name="close" size={30} color="#fff" />
+            </TouchableOpacity>
+            <Image
+              source={{ uri: selectedMedia }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 };
 
@@ -510,7 +665,9 @@ const styles = StyleSheet.create({
   },
   userNameText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Rubik-Bold',
+    color: '#000',
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   swiper: {
     height: 300,
@@ -530,6 +687,7 @@ const styles = StyleSheet.create({
   actionText: {
     marginLeft: 5,
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#000',
   },
   loadingContainer: {
@@ -543,8 +701,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    color: 'black',
+    color: '#000',
     fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   exerciseNamesContainer: {
     paddingHorizontal: 10,
@@ -568,50 +728,61 @@ const styles = StyleSheet.create({
   },
   captionText: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: 'Rubik-Bold',
     marginVertical: 5,
     color: '#333',
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   descriptionText: {
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#666',
     marginBottom: 10,
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   metricsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 10,
+    flexDirection: 'column', // Display metrics in a column
   },
   metricText: {
     fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
     color: '#007bff',
-    fontWeight: '600',
+    marginBottom: 2, // Add some space between the two lines
   },
   exerciseHeader: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Rubik-Bold',
     marginBottom: 5,
     color: '#333',
-  },
-  exerciseNamesContainer: {
-    marginBottom: 15,
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   exerciseItemContainer: {
-    backgroundColor: '#f8f8f8',
     padding: 10,
     borderRadius: 5,
     marginBottom: 5,
+    backgroundColor: '#D4DEE7',
+
   },
   exerciseNameText: {
     fontSize: 16,
+    fontFamily: 'Rubik-Bold',
     color: '#007bff',
-    fontWeight: 'bold',
-    marginBottom: 3,
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   bestSetText: {
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#555',
     marginTop: 2,
+    fontWeight: 'bold',
+  },
+  supersetText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+    marginTop: 2,
+    flex: 1, // Ensure the text takes up available space and wraps
   },
   imageContainer: {
     marginTop: 10,
@@ -620,12 +791,55 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 300,
     borderRadius: 10,
+    borderWidth: 1, // Add 1px border
+    borderColor: '#000', // Black border color
   },
   timestampText: {
     fontSize: 12,
+    fontFamily: 'Inter-Regular',
     color: '#888',
     marginTop: 10,
     alignSelf: 'flex-end',
+    flex: 1, // Ensure the text takes up available space and wraps
+  },
+  searchBar: {
+    height: 40,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    marginBottom: 16,
+    marginHorizontal: 15,
+    fontFamily: 'Inter-Regular',
+    color: '#000',
+    backgroundColor: '#f8f8f8',
+  },
+  userItem: {
+    padding: 12,
+    borderBottomColor: "#ccc",
+    borderBottomWidth: 1,
+  },
+  userName: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#000',
+    flex: 1, // Ensure the text takes up available space and wraps
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '80%',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 1,
   },
 });
 

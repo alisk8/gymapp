@@ -276,30 +276,33 @@ const Comments = ({ route, navigation }) => {
     return comment;
   };
 
-  const renderComment = (comment: Comment, level = 0) => {
-    const liked = comment.likes.includes(firebase_auth.currentUser.uid);
-    return (
-      <View key={comment.id} style={[styles.commentContainer, { marginLeft: level * 20 }]}>
-        <View style={styles.commentRow}>
-          <Image source={{ uri: currentUserProfile?.profilePicture || defaultProfilePicture }} style={styles.profilePicture} />
-          <View style={styles.commentContent}>
-            <Text style={styles.commenterName}>{comment.userName}</Text>
-            <Text style={styles.commentText}>{comment.text}</Text>
-          </View>
+  const renderComment = (comment: Comment) => {
+  const liked = comment.likes.includes(firebase_auth.currentUser.uid);
+  const commenterProfilePicture = userProfiles[comment.userId]?.profilePicture || defaultProfilePicture;
+
+  return (
+    <View key={comment.id} style={styles.commentContainer}>
+      <View style={styles.commentRow}>
+        <Image source={{ uri: commenterProfilePicture }} style={styles.profilePicture} />
+        <View style={styles.commentContent}>
+          <Text style={styles.commenterName}>{comment.userName}</Text>
+          <Text style={styles.commentText}>{comment.text}</Text>
         </View>
-        <View style={styles.commentActions}>
-          <TouchableOpacity onPress={() => liked ? handleUnlikeComment(comment.id, level > 0, comment.id) : handleLikeComment(comment.id, level > 0, comment.id)}>
-            <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color="#000" />
-            <Text style={styles.likeCount}>{comment.likes.length}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setReplyingTo(comment)}>
-            <Icon name="chatbubble-outline" size={20} color="#000" />
-          </TouchableOpacity>
-        </View>
-        {comment.replies && comment.replies.map(reply => renderComment(reply, level + 1))}
       </View>
-    );
-  };
+      <View style={styles.commentActions}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => liked ? handleUnlikeComment(comment.id) : handleLikeComment(comment.id)}>
+          <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color="#000" />
+          <Text style={styles.likeCount}>{comment.likes.length}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={() => setReplyingTo(comment)}>
+          <Icon name="chatbubble-outline" size={20} color="#000" />
+        </TouchableOpacity>
+      </View>
+      {comment.replies && comment.replies.map(reply => renderComment(reply))}
+    </View>
+  );
+};
+
 
   if (loading) {
     return (
@@ -392,6 +395,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 5,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 15,  // Adds space between the like and reply buttons
   },
   likeCount: {
     fontSize: 12,

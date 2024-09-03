@@ -10,17 +10,13 @@ import { useWorkout } from '../contexts/WorkoutContext';
 
 const CustomTabBar = ({ state, descriptors, navigation }) => {
     const nav = useNavigation();
-    const { workoutState, workoutFinished, workoutMode} = useWorkout();
+    const { workoutState, isWorkoutLogActive, isPaused} = useWorkout();
 
     const handleOpenWorkoutLog = () => {
-        if(workoutFinished){
+        if(isPaused){
             nav.navigate('WorkoutSummaryScreen',{ previousScreen: nav.getCurrentRoute().name} )
         }
-        else if (workoutState && workoutMode === 'Quick'){
-            nav.navigate('QuickMode', { previousScreen: nav.getCurrentRoute().name });
-        }
         else if (workoutState) {
-            console.log('wtf', workoutFinished);
             nav.navigate('WorkoutLog', { previousScreen: nav.getCurrentRoute().name });
         } else {
             nav.navigate('TemplateScreen', { previousScreen: nav.getCurrentRoute().name });
@@ -82,7 +78,6 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                         style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
                     >
                         <Ionicons
-                            name={options.tabBarIcon?.name}
                             size={24}
                             color={isFocused ? '#673ab7' : '#222'}
                         />
