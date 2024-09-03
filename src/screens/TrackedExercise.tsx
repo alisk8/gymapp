@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -7,8 +7,6 @@ import {
   Dimensions,
   TouchableOpacity,
   Alert,
-  Animated,
-  Easing,
   Modal,
   FlatList,
 } from "react-native";
@@ -39,10 +37,9 @@ const TrackedExercise = ({ route }) => {
   const { exercise } = route.params;
   const [exerciseInstances, setExerciseInstances] = useState([]);
   const [showInstances, setShowInstances] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedMonth, setSelectedMonth] = useState(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [cumulativeVolume, setCumulativeVolume] = useState(0);
-  const animatedValue = useRef(new Animated.Value(0)).current;
   const [customTimeline, setCustomTimeline] = useState({
     start: null,
     end: null,
@@ -52,7 +49,6 @@ const TrackedExercise = ({ route }) => {
     useState(false);
   const [isEndMonthPickerVisible, setEndMonthPickerVisibility] =
     useState(false);
-
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
@@ -60,23 +56,19 @@ const TrackedExercise = ({ route }) => {
   }, []);
 
   useEffect(() => {
-    calculateCumulativeVolume(exerciseInstances);
-  }, [exerciseInstances]);
-
-  useEffect(() => {
-    Animated.timing(animatedValue, {
-      toValue: cumulativeVolume,
-      duration: 1500,
-      easing: Easing.ease,
-      useNativeDriver: false,
-    }).start();
-  }, [cumulativeVolume]);
+    updateCumulativeVolume();
+  }, [exerciseInstances, selectedMonth, selectedYear, customTimelineSelected]);
 
   const fetchExerciseInstances = async () => {
     const user = firebase_auth.currentUser;
     if (user) {
-      const uid = "X1Nx52EQsHbEOz5mQyVmFum704X2"; // For testing, replace with user.uid in production
-      const workoutsRef = collection(db, "userProfiles", uid, "workouts");
+      const uid = user.uid;
+      const workoutsRef = collection(
+        db,
+        "userProfiles",
+        "X1Nx52EQsHbEOz5mQyVmFum704X2",
+        "workouts"
+      );
       const workoutsSnapshot = await getDocs(workoutsRef);
 
       const instances = [];
@@ -97,7 +89,6 @@ const TrackedExercise = ({ route }) => {
       });
 
       setExerciseInstances(instances);
-      calculateCumulativeVolume(instances);
     } else {
       Alert.alert("Error", "User not authenticated.");
     }
@@ -107,26 +98,12 @@ const TrackedExercise = ({ route }) => {
     let totalVolume = 0;
     instances.forEach((instance) => {
       instance.sets.forEach((set) => {
-        const reps = parseInt(set.reps.replace(/\D/g, ""), 10);
-        let weight = 0;
-        if (set.weight === "BW") {
-          weight = 150;
-        } else if (set.weight.includes("BW +")) {
-          const additionalWeight = parseInt(set.weight.replace(/\D/g, ""), 10);
-          weight = 150 + additionalWeight;
-        } else {
-          weight = parseInt(set.weight.replace(/\D/g, ""), 10);
-        }
+        const reps = set.reps;
+        const weight = set.weight;
         totalVolume += weight * reps;
       });
     });
-    setCumulativeVolume(totalVolume);
-    Animated.timing(animatedValue, {
-      toValue: totalVolume,
-      duration: 1500,
-      easing: Easing.ease,
-      useNativeDriver: false,
-    }).start();
+    return totalVolume;
   };
 
   const calculateOneRepMax = (weight, reps) => weight * (1 + reps / 30);
@@ -154,16 +131,8 @@ const TrackedExercise = ({ route }) => {
         };
       }
       sets.forEach((set) => {
-        const reps = parseInt(set.reps.replace(/\D/g, ""), 10);
-        let weight = 0;
-        if (set.weight === "BW") {
-          weight = 150;
-        } else if (set.weight.includes("BW +")) {
-          const additionalWeight = parseInt(set.weight.replace(/\D/g, ""), 10);
-          weight = 150 + additionalWeight;
-        } else {
-          weight = parseInt(set.weight.replace(/\D/g, ""), 10);
-        }
+        const reps = set.reps;
+        const weight = set.weight;
         const oneRepMax = calculateOneRepMax(weight, reps);
         dataByDate[workoutDate].totalWeight += weight * reps;
         dataByDate[workoutDate].totalReps += reps;
@@ -222,30 +191,53 @@ const TrackedExercise = ({ route }) => {
           new Date(item.date) >= new Date(customTimeline.start) &&
           new Date(item.date) <= new Date(customTimeline.end)
       )
-    : filterDataByMonthYear(oneRepMaxAverages, selectedMonth, selectedYear);
+    : selectedMonth !== null
+    ? filterDataByMonthYear(oneRepMaxAverages, selectedMonth, selectedYear)
+    : oneRepMaxAverages;
   const filteredSetsTimesRepsAverages = customTimelineSelected
     ? setsTimesRepsAverages.filter(
         (item) =>
           new Date(item.date) >= new Date(customTimeline.start) &&
           new Date(item.date) <= new Date(customTimeline.end)
       )
-    : filterDataByMonthYear(setsTimesRepsAverages, selectedMonth, selectedYear);
+    : selectedMonth !== null
+    ? filterDataByMonthYear(setsTimesRepsAverages, selectedMonth, selectedYear)
+    : setsTimesRepsAverages;
   const filteredTotalVolume = customTimelineSelected
     ? totalVolume.filter(
         (item) =>
           new Date(item.date) >= new Date(customTimeline.start) &&
           new Date(item.date) <= new Date(customTimeline.end)
       )
-    : filterDataByMonthYear(totalVolume, selectedMonth, selectedYear);
+    : selectedMonth !== null
+    ? filterDataByMonthYear(totalVolume, selectedMonth, selectedYear)
+    : totalVolume;
   const filteredInstanceCounts = customTimelineSelected
     ? instanceCounts.filter(
         (item) =>
           new Date(item.date) >= new Date(customTimeline.start) &&
           new Date(item.date) <= new Date(customTimeline.end)
       )
-    : filterDataByMonthYear(instanceCounts, selectedMonth, selectedYear);
+    : selectedMonth !== null
+    ? filterDataByMonthYear(instanceCounts, selectedMonth, selectedYear)
+    : instanceCounts;
 
   const hasData = filteredOneRepMaxAverages.length > 0;
+
+  const updateCumulativeVolume = () => {
+    const relevantData = customTimelineSelected
+      ? exerciseInstances.filter(
+          (instance) =>
+            new Date(instance.workoutDate) >= new Date(customTimeline.start) &&
+            new Date(instance.workoutDate) <= new Date(customTimeline.end)
+        )
+      : selectedMonth !== null
+      ? filterDataByMonthYear(exerciseInstances, selectedMonth, selectedYear)
+      : exerciseInstances;
+
+    const volume = calculateCumulativeVolume(relevantData);
+    setCumulativeVolume(volume);
+  };
 
   const handleCustomTimeline = () => {
     setShowModal(true);
@@ -284,7 +276,6 @@ const TrackedExercise = ({ route }) => {
       start: new Date(selectedYear, index, 1).toISOString(),
     });
     hideStartMonthPicker();
-    updateCumulativeVolume(index, selectedYear);
   };
 
   const handleConfirmEndMonth = (index) => {
@@ -293,15 +284,6 @@ const TrackedExercise = ({ route }) => {
       end: new Date(selectedYear, index + 1, 0).toISOString(),
     });
     hideEndMonthPicker();
-  };
-
-  const updateCumulativeVolume = (month, year) => {
-    const filteredInstances = filterDataByMonthYear(
-      exerciseInstances,
-      month,
-      year
-    );
-    calculateCumulativeVolume(filteredInstances);
   };
 
   const renderMonthPicker = ({ item, index }) => (
@@ -317,26 +299,14 @@ const TrackedExercise = ({ route }) => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
         <Text style={styles.heading}>{exercise.name} Progress</Text>
-        <Text style={styles.subheading}>Weight Types:</Text>
-        <Text style={styles.subheading}>1. [number] lbs / [number] kgs</Text>
-        <Text style={styles.subheading}>
-          2. BW (Body Weight, assumed to be 150 lbs)
-        </Text>
-        <Text style={styles.subheading}>
-          3. BW + [number] lbs / BW + [number] kgs
-        </Text>
+        {selectedMonth !== null && (
+          <Text style={styles.selectedMonthText}>
+            Showing data for {months[selectedMonth]} {selectedYear}
+          </Text>
+        )}
         <Text style={styles.cumulativeText}>
           Cumulative Volume Lifted:{" "}
-          <Animated.Text style={styles.cumulativeValue}>
-            {animatedValue
-              .interpolate({
-                inputRange: [0, cumulativeVolume],
-                outputRange: [0, cumulativeVolume],
-                extrapolate: "clamp",
-              })
-              .__getValue()}
-          </Animated.Text>{" "}
-          lbs
+          <Text style={styles.cumulativeValue}>{cumulativeVolume}</Text> lbs
         </Text>
         <TouchableOpacity
           style={styles.showButton}
@@ -352,42 +322,15 @@ const TrackedExercise = ({ route }) => {
           <View style={styles.instancesContainer}>
             {exerciseInstances.map((item) => (
               <View key={item.id} style={styles.card}>
-                <Text style={styles.dateText}>Date: {item.workoutDate}</Text>
+                <Text style={styles.dateText}>
+                  Date: {moment(item.workoutDate).format("MMM D, YYYY")}
+                </Text>
                 {item.sets.map((set, setIndex) => (
                   <View key={setIndex} style={styles.setContainer}>
                     <Text style={styles.detailText}>
-                      Set {setIndex + 1}:{" "}
-                      {parseInt(set.reps.replace(/\D/g, ""), 10)}{" "}
-                      {set.reps.includes("secs") ? "seconds" : "reps"},{" "}
-                      {set.weight === "BW"
-                        ? "bodyweight"
-                        : set.weight.includes("BW +")
-                        ? `weighted bodyweight (${set.weight})`
-                        : set.weight.includes("lbs")
-                        ? `${parseInt(set.weight.replace(/\D/g, ""), 10)} lbs`
-                        : `${parseInt(set.weight.replace(/\D/g, ""), 10)} kgs`}
+                      Set {setIndex + 1}: {set.reps} reps, {set.weight}{" "}
+                      {item.weightUnit}
                     </Text>
-                    {set.dropSets &&
-                      set.dropSets.map((dropset, dropsetIndex) => (
-                        <Text key={dropsetIndex} style={styles.dropsetText}>
-                          Dropset {dropsetIndex + 1}:{" "}
-                          {parseInt(dropset.reps.replace(/\D/g, ""), 10)}{" "}
-                          {dropset.reps.includes("secs") ? "seconds" : "reps"},{" "}
-                          {dropset.weight === "BW"
-                            ? "bodyweight"
-                            : dropset.weight.includes("BW +")
-                            ? `weighted bodyweight (${dropset.weight})`
-                            : dropset.weight.includes("lbs")
-                            ? `${parseInt(
-                                dropset.weight.replace(/\D/g, ""),
-                                10
-                              )} lbs`
-                            : `${parseInt(
-                                dropset.weight.replace(/\D/g, ""),
-                                10
-                              )} kgs`}
-                        </Text>
-                      ))}
                   </View>
                 ))}
               </View>
@@ -445,6 +388,34 @@ const TrackedExercise = ({ route }) => {
             </View>
           </View>
         </Modal>
+        <Modal
+          visible={isEndMonthPickerVisible}
+          transparent={true}
+          animationType="slide"
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <FlatList
+                data={months}
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity
+                    style={styles.monthPickerItem}
+                    onPress={() => handleConfirmEndMonth(index)}
+                  >
+                    <Text style={styles.monthPickerItemText}>{item}</Text>
+                  </TouchableOpacity>
+                )}
+                keyExtractor={(item, index) => index.toString()}
+              />
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={hideEndMonthPicker}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
         {hasData ? (
           <>
             <Text style={styles.chartTitle}>
@@ -456,11 +427,11 @@ const TrackedExercise = ({ route }) => {
                   value,
                   label: customTimelineSelected
                     ? moment(date).format("MMM YYYY")
-                    : moment(date).format("D"),
+                    : moment(date).format("MMM D"),
                 }))}
                 areaChart
                 height={250}
-                width={screenWidth - 120}
+                width={screenWidth - 60}
                 xAxisLabelTextStyle={styles.axisLabel}
                 yAxisTextStyle={styles.axisLabel}
                 color="#4484B2"
@@ -519,11 +490,11 @@ const TrackedExercise = ({ route }) => {
                   value,
                   label: customTimelineSelected
                     ? moment(date).format("MMM YYYY")
-                    : moment(date).format("D"),
+                    : moment(date).format("MMM D"),
                 }))}
                 areaChart
                 height={250}
-                width={screenWidth - 120}
+                width={screenWidth - 60}
                 xAxisLabelTextStyle={styles.axisLabel}
                 yAxisTextStyle={styles.axisLabel}
                 color="#4484B2"
@@ -580,11 +551,11 @@ const TrackedExercise = ({ route }) => {
                   value,
                   label: customTimelineSelected
                     ? moment(date).format("MMM YYYY")
-                    : moment(date).format("D"),
+                    : moment(date).format("MMM D"),
                 }))}
                 areaChart
                 height={250}
-                width={screenWidth - 120}
+                width={screenWidth - 60}
                 xAxisLabelTextStyle={styles.axisLabel}
                 yAxisTextStyle={styles.axisLabel}
                 color="#4484B2"
@@ -641,11 +612,11 @@ const TrackedExercise = ({ route }) => {
                   value,
                   label: customTimelineSelected
                     ? moment(date).format("MMM YYYY")
-                    : moment(date).format("D"),
+                    : moment(date).format("MMM D"),
                 }))}
                 areaChart
                 height={250}
-                width={screenWidth - 120}
+                width={screenWidth - 60}
                 xAxisLabelTextStyle={styles.axisLabel}
                 yAxisTextStyle={styles.axisLabel}
                 color="#4484B2"
@@ -711,34 +682,6 @@ const TrackedExercise = ({ route }) => {
                     : "Select Start Month"}
                 </Text>
               </TouchableOpacity>
-              <Modal
-                visible={isStartMonthPickerVisible}
-                transparent={true}
-                animationType="slide"
-              >
-                <View style={styles.modalContainer}>
-                  <View style={styles.modalContent}>
-                    <FlatList
-                      data={months}
-                      renderItem={({ item, index }) => (
-                        <TouchableOpacity
-                          style={styles.monthPickerItem}
-                          onPress={() => handleConfirmStartMonth(index)}
-                        >
-                          <Text style={styles.monthPickerItemText}>{item}</Text>
-                        </TouchableOpacity>
-                      )}
-                      keyExtractor={(item, index) => index.toString()}
-                    />
-                    <TouchableOpacity
-                      style={styles.modalButton}
-                      onPress={hideStartMonthPicker}
-                    >
-                      <Text style={styles.modalButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </Modal>
               <TouchableOpacity onPress={showEndMonthPicker}>
                 <Text style={styles.datePickerText}>
                   {customTimeline.end
@@ -746,34 +689,6 @@ const TrackedExercise = ({ route }) => {
                     : "Select End Month"}
                 </Text>
               </TouchableOpacity>
-              <Modal
-                visible={isEndMonthPickerVisible}
-                transparent={true}
-                animationType="slide"
-              >
-                <View style={styles.modalContainer}>
-                  <View style={styles.modalContent}>
-                    <FlatList
-                      data={months}
-                      renderItem={({ item, index }) => (
-                        <TouchableOpacity
-                          style={styles.monthPickerItem}
-                          onPress={() => handleConfirmEndMonth(index)}
-                        >
-                          <Text style={styles.monthPickerItemText}>{item}</Text>
-                        </TouchableOpacity>
-                      )}
-                      keyExtractor={(item, index) => index.toString()}
-                    />
-                    <TouchableOpacity
-                      style={styles.modalButton}
-                      onPress={hideEndMonthPicker}
-                    >
-                      <Text style={styles.modalButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </Modal>
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={handleConfirmCustomTimeline}
@@ -812,10 +727,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: "center",
   },
-  subheading: {
+  selectedMonthText: {
     fontSize: 16,
-    marginBottom: 5,
+    fontWeight: "bold",
     textAlign: "center",
+    marginVertical: 10,
   },
   showButton: {
     backgroundColor: "#6A0DAD",
@@ -856,11 +772,6 @@ const styles = StyleSheet.create({
     color: "#555",
     marginBottom: 5,
   },
-  dropsetText: {
-    fontSize: 14,
-    color: "#888",
-    marginLeft: 20,
-  },
   chartTitle: {
     fontSize: 18,
     fontWeight: "bold",
@@ -869,8 +780,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   chartContainer: {
-    height: 250, // Adjust the height as needed
+    height: 250,
     marginBottom: 20,
+    alignItems: "center",
   },
   noDataText: {
     fontSize: 18,

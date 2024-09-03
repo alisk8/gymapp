@@ -8,11 +8,21 @@ import {
   Alert,
   ScrollView,
   Image,
-  KeyboardTypeOptions,
+  KeyboardAvoidingView,
+  Platform,
+  Switch,
+  FlatList,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { firebase_auth, db } from "../../firebaseConfig";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { db } from "../../firebaseConfig";
+import {
+  doc,
+  updateDoc,
+  getDoc,
+  collection,
+  getDocs,
+} from "firebase/firestore";
+import { Ionicons } from "@expo/vector-icons";
 
 type AdditionalInfo = {
   firstName: string;
@@ -21,13 +31,31 @@ type AdditionalInfo = {
   weight: string;
   age: string;
   sex: string;
-  gym_interests: string[];
+  gym_interests: string;
   bio: string;
   profilePicture: string;
+  favoriteExercises: string[];
+  experienceLevel: string;
+  favoriteGym: string;
+  location: string;
+  displaySettings: Record<string, boolean>;
+};
+
+const defaultDisplaySettings = {
+  height: true,
+  weight: true,
+  age: true,
+  sex: true,
+  gym_interests: true,
+  bio: true,
+  favoriteExercises: true,
+  experienceLevel: true,
+  favoriteGym: true,
+  location: true,
 };
 
 export default function Settings({ route, navigation }) {
-  const { userId, onFieldUpdate } = route.params;
+  const { userId } = route.params;
   const [additionalInfo, setAdditionalInfo] = useState<AdditionalInfo>({
     firstName: "",
     lastName: "",
@@ -35,9 +63,14 @@ export default function Settings({ route, navigation }) {
     weight: "",
     age: "",
     sex: "",
-    gym_interests: [],
+    gym_interests: "",
     bio: "",
     profilePicture: "",
+    favoriteExercises: [],
+    experienceLevel: "",
+    favoriteGym: "",
+    location: "",
+    displaySettings: { ...defaultDisplaySettings },
   });
   const [tempInfo, setTempInfo] = useState<AdditionalInfo>({
     firstName: "",
@@ -46,29 +79,78 @@ export default function Settings({ route, navigation }) {
     weight: "",
     age: "",
     sex: "",
-    gym_interests: [],
+    gym_interests: "",
     bio: "",
     profilePicture: "",
+    favoriteExercises: [],
+    experienceLevel: "",
+    favoriteGym: "",
+    location: "",
+    displaySettings: { ...defaultDisplaySettings },
   });
+  const [exerciseInput, setExerciseInput] = useState("");
+  const [exerciseSuggestions, setExerciseSuggestions] = useState<string[]>([]);
+  const [exercisePresets, setExercisePresets] = useState([]);
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const docRef = doc(db, "userProfiles", userId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data() as AdditionalInfo;
-        setAdditionalInfo(data);
-        setTempInfo(data);
-      } else {
-        console.log("No such document!");
+      try {
+        const docRef = doc(db, "userProfiles", userId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data() as AdditionalInfo;
+          setAdditionalInfo({
+            ...data,
+            displaySettings: {
+              ...defaultDisplaySettings,
+              ...data.displaySettings,
+            },
+          });
+          setTempInfo({
+            ...data,
+            displaySettings: {
+              ...defaultDisplaySettings,
+              ...data.displaySettings,
+            },
+          });
+        } else {
+          console.log("No such document!");
+        }
+      } catch (error) {
+        console.error("Error fetching user data: ", error);
       }
     };
 
     fetchUserData();
+    fetchExercisePresets();
   }, [userId]);
+
+  const fetchExercisePresets = async () => {
+    try {
+      const presetsRef = collection(db, "exercisePresets");
+      const snapshot = await getDocs(presetsRef);
+      const exercises = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        name: doc.data().name,
+      }));
+      setExercisePresets(exercises);
+    } catch (error) {
+      console.error("Error fetching exercise presets: ", error);
+    }
+  };
 
   const handleUpdateField = (field: string, value: any) => {
     setTempInfo((prevInfo) => ({ ...prevInfo, [field]: value }));
+  };
+
+  const handleToggleDisplaySetting = (field: string) => {
+    setTempInfo((prevInfo) => ({
+      ...prevInfo,
+      displaySettings: {
+        ...prevInfo.displaySettings,
+        [field]: !prevInfo.displaySettings[field],
+      },
+    }));
   };
 
   const confirmUpdateProfile = async () => {
@@ -87,9 +169,6 @@ export default function Settings({ route, navigation }) {
               const docRef = doc(db, "userProfiles", userId);
               await updateDoc(docRef, tempInfo);
               setAdditionalInfo(tempInfo);
-              Object.keys(tempInfo).forEach((field) => {
-                onFieldUpdate(field, tempInfo[field]);
-              });
               Alert.alert("Success", "Profile updated successfully");
               navigation.goBack();
             } catch (error) {
@@ -116,55 +195,160 @@ export default function Settings({ route, navigation }) {
     }
   };
 
+  const handleExerciseInput = (text: string) => {
+    setExerciseInput(text);
+    const suggestions = exercisePresets
+      .filter((exercise) =>
+        exercise.name.toLowerCase().includes(text.toLowerCase())
+      )
+      .map((exercise) => exercise.name);
+    setExerciseSuggestions(suggestions);
+  };
+
+  const handleAddExercise = (exercise: string) => {
+    if (!tempInfo.favoriteExercises.includes(exercise)) {
+      handleUpdateField("favoriteExercises", [
+        ...tempInfo.favoriteExercises,
+        exercise,
+      ]);
+      setExerciseInput("");
+      setExerciseSuggestions([]);
+    }
+  };
+
+  const handleRemoveExercise = (exercise: string) => {
+    const updatedExercises = tempInfo.favoriteExercises.filter(
+      (ex) => ex !== exercise
+    );
+    handleUpdateField("favoriteExercises", updatedExercises);
+  };
+
+  const displayLabels = {
+    height: "Show Height on Profile",
+    weight: "Show Weight on Profile",
+    age: "Show Age on Profile",
+    sex: "Show Sex on Profile",
+    gym_interests: "Show Gym Interests on Profile",
+    bio: "Show Bio on Profile",
+    favoriteExercises: "Show Favorite Exercises on Profile",
+    experienceLevel: "Show Experience Level on Profile",
+    favoriteGym: "Show Favorite Gym on Profile",
+    location: "Show Location on Profile",
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Edit Profile</Text>
-      <TouchableOpacity onPress={pickImage}>
-        {tempInfo.profilePicture ? (
-          <Image
-            source={{ uri: tempInfo.profilePicture }}
-            style={styles.profileImage}
-          />
-        ) : (
-          <Text style={styles.uploadText}>Upload Profile Picture</Text>
-        )}
-      </TouchableOpacity>
-      {[
-        { label: "First Name", field: "firstName" },
-        { label: "Last Name", field: "lastName" },
-        { label: "Height (e.g., 6'1)", field: "height" },
-        { label: "Weight (lbs)", field: "weight" },
-        { label: "Age", field: "age", keyboardType: "numeric" },
-        { label: "Sex", field: "sex" },
-        { label: "Gym Interests (comma-separated)", field: "gym_interests" },
-        { label: "Bio", field: "bio" },
-      ].map(({ label, field, keyboardType }) => (
-        <View key={field} style={styles.inputGroup}>
-          <Text style={styles.label}>{label}</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.keyboardAvoidingView}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Edit Profile</Text>
+        <TouchableOpacity onPress={pickImage}>
+          {tempInfo.profilePicture ? (
+            <Image
+              source={{ uri: tempInfo.profilePicture }}
+              style={styles.profileImage}
+            />
+          ) : (
+            <Text style={styles.uploadText}>Upload Profile Picture</Text>
+          )}
+        </TouchableOpacity>
+        {[
+          { label: "First Name", field: "firstName" },
+          { label: "Last Name", field: "lastName" },
+          { label: "Height (e.g., 6'1\")", field: "height" },
+          { label: "Weight (lbs)", field: "weight", keyboardType: "numeric" },
+          { label: "Age", field: "age", keyboardType: "numeric" },
+          { label: "Sex", field: "sex" },
+          { label: "Gym Interests (comma-separated)", field: "gym_interests" },
+          { label: "Bio", field: "bio" },
+          { label: "Experience Level", field: "experienceLevel" },
+          { label: "Favorite Gym", field: "favoriteGym" },
+          { label: "Location", field: "location" },
+        ].map(({ label, field, keyboardType }) => (
+          <View key={field} style={styles.inputGroup}>
+            <View style={styles.labelContainer}>
+              <Text style={styles.label}>{label}</Text>
+              {field in tempInfo.displaySettings && (
+                <View style={styles.checkboxContainer}>
+                  <Text style={styles.checkboxLabel}>
+                    {displayLabels[field]}
+                  </Text>
+                  <Switch
+                    value={tempInfo.displaySettings[field]}
+                    onValueChange={() => handleToggleDisplaySetting(field)}
+                  />
+                </View>
+              )}
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder={label}
+              value={tempInfo[field] || ""}
+              onChangeText={(text) => handleUpdateField(field, text)}
+            />
+          </View>
+        ))}
+        <View style={styles.inputGroup}>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Favorite Exercises</Text>
+            <View style={styles.checkboxContainer}>
+              <Text style={styles.checkboxLabel}>
+                {displayLabels["favoriteExercises"]}
+              </Text>
+              <Switch
+                value={tempInfo.displaySettings["favoriteExercises"]}
+                onValueChange={() =>
+                  handleToggleDisplaySetting("favoriteExercises")
+                }
+              />
+            </View>
+          </View>
           <TextInput
             style={styles.input}
-            placeholder={label}
-            value={
-              field === "gym_interests"
-                ? tempInfo[field].join(", ")
-                : tempInfo[field]
-            }
-            onChangeText={(text) => {
-              const value = field === "gym_interests" ? text.split(", ") : text;
-              handleUpdateField(field, value);
-            }}
-            keyboardType={keyboardType as KeyboardTypeOptions}
+            placeholder="Add Exercise"
+            value={exerciseInput}
+            onChangeText={handleExerciseInput}
           />
+          {exerciseSuggestions.length > 0 && (
+            <FlatList
+              data={exerciseSuggestions}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.suggestion}
+                  onPress={() => handleAddExercise(item)}
+                >
+                  <Text>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+          <View style={styles.selectedExercisesContainer}>
+            {tempInfo.favoriteExercises.map((exercise) => (
+              <View key={exercise} style={styles.selectedExercise}>
+                <Text>{exercise}</Text>
+                <TouchableOpacity
+                  onPress={() => handleRemoveExercise(exercise)}
+                >
+                  <Ionicons name="close" size={16} color="black" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
         </View>
-      ))}
-      <TouchableOpacity style={styles.button} onPress={confirmUpdateProfile}>
-        <Text style={styles.buttonText}>Update Profile</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity style={styles.button} onPress={confirmUpdateProfile}>
+          <Text style={styles.buttonText}>Update Profile</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   container: {
     flexGrow: 1,
     padding: 20,
@@ -180,6 +364,11 @@ const styles = StyleSheet.create({
   inputGroup: {
     width: "100%",
     marginBottom: 15,
+  },
+  labelContainer: {
+    flexDirection: "column",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
   label: {
     fontSize: 16,
@@ -222,5 +411,36 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 20,
+  },
+  checkboxContainer: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    marginRight: 10,
+    color: "#333",
+  },
+  suggestion: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  selectedExercisesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  selectedExercise: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
+    padding: 5,
+    borderRadius: 5,
+    margin: 5,
   },
 });

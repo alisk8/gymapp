@@ -57,20 +57,18 @@ const ExploreScreen = () => {
     </View>
   );
 
-  const renderUserRows = (users) => (
-    <View style={styles.userRowsContainer}>
-      <ScrollView horizontal>
-        <View style={styles.userRow}>
-          {users.slice(0, Math.ceil(users.length / 2)).map(renderUserItem)}
+  const renderUserRows = (users) => {
+    const rows = [];
+    for (let i = 0; i < users.length; i += 3) {
+      const userRow = users.slice(i, i + 3);
+      rows.push(
+        <View key={i} style={styles.userRow}>
+          {userRow.map(renderUserItem)}
         </View>
-      </ScrollView>
-      <ScrollView horizontal>
-        <View style={styles.userRow}>
-          {users.slice(Math.ceil(users.length / 2)).map(renderUserItem)}
-        </View>
-      </ScrollView>
-    </View>
-  );
+      );
+    }
+    return rows;
+  };
 
   return (
     <ScrollView
@@ -81,16 +79,7 @@ const ExploreScreen = () => {
       {loading ? (
         <ActivityIndicator size="large" color="#007BFF" />
       ) : (
-        <>
-          <Text style={styles.sectionTitle}>Nearby Locations</Text>
-          {renderUserRows(users)}
-
-          <Text style={styles.sectionTitle}>Similar Favorite Exercises</Text>
-          {renderUserRows(users)}
-
-          <Text style={styles.sectionTitle}>Similar Experience Levels</Text>
-          {renderUserRows(users)}
-        </>
+        <View style={styles.userRowsContainer}>{renderUserRows(users)}</View>
       )}
     </ScrollView>
   );
@@ -101,12 +90,11 @@ export default ExploreScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f7f7f7", // Light background for better contrast
-    paddingHorizontal: 24,
+    backgroundColor: "#f7f7f7",
     paddingTop: 100,
   },
   contentContainer: {
-    paddingBottom: 100, // Extra padding at the bottom
+    paddingBottom: 100,
   },
   pageTitle: {
     fontSize: 26,
@@ -115,25 +103,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#333",
   },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginVertical: 20,
-    color: "#555",
-  },
   userRowsContainer: {
-    marginBottom: 40,
-    paddingRight: 10,
+    alignItems: "center", // Centers the rows within the container
+    paddingHorizontal: 10,
   },
   userRow: {
     flexDirection: "row",
+    justifyContent: "space-around", // Distributes space evenly between items
     marginBottom: 15,
+    width: "100%", // Ensures the row takes full width
   },
   userItem: {
-    width: 130, // Slightly wider user cards
+    width: 120,
     alignItems: "center",
-    marginHorizontal: 12,
-    padding: 15,
+    marginHorizontal: 5,
+    paddingVertical: 20,
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 12,
@@ -144,25 +129,31 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
   },
   userImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     marginBottom: 10,
   },
   userName: {
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: "600",
     textAlign: "center",
-    marginBottom: 6,
+    marginBottom: 10,
     color: "#333",
   },
   connectButton: {
     backgroundColor: "#007BFF",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 20,
+    shadowColor: "#007BFF",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   connectButtonText: {
     color: "#fff",
     fontSize: 14,
+    fontWeight: "bold",
   },
 });
