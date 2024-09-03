@@ -123,12 +123,23 @@ const FeedPage = ({ navigation }) => {
     try {
       const commentsRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments');
       const commentsSnapshot = await getDocs(commentsRef);
-      return commentsSnapshot.size;
+  
+      let totalCount = commentsSnapshot.size;
+  
+      // For each comment, fetch the number of replies
+      for (const commentDoc of commentsSnapshot.docs) {
+        const repliesRef = collection(db, 'userProfiles', userId, collectionName, postId, 'comments', commentDoc.id, 'replies');
+        const repliesSnapshot = await getDocs(repliesRef);
+        totalCount += repliesSnapshot.size;
+      }
+  
+      return totalCount;
     } catch (error) {
       console.error('Error fetching comment count: ', error);
       return 0;
     }
   };
+  
 
   const fetchHighlights = async (isRefresh = false) => {
     if (isRefresh) {
@@ -429,132 +440,159 @@ const FeedPage = ({ navigation }) => {
 
   const renderItem = useCallback(({ item }) => {
     if (item.type === 'workout') {
-      const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.sets ? exercise.sets.length : 0), 0);
-      const elapsedTime = formatTotalWorkoutTime(item.totalWorkoutTime);
+        console.log('Item received:', item); // Debugging statement
 
-      return (
-        <View style={styles.highlightContainer}>
-          <View style={styles.userInfoContainer}>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
-            </TouchableOpacity>
-          </View>
+        // Ensure that totalWorkoutTime is defined
+        if (typeof item.totalWorkoutTime === 'undefined' || item.totalWorkoutTime === null) {
+            console.log('totalWorkoutTime is undefined or null for item:', item.id);
+            return null; // Skip rendering this item if time is not available
+        }
 
-          {item.workoutDescription && <Text style={styles.descriptionText}>{item.workoutDescription}</Text>}
+        const totalSets = item.exercises.reduce((acc, exercise) => acc + (exercise.sets ? exercise.sets.length : 0), 0);
+        const elapsedTime = formatTotalWorkoutTime(item.totalWorkoutTime);
 
-          <View style={styles.metricsContainer}>
-            <Text style={styles.metricText}>{`Total Sets: ${totalSets}`}</Text>
-            <Text style={styles.metricText}>{`Workout Time: ${elapsedTime}`}</Text>
-          </View>
+        const getBestSet = (sets) => {
+            if (!sets || sets.length === 0) return null;
 
-          <Text style={styles.exerciseHeader}>{item.title}</Text>
-          
-          {item.exercises && item.exercises.length > 0 ? (
-            <View style={styles.exerciseNamesContainer}>
-              {item.exercises.map((exercise, index) => (
-                <View key={index} style={styles.exerciseItemContainer}>
-                  <Text style={styles.exerciseNameText}>{exercise.name}</Text>
-                  {exercise.sets && exercise.sets.length > 0 ? (
-                    exercise.sets.map((set, setIndex) => (
-                      <Text key={set.key} style={styles.bestSetText}>
-                        {`Set ${setIndex + 1}: ${set.weight} ${exercise.weightUnit} x ${exercise.repsUnit === 'time' ? `${Math.floor(set.time / 60000)} mins ${Math.floor((set.time % 60000) / 1000)} secs` : `${set.reps} ${exercise.repsUnit}`}`}
-                      </Text>
-                    ))
-                  ) : (
-                    <Text style={styles.bestSetText}>No sets available</Text>
-                  )}
-                  {exercise.isSuperset && exercise.supersetExercise && (
-                    <Text style={styles.supersetText}>
-                      {`Superset with: ${exercise.supersetExercise}`}
-                    </Text>
-                  )}
+            return sets.reduce((bestSet, currentSet) => {
+                if (currentSet.weight > bestSet.weight) {
+                    return currentSet;
+                } else if (currentSet.weight === bestSet.weight && currentSet.reps > bestSet.reps) {
+                    return currentSet;
+                }
+                return bestSet;
+            });
+        };
+
+        return (
+            <View style={styles.highlightContainer}>
+                <View style={styles.userInfoContainer}>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+                    </TouchableOpacity>
                 </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.bestSetText}>No exercises available</Text>
-          )}
-          {item.mediaUrls && item.mediaUrls.length > 0 && (
-            <View style={styles.imageContainer}>
-              <Swiper style={styles.swiper} showsPagination={true}>
-                {item.mediaUrls.map((mediaUrl, index) => (
-                  <TouchableOpacity key={`${item.id}_${index}`} onPress={() => openModal(mediaUrl)}>
-                    <Image
-                      source={{ uri: mediaUrl }}
-                      style={styles.postImage}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </Swiper>
-            </View>
-          )}
 
-          {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, true) : handleLike(item.id, item.userId, true)}>
-              <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.likes}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, true)}>
-              <Icon name="chatbubble-outline" size={25} color="#000" />
-              <Text style={styles.actionText}>{item.commentCount}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, true) : handleSave(item.id, item.userId, true)}>
-              <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.savedBy}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
-    } else {
-      return (
-        <View style={styles.highlightContainer}>
-          <View style={styles.userInfoContainer}>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
-              <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
-            </TouchableOpacity>
-          </View>
-          {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
-          {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
-          {item.mediaUrls && item.mediaUrls.length > 0 && (
-            <View style={styles.imageContainer}>
-              <Swiper style={styles.swiper} showsPagination={true}>
-                {item.mediaUrls.map((mediaUrl, index) => (
-                  <TouchableOpacity key={`${item.id}_${index}`} onPress={() => openModal(mediaUrl)}>
-                    <Image
-                      source={{ uri: mediaUrl }}
-                      style={styles.postImage}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </Swiper>
+                {item.workoutDescription && <Text style={styles.descriptionText}>{item.workoutDescription}</Text>}
+                <View style={styles.metricsContainer}>
+                    <Text style={styles.metricText}>{`Total Sets: ${totalSets}`}</Text>
+                    <Text style={styles.metricText}>{`Workout Time: ${elapsedTime}`}</Text>
+                </View>
+                <Text style={styles.exerciseHeader}>{item.title}</Text>
+                {item.exercises && item.exercises.length > 0 ? (
+                    <View style={styles.exerciseNamesContainer}>
+                        {item.exercises.map((exercise, index) => {
+                            const bestSet = getBestSet(exercise.sets);
+                            if (!bestSet) {
+                                return (
+                                    <Text key={index} style={styles.bestSetText}>
+                                        No sets available
+                                    </Text>
+                                );
+                            }
+
+                            return (
+                                <View key={index} style={styles.exerciseItemContainer}>
+                                    <Text style={styles.exerciseNameText}>{exercise.name}</Text>
+                                    <Text style={styles.bestSetText}>
+                                        {`Total Sets: ${exercise.sets.length}`}
+                                    </Text>
+                                    <Text style={styles.bestSetText}>
+                                        {`Best Set: ${bestSet.weight} ${exercise.weightUnit} x ${exercise.repsUnit === 'time' ? `${Math.floor(bestSet.reps / 60000)} mins ${Math.floor((bestSet.reps % 60000) / 1000)} secs` : `${bestSet.reps} ${exercise.repsUnit}`}`}
+                                    </Text>
+                                    
+                                    {exercise.isSuperset && exercise.supersetExercise && (
+                                        <Text style={styles.supersetText}>
+                                            {`Superset with: ${exercise.supersetExercise}`}
+                                        </Text>
+                                    )}
+                                </View>
+                            );
+                        })}
+                    </View>
+                ) : (
+                    <Text style={styles.bestSetText}>No exercises available</Text>
+                )}
+                {item.mediaUrls && item.mediaUrls.length > 0 && (
+                    <View style={styles.imageContainer}>
+                        <Swiper style={styles.swiper} showsPagination={true}>
+                            {item.mediaUrls.map((mediaUrl, index) => (
+                                <TouchableOpacity key={`${item.id}_${index}`} onPress={() => openModal(mediaUrl)}>
+                                  <Image
+                                      source={{ uri: mediaUrl }}
+                                      style={styles.postImage}
+                                  />
+                                </TouchableOpacity>
+                            ))}
+                        </Swiper>
+                    </View>
+                )}
+
+                {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+                <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, true) : handleLike(item.id, item.userId, true)}>
+                        <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.likes}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, true)}>
+                        <Icon name="chatbubble-outline" size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.commentCount}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, true) : handleSave(item.id, item.userId, true)}>
+                        <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.savedBy}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-          )}
-          {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, false) : handleLike(item.id, item.userId, false)}>
-              <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.likes}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, false)}>
-              <Icon name="chatbubble-outline" size={25} color="#000" />
-              <Text style={styles.actionText}>{item.commentCount}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, false) : handleSave(item.id, item.userId, false)}>
-              <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
-              <Text style={styles.actionText}>{item.savedBy}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
+        );
+    } else {
+        return (
+            <View style={styles.highlightContainer}>
+                <View style={styles.userInfoContainer}>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Image source={{ uri: item.profilePicture }} style={styles.profilePicture} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('UserDetails', { user: item })}>
+                        <Text style={styles.userNameText}>{item.firstName} {item.lastName}</Text>
+                    </TouchableOpacity>
+                </View>
+                {item.caption && <Text style={styles.captionText}>{item.caption}</Text>}
+                {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
+                {item.mediaUrls && item.mediaUrls.length > 0 && (
+                    <View style={styles.imageContainer}>
+                        <Swiper style={styles.swiper} showsPagination={true}>
+                            {item.mediaUrls.map((mediaUrl, index) => (
+                                <TouchableOpacity key={`${item.id}_${index}`} onPress={() => openModal(mediaUrl)}>
+                                  <Image
+                                      source={{ uri: mediaUrl }}
+                                      style={styles.postImage}
+                                  />
+                                </TouchableOpacity>
+                            ))}
+                        </Swiper>
+                    </View>
+                )}
+                {item.timestamp && <Text style={styles.timestampText}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+                <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.liked ? handleUnlike(item.id, item.userId, false) : handleLike(item.id, item.userId, false)}>
+                        <Icon name={item.liked ? "heart" : "heart-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.likes}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => handleComment(item.id, item.userId, false)}>
+                        <Icon name="chatbubble-outline" size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.commentCount}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => item.saved ? handleUnsave(item.id, item.userId, false) : handleSave(item.id, item.userId, false)}>
+                        <Icon name={item.saved ? "bookmark" : "bookmark-outline"} size={25} color="#000" />
+                        <Text style={styles.actionText}>{item.savedBy}</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
     }
-  }, []);
+}, []);
 
   if (loading) {
     return (
@@ -658,7 +696,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#000',
-    flex: 1, // Ensure the text takes up available space and wraps
   },
   loadingContainer: {
     flex: 1,
@@ -746,7 +783,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#555',
     marginTop: 2,
-    flex: 1, // Ensure the text takes up available space and wraps
+    fontWeight: 'bold',
   },
   supersetText: {
     fontSize: 14,

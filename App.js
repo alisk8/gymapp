@@ -43,6 +43,10 @@ import EditTemplateScreen from "./src/screens/ProgressLog/EditTemplateScreen";
 import EditTemplateScreenUpdated from "./src/screens/ProgressLog/EditTemplateScreenUpdated";
 import Comments from './src/screens/Feed/Comments';
 
+import { LogBox } from 'react-native';
+LogBox.ignoreLogs(['Warning: ...']); // Ignore log notification by message
+LogBox.ignoreAllLogs();//Ignore all log notifications
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
