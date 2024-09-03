@@ -38,20 +38,14 @@ const FeedPage = ({ navigation }) => {
 
   useEffect(() => {
     navigation.setOptions({
-      title: 'Custom Header Title',
+      title: 'Feed Page',
       headerRight: () => <CustomHeaderView />,
     });
   }, [navigation]);
 
 
   const CustomHeaderView = () => (
-      <View style={{flexDirection: 'row', padding: 2,}}>
-        <TouchableOpacity
-            onPress={navigation.navigate('Messages')}
-            style={{ marginRight: 10}}
-        >
-          <Ionicons name="chatbox-ellipses-outline" size={24} color="black" />
-        </TouchableOpacity>
+
       <TouchableOpacity
           onPress={() => {
             navigation.navigate('SaveGymHighlightScreen');
@@ -60,7 +54,6 @@ const FeedPage = ({ navigation }) => {
       >
         <Ionicons name="create-outline" size={24} color="black" />
       </TouchableOpacity>
-      </View>
   );
 
   useFocusEffect(
@@ -611,7 +604,7 @@ const FeedPage = ({ navigation }) => {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#D4DEE7' }}>
+    <View style={{ flex: 1 }}>
       <FlatList
         data={searchQuery.length > 0 ? filteredUsers : highlights}
         keyExtractor={item => item.id}
@@ -701,13 +694,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#D4DEE7',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#D4DEE7',
   },
   errorText: {
     color: '#000',
@@ -767,10 +758,11 @@ const styles = StyleSheet.create({
     flex: 1, // Ensure the text takes up available space and wraps
   },
   exerciseItemContainer: {
-    backgroundColor: '#D4DEE7', // Set the background color to #D4DEE7
     padding: 10,
     borderRadius: 5,
     marginBottom: 5,
+    backgroundColor: '#D4DEE7',
+
   },
   exerciseNameText: {
     fontSize: 16,
