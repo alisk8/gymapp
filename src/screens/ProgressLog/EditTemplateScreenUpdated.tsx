@@ -26,6 +26,7 @@ import { useWorkout } from '../../contexts/WorkoutContext';
 import ExercisePickerModal from "../WorkoutLog/ExercisePickerModal";
 import findLastIndex from "@react-navigation/stack/lib/typescript/src/utils/findLastIndex";
 import axios from 'axios';
+import FeedbackModal from "./FeedbackModal";
 import {doc, updateDoc} from "@firebase/firestore";
 
 
@@ -49,11 +50,12 @@ export default function EditTemplateScreenUpdated({route}) {
     const [userGoal, setUserGoal] = useState('');  // State to store the user goal
     const [feedback, setFeedback] = useState('');  // State to store the feedback from the server
 
-
     const [selectedExerciseIndex, setSelectedExerciseIndex] = useState(null);
     const [proceedWithSave, setProceedWithSave] = useState(false);
     const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
     const [pickerModalVisible, setPickerModalVisible] = useState(false);
+    const [feedbackModalVisible, setFeedbackModalVisible] = useState(false); // Modal visibility
+
 
     const timerHeight = useSharedValue(120);
 
@@ -657,7 +659,13 @@ export default function EditTemplateScreenUpdated({route}) {
     });
 
 
+    const openFeedbackModal = () => {
+        setFeedbackModalVisible(true);
+    };
 
+    const closeFeedbackModal = () => {
+        setFeedbackModalVisible(false);
+    };
 
     return (
         <GestureHandlerRootView style={styles.fullScreenContainer}>
@@ -687,19 +695,20 @@ export default function EditTemplateScreenUpdated({route}) {
                     style={{ zIndex: 1, flex: 1, height: '80%' }}
                     nestedScrollEnabled={true}
                 />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Enter your goal"
-                        value={userGoal}
-                        onChangeText={setUserGoal}
-                    />
-                    <Button title="Get Feedback" onPress={sendWorkoutDetails} color='#016e03'/>
+                    <Button title="Get Feedback" onPress={openFeedbackModal} color='#016e03'/>
             </KeyboardAvoidingView>
 
             <ExercisePickerModal
                 visible={pickerModalVisible}
                 onClose={() => setPickerModalVisible(false)}
                 onSelectExercise={(exerciseName) => addExercise(exerciseName, selectedExerciseIndex)}
+            />
+
+            <FeedbackModal
+                visible={feedbackModalVisible}
+                onClose={closeFeedbackModal}
+                exercises={exercises}  // Pass exercises state to the modal
+                template={template}    // Pass template to the modal
             />
 
         </GestureHandlerRootView>
@@ -1357,20 +1366,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         marginTop: 10,
         marginBottom: 10,
-    },
-    feedbackContainer: {
-        marginTop: 20,
-        padding: 10,
-        backgroundColor: '#e0f7fa',
-        borderRadius: 5,
-    },
-    feedbackText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 5,
-    },
-    feedbackContent: {
-        fontSize: 16,
     },
 });
 

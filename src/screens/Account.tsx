@@ -267,7 +267,6 @@ export default function Account({ navigation }) {
 
   const isStepFourComplete =
       additionalInfo.location &&
-      additionalInfo.favoriteExercises.length > 0 &&
       gymInterests.length > 0 &&
       additionalInfo.experienceLevel &&
       additionalInfo.favoriteGym &&
