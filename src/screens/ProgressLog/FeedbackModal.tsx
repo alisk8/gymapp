@@ -1,15 +1,39 @@
 // FeedbackModal.js
-import React, { useState } from 'react';
-import { Modal, View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {
+    Modal,
+    View,
+    Text,
+    TextInput,
+    Button,
+    StyleSheet,
+    ScrollView,
+    ActivityIndicator,
+    TouchableOpacity, Touchable
+} from 'react-native';
 import axios from "axios/index";
 
-const FeedbackModal = ({ visible, onClose, exercises, template }) => {
+const FeedbackModal = ({ visible, onClose, exercises, template, useTemplateFeedback }) => {
     const [userGoal, setUserGoal] = useState('');  // State to store the user goal
     const [feedback, setFeedback] = useState('');  // State to store the feedback from the server
     const [age, setAge] = useState(null);  // State for age
     const [yearsLifting, setYearsLifting] = useState('');  // State for years lifting
     const [muscleGroups, setMuscleGroups] = useState('');  // Sta
     const [injuryConcerns, setInjuryConcerns] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [newTemplate, setNewTemplate] = useState(template);
+
+    const camelCase = (str) => {
+        return str
+            .replace(/\s(.)/g, function (match, group1) {
+                return group1.toUpperCase();
+            })
+            .replace(/\s/g, '')
+            .replace(/^(.)/, function (match, group1) {
+                return group1.toLowerCase();
+            });
+    };
+
     const preprocessTemplate = () => {
         let result = '';
 
@@ -50,11 +74,13 @@ const FeedbackModal = ({ visible, onClose, exercises, template }) => {
 
 
     const sendWorkoutDetails = async () => {
+        setLoading(true);
         const templateToString = preprocessTemplate();
 
         try {
             console.log('we here"');
-            const response = await axios.post('http://192.168.68.71:8000/generate/', {
+            //ip will be the host server's ip
+            const response = await axios.post('http://10.161.68.123:8082/generate/', {
                 workout_template: templateToString,
                 user_goal: userGoal,
                 age: age,
@@ -64,21 +90,80 @@ const FeedbackModal = ({ visible, onClose, exercises, template }) => {
                 prior_injuries: injuryConcerns,
             });
 
-            const feedback = response.data.response.content;
-            console.log('LLM Feedback:', feedback);
+            const feedback = response.data;
+            console.log('LLM Feedback:', response.data);
             setFeedback(feedback);
         } catch (error) {
             console.error('Error:', error);
             return null;
+        } finally{
+            setLoading(false);
         }
     };
+
+    const handleSave = () => {
+        useTemplateFeedback(newTemplate);  // Save newTemplate to the original screen's state
+        onClose();  // Close the modal
+    };
+
+    const processWorkoutRoutine = (workoutString) => {
+        // Split the workout string into individual exercise lines
+        const exercisesArray = workoutString.split('\n').filter(line => line.trim() !== '');
+
+        // Initialize a list to hold the exercises
+        let processedExercises = [];
+
+        // Iterate over each exercise line and process it
+        exercisesArray.forEach(exerciseLine => {
+            const match = exerciseLine.match(/^\d*\.\s*(.*?):\s*(\d+)\s*sets\s*total/i);
+            if (match) {
+                const exerciseName = match[1].trim();  // Extract the exercise name
+                const totalSets = parseInt(match[2], 10);  // Extract the number of sets
+                const setsKeys = Array.from({ length: totalSets }, (_, i) => `set${i + 1}`);  // Create setsKeys
+
+                const supersetMatch = exerciseLine.match(/\(superset with (.*?)\)/i);
+                const supersetExercise = supersetMatch ? supersetMatch[1].trim() : '';  // Check for superset exercise
+                const isSuperset = !!supersetExercise;  // Boolean flag if it's a superset
+
+                // Create the exercise object
+                const exerciseObject = {
+                    id: camelCase(exerciseName),
+                    name: exerciseName,
+                    setsKeys: setsKeys,
+                    supersetExercise: supersetExercise,
+                    isSuperset: isSuperset,
+                };
+
+                // Add the exercise object to the list
+                processedExercises.push(exerciseObject);
+            }
+        });
+
+        console.log(processedExercises);
+
+        return processedExercises;
+    };
+
+    useEffect(() => {
+        if(feedback){
+            setNewTemplate((prevState) => ({
+                ...prevState, // Copy the previous state
+                exercises: processWorkoutRoutine(feedback) // Set the new exercises list
+            }));        }
+    }, [feedback]);
 
 
     return (
         <Modal visible={visible} transparent animationType="slide">
             <View style={styles.modalContainer}>
                 <View style={styles.modalContent}>
+                    <View style={styles.headerRow}>
+                        <TouchableOpacity onPress={onClose}>
+                            <Text style={styles.cancelButton}>Cancel</Text>
+                        </TouchableOpacity>
 
+                    </View>
+                    <ScrollView contentContainerStyle={{alignItems: 'center', flex: 1, height: '95%'}}>
                     <Text style={styles.modalTitle}>Adapt my workout</Text>
                     <TextInput
                         style={styles.modalInput}
@@ -114,16 +199,25 @@ const FeedbackModal = ({ visible, onClose, exercises, template }) => {
                         value={userGoal}
                         onChangeText={(text) => setUserGoal(text)}
                     />
-                    <View style={styles.modalButtons}>
-                        <Button title="Submit" onPress={sendWorkoutDetails} />
-                        <Button title="Cancel" onPress={onClose} />
-                    </View>
-                    {feedback !== '' && (
-                        <View style={styles.feedbackContainer}>
-                            <Text style={styles.feedbackText}>Feedback:</Text>
-                            <Text style={styles.feedbackContent}>{feedback}</Text>
-                        </View>
-                    )}
+                        <Button title="Submit" onPress={sendWorkoutDetails} disabled={loading} />
+
+                        {loading && <ActivityIndicator size="large" color="#0000ff" />}
+
+
+                        {feedback !== '' && (
+                         <View>
+                            <View style={styles.feedbackContainer}>
+                                <Text style={styles.feedbackText}>Feedback:</Text>
+                                <Text style={styles.feedbackContent}>{feedback}</Text>
+                            </View>
+                             <View style={{flexDirection:'row', justifyContent:'center'}}>
+                             <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
+                                 <Text>Save</Text>
+                             </TouchableOpacity>
+                             </View>
+                         </View>
+                        )}
+                    </ScrollView>
                 </View>
             </View>
         </Modal>
@@ -133,7 +227,7 @@ const FeedbackModal = ({ visible, onClose, exercises, template }) => {
 const styles = StyleSheet.create({
     modalContainer: {
         flex: 1,
-        justifyContent: 'center',
+        justifyContent: 'flex-end',
         alignItems: 'center',
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
@@ -141,8 +235,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
         padding: 20,
         borderRadius: 10,
-        width: '80%',
-        alignItems: 'center',
+        width: '100%',
+        height: '97%',
     },
     modalTitle: {
         fontSize: 18,
@@ -156,6 +250,11 @@ const styles = StyleSheet.create({
         borderColor: '#ccc',
         borderRadius: 5,
         marginBottom: 20,
+    },
+    headerRow: {
+        flexDirection: "row",
+        justifyContent: "flex-start",
+        alignItems:"center",
     },
     modalButtons: {
         flexDirection: 'row',
@@ -176,6 +275,12 @@ const styles = StyleSheet.create({
     feedbackContent: {
         fontSize: 16,
     },
+    cancelButton: {
+       color: 'black',
+        fontSize: 16,
+    },
+    saveButton: {
+    }
 });
 
 export default FeedbackModal;

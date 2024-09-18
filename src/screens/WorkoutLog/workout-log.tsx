@@ -269,7 +269,7 @@ export default function WorkoutLogScreen({route}) {
             const data = doc.data();
             presets[data.name] = {
                 weightConfig: data.weightConfig,
-                repsConfig: data.repsConfig
+                repsConfig: data.repsType
             };
         });
         setExercisePresets(presets);

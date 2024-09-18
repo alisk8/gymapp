@@ -36,14 +36,6 @@ export default function EditTemplateScreenUpdated({route}) {
     const [exercises, setExercises] = useState([]);
     const [userExercises, setUserExercises] = useState([]);
     const [exercisePresets, setExercisePresets] = useState({});
-    const [currentExerciseIndex, setCurrentExerciseIndex] = useState(null);
-    const [editModalVisible, setEditModalVisible] = useState(false);
-    const [editExerciseIndex, setEditExerciseIndex] = useState(null);
-    const [weightConfig, setWeightConfig] = useState('totalWeight');
-    const [repsConfig, setRepsConfig] = useState('reps');
-    const [timerConfigured, setTimerConfigured] = useState(false); // New state variable
-    const [comparisonModalVisible, setComparisonModalVisible] = useState(false);
-    const [selectedExercise, setSelectedExercise] = useState(null);
     const previousScreen = route.params?.previousScreen;
     const [showPreviousAttempts, setShowPreviousAttempts] = useState({});
     const [exercisePresetsLoaded, setExercisePresetsLoaded] = useState(false);
@@ -55,30 +47,10 @@ export default function EditTemplateScreenUpdated({route}) {
     const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
     const [pickerModalVisible, setPickerModalVisible] = useState(false);
     const [feedbackModalVisible, setFeedbackModalVisible] = useState(false); // Modal visibility
-
-
+    const [template, setTemplate] = useState(route?.params?.template);
+    const [feedbackLoaded, setFeedbackLoaded] = useState(false);
     const timerHeight = useSharedValue(120);
 
-    const template = route?.params?.template;
-
-
-    const sendWorkoutDetails = async () => {
-        const templateToString = preprocessTemplate();
-
-        try {
-            const response = await axios.post('http://172.16.16.168:8000/generate/', {
-                workout_template: templateToString,
-                user_goal: userGoal
-            });
-
-            const feedback = response.data.response.content;
-            console.log('LLM Feedback:', feedback);
-            setFeedback(feedback);
-        } catch (error) {
-            console.error('Error:', error);
-            return null;
-        }
-    };
 
     const preprocessTemplate = () => {
         let result = '';
@@ -143,8 +115,29 @@ export default function EditTemplateScreenUpdated({route}) {
     };
 
     useEffect(() => {
-        fetchExercisePresets()
+        fetchExercisePresets();
     }, []);
+
+    useEffect(() => {
+        loadTemplate();
+    }, [exercisePresets]);
+
+    useEffect(() => {
+        console.log('presets fetched again', exercisePresets)
+    }, [exercisePresets]);
+
+
+    const useTemplateFeedback = (newTemplate) => {
+        console.log('old template', template);
+        setTemplate(newTemplate);  // Add new template to existing templates
+        console.log('new template', exercises);
+        console.log('new exercises', exercises);
+        setFeedbackLoaded(true);
+    };
+
+    useEffect(() => {
+        loadTemplate();
+    }, [feedbackLoaded]);
 
     useEffect(() => {
         nav.setOptions({
@@ -159,34 +152,34 @@ export default function EditTemplateScreenUpdated({route}) {
         });
     }, [nav]);
 
-    useEffect(() => {
-        const loadTemplate = async () => {
-            try {
-                const mappedExercises = await Promise.all(template.exercises.map(async ex => {
-                    return {
-                        id: ex.id,
-                        name: ex.name,
-                        weightUnit: 'lbs', // can adjust to default weight unit preferred by user
-                        repsUnit: exercisePresets[ex.name].repsConfig === 'R' ? 'reps' : 'time',
-                        sets: ex.setsKeys.map((setKey, index) => {
-                            return {
-                                key: setKey,
-                            };
-                        }),
-                        isSuperset: ex.isSuperset,
-                        supersetExercise: ex.supersetExercise,
-                        weightConfig: exercisePresets[ex.name].weightConfig || 'W',
-                        repsConfig: exercisePresets[ex.name].repsConfig || 'R',
-                    };
-                }));
-                setExercises(mappedExercises);
-            } catch (error) {
-                console.log('Error loading template:', error);
-            }
-        };
-
-        loadTemplate();
-    }, [exercisePresets]);
+    const loadTemplate = async () => {
+        try {
+            const mappedExercises = await Promise.all(template.exercises.map(async ex => {
+                console.log('exercise good', ex);
+                console.log('repsconfig', exercisePresets[ex.name].repsConfig);
+                return {
+                    id: ex.id,
+                    name: ex.name,
+                    weightUnit: 'lbs', // can adjust to default weight unit preferred by user
+                    repsUnit: exercisePresets[ex.name].repsConfig === 'R' ? 'reps' : 'time',
+                    sets: ex.setsKeys.map((setKey, index) => {
+                        return {
+                            key: setKey,
+                        };
+                    }),
+                    isSuperset: ex.isSuperset,
+                    supersetExercise: ex.supersetExercise,
+                    weightConfig: exercisePresets[ex.name].weightConfig || 'W',
+                    repsConfig: exercisePresets[ex.name].repsConfig || 'R',
+                };
+            }));
+            setExercises(mappedExercises);
+            console.log('exerciceslist after loading', exercises);
+        } catch (error) {
+            console.log('Error loading template:', error);
+            console.log('template when loading:', template);
+        }
+    };
 
 
     const fetchUserExercises = async () => {
@@ -207,10 +200,11 @@ export default function EditTemplateScreenUpdated({route}) {
             const data = doc.data();
             presets[data.name] = {
                 weightConfig: data.weightConfig,
-                repsConfig: data.repsConfig
+                repsConfig: data.repsType
             };
         });
 
+        console.log('presets fetched');
         setExercisePresets(presets);
         setExercisePresetsLoaded(true);
     };
@@ -660,12 +654,16 @@ export default function EditTemplateScreenUpdated({route}) {
 
 
     const openFeedbackModal = () => {
+        setFeedbackLoaded(false);
         setFeedbackModalVisible(true);
     };
 
     const closeFeedbackModal = () => {
         setFeedbackModalVisible(false);
     };
+
+
+
 
     return (
         <GestureHandlerRootView style={styles.fullScreenContainer}>
@@ -683,19 +681,13 @@ export default function EditTemplateScreenUpdated({route}) {
                                 setSelectedExerciseIndex(null);
                                 setPickerModalVisible(true);
                             }} />
-                            {feedback !== '' && (
-                                <View style={styles.feedbackContainer}>
-                                    <Text style={styles.feedbackText}>Feedback:</Text>
-                                    <Text style={styles.feedbackContent}>{feedback}</Text>
-                                </View>
-                            )}
                         </View>
                     )}
                     keyboardShouldPersistTaps="handled"
                     style={{ zIndex: 1, flex: 1, height: '80%' }}
                     nestedScrollEnabled={true}
                 />
-                    <Button title="Get Feedback" onPress={openFeedbackModal} color='#016e03'/>
+                    <Button title="Customize with AI" onPress={openFeedbackModal} color='#016e03'/>
             </KeyboardAvoidingView>
 
             <ExercisePickerModal
@@ -707,6 +699,7 @@ export default function EditTemplateScreenUpdated({route}) {
             <FeedbackModal
                 visible={feedbackModalVisible}
                 onClose={closeFeedbackModal}
+                useTemplateFeedback={useTemplateFeedback}
                 exercises={exercises}  // Pass exercises state to the modal
                 template={template}    // Pass template to the modal
             />
