@@ -283,6 +283,7 @@ function CommunitiesStack() {
                 })}
             />
             <Stack.Screen name='ExploreScreen' component={ExploreScreen} options={screenOptions} />
+            <Stack.Screen name='UserDetails' component={UserDetails} />
             <Stack.Screen name='Communities' component={Communities} />
             <Stack.Screen name="EventDetailScreen" component={EventDetailScreen} />
             <Stack.Screen
