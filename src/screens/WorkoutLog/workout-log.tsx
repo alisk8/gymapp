@@ -495,7 +495,7 @@ export default function WorkoutLogScreen({route}) {
                     const parentSetIndex = isDropSet ? set.key.split('_')[0].replace('set', '') : null;
                     let indicator = '';
                     const previousSet = showPreviousAttempts[exerciseId]?.find(prevSet => prevSet.key === set.key) || {};
-                    const repsAreTimed = exercise.repsConfig === 'H' || exercise.repsConfig === 'C';
+                    const repsAreTimed = exercise.repsConfig !== "Reps";
                     const repsString = repsAreTimed? 'Time': 'Reps';
 
                     if (isDropSet) {
@@ -847,7 +847,7 @@ export default function WorkoutLogScreen({route}) {
             setExercises(newExercises);
         };
 
-        const repsAreTimed = exercise.repsConfig === 'H' || exercise.repsConfig === 'C';
+        const repsAreTimed = exercise.repsConfig !== 'Reps';
 
         return(
             <View key={exercise.id} style={isSuperset ? styles.supersetContainer : styles.exerciseContainer}>
