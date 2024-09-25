@@ -23,6 +23,9 @@ import { useFocusEffect } from "@react-navigation/native";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Icon from "react-native-vector-icons/FontAwesome";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import DropDownPicker from "react-native-dropdown-picker";
+import {center} from "@shopify/react-native-skia"; // Import dropdown picker
+
 
 const auth = getAuth(app);
 
@@ -52,6 +55,8 @@ const CommunityLandingPage = ({ route, navigation }) => {
   const [events, setEvents] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [userProfiles, setUserProfiles] = useState({});
+  const [selectedLeaderboardExercise, setSelectedLeaderboardExercise] = useState(null); // For selected exercise
+  const [openExerciseSelector, setOpenExerciseSelector] = useState(false); // Dropdown state
 
   const user = useAuth();
   const userId = user?.uid; // Fetch the userId of the logged-in user
@@ -108,20 +113,23 @@ const CommunityLandingPage = ({ route, navigation }) => {
 
   useEffect(() => {
     const loadLeaderboard = async () => {
-      const data = await fetchBenchPressLeaderboard();
-      setLeaderboard(data);
+      if (selectedLeaderboardExercise) {
+        const data = await fetchExerciseLeaderboard(selectedLeaderboardExercise);
+        setLeaderboard(data);
+      }
     };
 
     loadLeaderboard();
-  }, [communityData]);
+  }, [selectedLeaderboardExercise, communityData]);
 
-  const fetchBenchPressLeaderboard = async () => {
+
+  const fetchExerciseLeaderboard = async (exerciseName) => {
     if (!communityData || !communityData.members) {
       return;
     }
 
     try {
-      const benchPressData = [];
+      const leaderboardData = [];
 
       // Fetch each member's bench press data
       for (let userId of communityData.members) {
@@ -141,7 +149,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
           workoutsSnapshot.forEach((workoutDoc) => {
             const workoutData = workoutDoc.data();
             const exercise = workoutData.exercises.find(
-              (exercise) => exercise.name.toLowerCase() === "bench press"
+              (exercise) => exercise.name.toLowerCase() === exerciseName.toLowerCase()
             );
             if (exercise && exercise.sets) {
               console.log('bench',exercise);
@@ -161,15 +169,15 @@ const CommunityLandingPage = ({ route, navigation }) => {
           });
 
           if (latestBenchPress) {
-            benchPressData.push(latestBenchPress);
+            leaderboardData.push(latestBenchPress);
           }
         }
       }
 
       // Sort the data by estimated 1RM
-      benchPressData.sort((a, b) => b.estimated1RM - a.estimated1RM);
+      leaderboardData.sort((a, b) => b.estimated1RM - a.estimated1RM);
 
-      return benchPressData;
+      return leaderboardData;
     } catch (error) {
       console.error("Error fetching bench press data: ", error);
     }
@@ -279,7 +287,8 @@ const CommunityLandingPage = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView>
+      <ScrollView keyboardShouldPersistTaps="handled"
+      >
         {communityData.bannerImageUrl ? (
           <Image
             source={{ uri: communityData.bannerImageUrl }}
@@ -376,26 +385,46 @@ const CommunityLandingPage = ({ route, navigation }) => {
           </ScrollView>
         )}
 
-        <Text style={styles.leaderboardTitle}>Bench Press Leaderboard</Text>
-        {leaderboard ? (
-          <FlatList
-            data={leaderboard}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item, index }) => (
-              <View style={styles.leaderboardItem}>
-                <Text style={styles.leaderboardRank}>{index + 1}.</Text>
-                <Text style={styles.leaderboardName}>{item.userName}</Text>
-                <Text style={styles.leaderboardDetails}>
-                  {item.weight}
-                  {item.weightUnit} x {item.reps} reps
-                </Text>
-              </View>
-            )}
+        <Text style={styles.leaderboardTitle}>{selectedLeaderboardExercise ? `${selectedLeaderboardExercise} Leaderboard` : "Leaderboard"}</Text>
+        <View style={{paddingHorizontal: 30,justifyContent: 'center'}}>
+          <DropDownPicker
+              open={openExerciseSelector}
+              value={selectedLeaderboardExercise}
+              items={communityData.leaderboardExercises.map((exercise) => ({
+                label: exercise,
+                value: exercise,
+              }))}
+              setOpen={setOpenExerciseSelector}
+              setValue={setSelectedLeaderboardExercise}
+              placeholder="Select an exercise"
+              style={styles.dropdownPicker}
+              containerStyle={styles.dropdownContainerStyle}
+              dropDownContainerStyle={styles.dropDownContainerStyle}
+              textStyle={styles.dropdownTextStyle}
+              labelStyle={styles.dropdownLabelStyle}
+              arrowIconStyle={styles.arrowIconStyle}
+              placeholderStyle={styles.placeholderStyle}
+              selectedItemLabelStyle={styles.selectedItemLabelStyle}
           />
-        ) : (
-          <Text>No bench press data available.</Text>
-        )}
-
+          {leaderboard ? (
+            <FlatList
+              data={leaderboard}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item, index }) => (
+                <View style={styles.leaderboardItem}>
+                  <Text style={styles.leaderboardRank}>{index + 1}.</Text>
+                  <Text style={styles.leaderboardName}>{item.userName}</Text>
+                  <Text style={styles.leaderboardDetails}>
+                    {item.weight}
+                    {item.weightUnit} x {item.reps} reps
+                  </Text>
+                </View>
+              )}
+            />
+          ) : (
+            <Text>No exercise data available.</Text>
+          )}
+        </View>
         <View>
         <TouchableOpacity
           style={styles.createPostButton}
@@ -486,7 +515,8 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    marginVertical: 10,
+    marginTop: 35,
+    marginBottom: 10,
   },
   communityDetails: {
     fontSize: 16,
@@ -499,8 +529,9 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 10,
     padding: 15,
-    marginTop: 20,
+    marginTop: 40,
     backgroundColor: "#fff",
+    marginBottom: 40,
   },
   postActions: {
     flexDirection: "row",
@@ -603,6 +634,44 @@ const styles = StyleSheet.create({
   leaderboardDetails: {
     fontSize: 16,
     color: "#666",
+  },
+  dropdownContainer: {
+    paddingHorizontal: 15,
+    marginTop: 20,
+  },
+  dropdownPicker: {
+    backgroundColor: "#fff",
+    borderColor: "#ccc", // Border color
+    borderRadius: 10, // Rounded corners
+    height: 50, // Height of the dropdown
+  },
+  dropdownContainerStyle: {
+    height: 50, // Adjust the height of the picker container
+    borderColor: "#ccc", // Same border color as dropdown picker
+  },
+  dropDownContainerStyle: {
+    backgroundColor: "#fafafa", // Background for the dropdown options
+    borderColor: "#ccc", // Same border color as the picker
+    borderRadius: 10, // Rounded corners
+  },
+  dropdownTextStyle: {
+    fontSize: 16,
+    color: "#333", // Text color
+  },
+  dropdownLabelStyle: {
+    fontSize: 16,
+    color: "#333", // Label text color
+  },
+  arrowIconStyle: {
+    width: 20,
+    height: 20, // Arrow icon size
+  },
+  placeholderStyle: {
+    fontSize: 16,
+    color: "#aaa", // Placeholder color
+  },
+  selectedItemLabelStyle: {
+    fontWeight: "bold", // Highlight selected item
   },
 });
 

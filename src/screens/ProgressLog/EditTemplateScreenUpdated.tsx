@@ -355,7 +355,6 @@ export default function EditTemplateScreenUpdated({route}) {
 
 
 
-
     const renderSets = (sets, exerciseIndex) => {
         const exercise = exercises[exerciseIndex];
         const exerciseId = exercise.id;

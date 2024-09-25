@@ -78,9 +78,8 @@ const FeedbackModal = ({ visible, onClose, exercises, template, useTemplateFeedb
         const templateToString = preprocessTemplate();
 
         try {
-            console.log('we here"');
-            //ip will be the host server's ip
-            const response = await axios.post('http://10.161.68.123:8082/generate/', {
+
+            const response = await axios.post('http://18.191.185.112:80/generate/', {
                 workout_template: templateToString,
                 user_goal: userGoal,
                 age: age,

@@ -43,9 +43,12 @@ const Feed: React.FC = ({ navigation }) => {
         );
         const eventDocs = await Promise.all(eventPromises);
 
+        const currentTimestamp = Date.now(); // Get current time
+
         const eventsList = eventDocs
             .filter(eventDoc => eventDoc.exists())
-            .map(eventDoc => ({ ...eventDoc.data(), id: eventDoc.id }));
+            .map(eventDoc => ({ ...eventDoc.data(), id: eventDoc.id }))
+            .filter(event => event.date.seconds * 1000 > currentTimestamp);
 
         setUserEvents(eventsList);
       }

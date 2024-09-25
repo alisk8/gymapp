@@ -75,6 +75,14 @@ const TemplateRecords = ({ navigation }) => {
                     </TouchableOpacity>
                 )}
             />
+            <TouchableOpacity
+                style={styles.createButton}
+                onPress={() => {
+                    navigation.navigate('EditTemplateScreenUpdated', { template: [] });
+                }}
+            >
+                <Text style={styles.createButtonText}>+ Create New Workout</Text>
+            </TouchableOpacity>
         </View>
     );
 };
@@ -108,6 +116,24 @@ const styles = StyleSheet.create({
     templateDescription: {
         fontSize: 14,
         color: "#666",
+    },
+    createButton: {
+        backgroundColor: "#016e03", // Green background for the button
+        padding: 15,
+        marginVertical: 8,
+        marginHorizontal: 10,
+        borderRadius: 10,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2, // Adds a subtle shadow on Android
+        alignItems: "center", // Centers the text inside the button
+    },
+    createButtonText: {
+        fontSize: 18,
+        fontWeight: "600",
+        color: "#ffffff", // White text color
     },
 });
 

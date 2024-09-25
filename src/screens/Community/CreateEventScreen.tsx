@@ -13,6 +13,7 @@ import {
   Alert,
   FlatList,
   Modal,
+  ActivityIndicator
 } from "react-native";
 import { db, app } from "../../../firebaseConfig"; // Adjust the import path based on your project structure
 import {
@@ -97,6 +98,8 @@ const CreateEventScreen = ({ route, navigation }) => {
   const [selectedFollowers, setSelectedFollowers] = useState([]);
   const [userCommunities, setUserCommunities] = useState([]);
   const [mutualFollowers, setMutualFollowers] = useState([]);
+  const [loading, setLoading] = useState(false); // Loading state
+
 
   const user = useAuth();
 
@@ -118,7 +121,7 @@ const CreateEventScreen = ({ route, navigation }) => {
     }
 
     try {
-      const eventRef = await addDoc(collection(db, "events"), {
+      const eventData = {
         name: eventName,
         description: eventDescription,
         date: eventDate,
@@ -133,12 +136,15 @@ const CreateEventScreen = ({ route, navigation }) => {
         owner: user?.uid,
         invitedCommunities: selectedCommunities,
         invitedPeople: selectedFollowers,
-      });
+      }
 
       if (isEdit) {
         await updateDoc(doc(db, "events", event.id), eventData);
         Alert.alert("Event updated successfully.");
       } else {
+
+        const eventRef = await addDoc(collection(db, "events"), eventData);
+
         const communityUpdatePromises = selectedCommunities.map((communityId) =>
           updateDoc(doc(db, "communities", communityId), {
             events: arrayUnion(eventRef.id),
@@ -432,10 +438,15 @@ const CreateEventScreen = ({ route, navigation }) => {
             )}
         </TouchableOpacity>
 
-        <Button
-          title={isEdit ? "Update Event" : "Create Event"}
-          onPress={handleCreateEvent}
-        />
+        {loading ? (
+            <ActivityIndicator size="large" color="#0000ff" /> // Display loader
+        ) : (
+            <Button
+                title={isEdit ? "Update Event" : "Create Event"}
+                onPress={handleCreateEvent}
+                disabled={loading} // Disable button during loading
+            />
+        )}
 
         <GPSModal
           isVisible={locationModalVisible}
@@ -475,6 +486,7 @@ const CreateEventScreen = ({ route, navigation }) => {
           selectedCommunities={selectedCommunities}
           selectedFollowers={selectedFollowers}
         />
+
       </ScrollView>
     </KeyboardAvoidingView>
   );

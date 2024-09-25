@@ -30,8 +30,14 @@ import {
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
+import exercisePickerModal from "../WorkoutLog/ExercisePickerModal";
+import ExercisePickerModal from "../WorkoutLog/ExercisePickerModal";
+import { FontAwesome5 } from '@expo/vector-icons';
 
-const CreateCommunity = () => {
+
+const CreateCommunity = ({ route }) => {
+  const {community, isEdit} = route.params || {};
+  console.log('is edit', isEdit);
   const [communityName, setCommunityName] = useState("");
   const [communityDescription, setCommunityDescription] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
@@ -39,6 +45,10 @@ const CreateCommunity = () => {
   const [image, setImage] = useState(null);
   const [bannerImage, setBannerImage] = useState(null);
   const navigation = useNavigation();
+  const [leaderboardExercises, setLeaderboardExercises] = useState([]);
+  const [pickerModalVisible, setPickerModalVisible] = useState(false);
+
+
 
   const handleCreate = async () => {
     if (!firebase_auth.currentUser) {
@@ -53,25 +63,23 @@ const CreateCommunity = () => {
       return;
     }
 
-    if (!communityDescription.trim()) {
-      Alert.alert("Validation Error", "Please enter a community description.");
-      return;
-    }
 
     try {
-      // Check if community name already exists
-      const communityQuery = query(
-        collection(db, "communities"),
-        where("name", "==", communityName)
-      );
-      const querySnapshot = await getDocs(communityQuery);
-
-      if (!querySnapshot.empty) {
-        Alert.alert(
-          "Validation Error",
-          "A community with this name already exists. Please choose a different name."
+      if (!isEdit) {
+        // Check if community name already exists
+        const communityQuery = query(
+            collection(db, "communities"),
+            where("name", "==", communityName)
         );
-        return;
+        const querySnapshot = await getDocs(communityQuery);
+
+        if (!querySnapshot.empty) {
+          Alert.alert(
+              "Validation Error",
+              "A community with this name already exists. Please choose a different name."
+          );
+          return;
+        }
       }
 
       const newCommunityRef = doc(collection(db, "communities"));
@@ -87,23 +95,32 @@ const CreateCommunity = () => {
         bannerImageUrl = await uploadImage(bannerImage, "communityBanners");
       }
 
-      await setDoc(newCommunityRef, {
+      const communityData = {
         name: communityName,
-        description: communityDescription,
+        description: communityDescription || "",
         private: isPrivate,
         owner: userId,
         members: [userId],
         imageUrl: imageUrl, // Add image URL to the community document
         bannerImageUrl: bannerImageUrl,
-      });
+        leaderboardExercises: leaderboardExercises
+      }
 
-      // Add the new community ID to the user's document
-      const userRef = doc(db, "userProfiles", userId);
-      await updateDoc(userRef, {
-        communities: arrayUnion(newCommunityId),
-      });
+      if (isEdit){
+        await updateDoc(doc(db, "communities", community.id), communityData);
+        Alert.alert("Event updated successfully.");
+      }else{
+        await setDoc(newCommunityRef, communityData);
 
-      Alert.alert("Success", "Community created successfully!");
+        // Add the new community ID to the user's document
+        const userRef = doc(db, "userProfiles", userId);
+        await updateDoc(userRef, {
+          communities: arrayUnion(newCommunityId),
+        });
+        Alert.alert("Success", "Community created successfully!");
+
+      }
+
       navigation.goBack();
     } catch (error) {
       Alert.alert("Error", "Failed to create community.");
@@ -208,14 +225,24 @@ const CreateCommunity = () => {
     }
   };
 
+  const addExercise = async (selectedExercise, parentExerciseIndex = null) => {
+    setLeaderboardExercises([...leaderboardExercises, selectedExercise]);
+    setPickerModalVisible(false);
+  };
+
+  const deleteExercise = (index) => {
+    const updatedExercises = leaderboardExercises.filter((_, i) => i !== index);
+    setLeaderboardExercises(updatedExercises);
+  };
+
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.heading}>Create a New Community</Text>
+      <Text style={styles.heading}> {isEdit? 'Edit': 'Create a New'} Community</Text>
       <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
         {image ? (
           <Image source={{ uri: image }} style={styles.image} />
         ) : (
-          <Text style={styles.addImageText}>Pick an Image</Text>
+          <Text style={styles.addImageText}>{isEdit?'Edit':'Pick an'} Image</Text>
         )}
       </TouchableOpacity>
       <TouchableOpacity
@@ -225,21 +252,50 @@ const CreateCommunity = () => {
         {bannerImage ? (
           <Image source={{ uri: bannerImage }} style={styles.bannerImage} />
         ) : (
-          <Text style={styles.addImageText}>Pick a Banner Image</Text>
+          <Text style={styles.addImageText}>{isEdit?'Edit':'Pick a'} Banner Image</Text>
         )}
       </TouchableOpacity>
       <TextInput
         style={styles.input}
-        placeholder="Name your community"
+        placeholder={isEdit ? "Edit Name":"Name your community"}
         value={communityName}
         onChangeText={setCommunityName}
       />
       <TextInput
         style={styles.input}
-        placeholder="Describe your community"
+        placeholder={isEdit? "Edit description": "Describe your community"}
         value={communityDescription}
         onChangeText={setCommunityDescription}
       />
+
+      <Text style={styles.leaderboardHeading}>Leaderboard Exercises</Text>
+
+      <ScrollView style={styles.leaderboardScroll}>
+        {leaderboardExercises.length > 0 ? (
+            leaderboardExercises.map((exercise, index) => (
+                <View key={index} style={styles.exerciseItem}>
+                  <Text style={styles.exerciseName}>{exercise}</Text>
+                  <FontAwesome5
+                      name="times"
+                      onPress={() => deleteExercise(index)}
+                      size={20}
+                      color="black"
+                      style={styles.deleteExerciseButton}
+                  />
+                </View>
+            ))
+        ) : (
+            <Text style={styles.noExerciseText}>No exercises added yet.</Text>
+        )}
+      </ScrollView>
+
+      <TouchableOpacity
+          style={styles.addExerciseButton}
+          onPress={() => setPickerModalVisible(true)}
+      >
+        <Text style={styles.addExerciseText}>Add New Exercise</Text>
+      </TouchableOpacity>
+
       <View style={styles.switchContainer}>
         <Text style={styles.label}>Private Group</Text>
         <Switch
@@ -253,6 +309,12 @@ const CreateCommunity = () => {
       <TouchableOpacity style={styles.createButton} onPress={handleCreate}>
         <Text style={styles.createButtonText}>Create Group</Text>
       </TouchableOpacity>
+
+      <ExercisePickerModal
+          visible={pickerModalVisible}
+          onClose={() => setPickerModalVisible(false)}
+          onSelectExercise={(exerciseName) => addExercise(exerciseName)}
+      />
     </ScrollView>
   );
 };
@@ -375,5 +437,55 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     alignSelf: "center",
     marginBottom: 10,
+  },
+  addExerciseButton: {
+    backgroundColor: "#016e03",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginHorizontal: 50,
+    borderRadius: 25,
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  addExerciseText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  leaderboardHeading: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginTop: 20,
+    marginBottom: 10,
+    color: "#333",
+  },
+  leaderboardScroll: {
+    maxHeight: 150, // Set a max height for the scroll area
+    marginBottom: 10,
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 10,
+    borderColor: "#ddd",
+    borderWidth: 1,
+  },
+  exerciseItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  exerciseName: {
+    fontSize: 16,
+    color: "#333",
+  },
+  noExerciseText: {
+    fontSize: 14,
+    color: "#999",
+  },
+  deleteExerciseButton: {
+    borderRadius: 5,
+    zIndex: 1, // Ensure it stays above other elements
   },
 });
