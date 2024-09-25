@@ -81,35 +81,6 @@ export default function WorkoutLogScreen({route}) {
 
 
 
-
-
-
-
-
-
-/**
-    useFocusEffect(() => {
-        console.log('reset');
-        nav.navigate('CommunityTopTabs');
-        resetWorkout();
-    });
-        **/
-
-
-    /**
-    const toggleFailureTracking = () => {
-        setIsFailureTracking(!isFailureTracking);
-    };
-
-    const toggleFailure = (exerciseIndex, setIndex) => {
-        const newExercises = [...exercises];
-        const currentFailureState = newExercises[exerciseIndex].sets[setIndex].isFailure;
-        newExercises[exerciseIndex].sets[setIndex].isFailure = currentFailureState === null ? true : null;
-        setExercises(newExercises);
-    };
-        **/
-
-
     const formatTime = (seconds) => {
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
@@ -983,85 +954,6 @@ export default function WorkoutLogScreen({route}) {
         return () => stopWorkoutLog();
     }, []);
 
-    /** exercise config modal
-
-    <Modal
-        animationType="slide"
-        transparent={true}
-        visible={editModalVisible}
-        onRequestClose={() => setEditModalVisible(false)}
-    >
-        <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Edit Exercise Configuration</Text>
-                <View style={styles.configContainer}>
-                    <View style={styles.configColumn}>
-                        <Text style={styles.modalSubTitle}>Weight Exercise</Text>
-                        <TouchableOpacity onPress={() => setWeightConfig('totalWeight')}>
-                            <Text style={[styles.configOption, weightConfig === 'totalWeight' && styles.configOptionSelected]}>
-                                Total Weight
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setWeightConfig('weightPerSide')}>
-                            <Text style={[styles.configOption, weightConfig === 'weightPerSide' && styles.configOptionSelected]}>
-                                Weight Per Side
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setWeightConfig('weightPerSideBarbell')}>
-                            <Text style={[styles.configOption, weightConfig === 'weightPerSideBarbell' && styles.configOptionSelected]}>
-                                Weight Per Side + Standard Barbell (45lb)
-                            </Text>
-                        </TouchableOpacity>
-                        <Text style={styles.modalSubTitle}>Calisthenics Exercise</Text>
-                        <TouchableOpacity onPress={() => setWeightConfig('bodyWeight')}>
-                            <Text style={[styles.configOption, weightConfig === 'bodyWeight' && styles.configOptionSelected]}>
-                                Body Weight
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setWeightConfig('extraWeightBodyWeight')}>
-                            <Text style={[styles.configOption, weightConfig === 'extraWeightBodyWeight' && styles.configOptionSelected]}>
-                                Extra Weight + Body Weight
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.configColumn}>
-                        <Text style={styles.modalSubTitle}>Reps Configuration</Text>
-                        <TouchableOpacity onPress={() => setRepsConfig('reps')}>
-                            <Text style={[styles.configOption, repsConfig === 'reps' && styles.configOptionSelected]}>
-                                Reps
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setRepsConfig('time')}>
-                            <Text style={[styles.configOption, repsConfig === 'time' && styles.configOptionSelected]}>
-                                Time
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-                <Button title="Save" onPress={saveConfig} />
-                <Button title="Cancel" onPress={() => setEditModalVisible(false)} />
-            </View>
-        </View>
-    </Modal>
-
-    **/
-
-    /**
-     *
-
-     ListHeaderComponent={() => (
-     <View>
-     <View style={styles.toggleContainer}>
-     <Text style={styles.toggleLabel}>Mark Failure</Text>
-     <Switch
-     onValueChange={toggleFailureTracking}
-     value={isFailureTracking}
-     />
-     </View>
-     </View>
-     )}
-
-     */
 
     return (
         <GestureHandlerRootView style={styles.fullScreenContainer}>
@@ -1145,6 +1037,13 @@ export default function WorkoutLogScreen({route}) {
                 visible={pickerModalVisible}
                 onClose={() => setPickerModalVisible(false)}
                 onSelectExercise={(exerciseName) => addExercise(exerciseName, selectedExerciseIndex)}
+                onCustomExercise={(customPreset) => {
+                    exercisePresets[customPreset.name] = {
+                        weightConfig: customPreset.weightConfig,
+                        repsConfig: customPreset.repsType
+                    };
+                    addExercise(customPreset.name, selectedExerciseIndex)
+                }}
             />
 
             {timeRemaining !== null && (

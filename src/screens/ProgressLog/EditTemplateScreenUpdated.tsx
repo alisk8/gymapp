@@ -693,6 +693,13 @@ export default function EditTemplateScreenUpdated({route}) {
                 visible={pickerModalVisible}
                 onClose={() => setPickerModalVisible(false)}
                 onSelectExercise={(exerciseName) => addExercise(exerciseName, selectedExerciseIndex)}
+                onCustomExercise={(customPreset) => {
+                    exercisePresets[customPreset.name] = {
+                        weightConfig: customPreset.weightConfig,
+                        repsConfig: customPreset.repsType
+                    };
+                    addExercise(customPreset.name, selectedExerciseIndex)
+                }}
             />
 
             <FeedbackModal
