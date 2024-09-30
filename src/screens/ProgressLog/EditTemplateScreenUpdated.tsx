@@ -130,25 +130,32 @@ export default function EditTemplateScreenUpdated({route}) {
     const useTemplateFeedback = (newTemplate) => {
         console.log('old template', template);
         setTemplate(newTemplate);  // Add new template to existing templates
-        console.log('new template', exercises);
-        console.log('new exercises', exercises);
         setFeedbackLoaded(true);
     };
+
+    useEffect(() => {
+        console.log('new template', template);
+        console.log('new exercises', exercises);
+    }, [template]);
 
     useEffect(() => {
         loadTemplate();
     }, [feedbackLoaded]);
 
     useEffect(() => {
+        console.log('EVERTYIME exercise changes', exercises);
+    }, [exercises]);
+
+    useEffect(() => {
         nav.setOptions({
             title: 'Edit Template',  // Set your desired title here
-        headerRight: () => (
-            <TouchableOpacity onPress={() => {
-                saveTemplate();
-            }} style={styles.hideButton}>
-                <Text style={styles.hideButtonText}>Save</Text>
-            </TouchableOpacity>
-        )
+            headerRight: () => (
+                <TouchableOpacity onPress={() => {
+                    saveTemplate();
+                }} style={styles.hideButton}>
+                    <Text style={styles.hideButtonText}>Save</Text>
+                </TouchableOpacity>
+            )
         });
     }, [nav]);
 
@@ -161,7 +168,7 @@ export default function EditTemplateScreenUpdated({route}) {
                     id: ex.id,
                     name: ex.name,
                     weightUnit: 'lbs', // can adjust to default weight unit preferred by user
-                    repsUnit: exercisePresets[ex.name].repsConfig === 'R' ? 'reps' : 'time',
+                    repsUnit: exercisePresets[ex.name].repsConfig === 'Reps' ? 'reps' : 'time',
                     sets: ex.setsKeys.map((setKey, index) => {
                         return {
                             key: setKey,
@@ -170,7 +177,7 @@ export default function EditTemplateScreenUpdated({route}) {
                     isSuperset: ex.isSuperset,
                     supersetExercise: ex.supersetExercise,
                     weightConfig: exercisePresets[ex.name].weightConfig || 'W',
-                    repsConfig: exercisePresets[ex.name].repsConfig || 'R',
+                    repsConfig: exercisePresets[ex.name].repsConfig || 'Reps',
                 };
             }));
             setExercises(mappedExercises);
@@ -262,10 +269,10 @@ export default function EditTemplateScreenUpdated({route}) {
             name: selectedExercise,
             sets: [{ key: 'set1', weight: '', reps: '', isFailure: null, completed: false}],
             weightUnit:'lbs',
-            repsUnit: exercisePresets[selectedExercise].repsConfig === 'R'? 'reps': 'time',
+            repsUnit: exercisePresets[selectedExercise].repsConfig === 'Reps'? 'reps': 'time',
             supersetExercise: '',
             weightConfig: exercisePresets[selectedExercise].weightConfig || 'W',
-            repsConfig: exercisePresets[selectedExercise].repsConfig || 'R',
+            repsConfig: exercisePresets[selectedExercise].repsConfig || 'Reps',
             isSuperset: parentExerciseIndex != null,
         };
 
@@ -366,7 +373,7 @@ export default function EditTemplateScreenUpdated({route}) {
                     const parentSetIndex = isDropSet ? set.key.split('_')[0].replace('set', '') : null;
                     let indicator = '';
                     const previousSet = showPreviousAttempts[exerciseId]?.find(prevSet => prevSet.key === set.key) || {};
-                    const repsAreTimed = exercise.repsConfig === 'H' || exercise.repsConfig === 'C';
+                    const repsAreTimed = exercise.repsConfig !== "Reps";
                     const repsString = repsAreTimed? 'Time': 'Reps';
 
                     if (isDropSet) {
@@ -513,9 +520,32 @@ export default function EditTemplateScreenUpdated({route}) {
 
 
 
-
-
     const saveTemplate = async () => {
+
+        console.log('NORMAL EXERCISES', exercises);
+        console.log('CURRENT TEMPLATE', template);
+
+        const userId = firebase_auth.currentUser.uid;
+
+        const templateRef = collection(db, "userProfiles", userId, "templates");
+
+        const templateExercises = template.exercises;
+
+        console.log('TEMPLATE EXERCISES', templateExercises)
+
+        const existingTemplateRef = doc(templateRef, template.id);
+
+        await updateDoc(existingTemplateRef, {
+            exercises: templateExercises,
+            updatedAt: new Date()  // You can add an updatedAt field to track changes
+        });
+
+        console.log('EXISTING REF', existingTemplateRef);
+
+        Alert.alert('Template updated!');
+    };
+
+        /**
         if (!firebase_auth.currentUser) {
             Alert.alert("Error", "You must be logged in to save the template.");
             return;
@@ -545,6 +575,8 @@ export default function EditTemplateScreenUpdated({route}) {
         nav.goBack();
 
     };
+
+            **/
 
     const camelCase = (str) => {
         return str
@@ -591,7 +623,7 @@ export default function EditTemplateScreenUpdated({route}) {
                 setExercises(newExercises);
             };
 
-            const repsAreTimed = exercise.repsConfig === 'H' || exercise.repsConfig === 'C';
+            const repsAreTimed = exercise.repsConfig !== "Reps";
 
             return(
                 <View key={exercise.id} style={isSuperset ? styles.supersetContainer : styles.exerciseContainer}>
@@ -686,7 +718,7 @@ export default function EditTemplateScreenUpdated({route}) {
                     style={{ zIndex: 1, flex: 1, height: '80%' }}
                     nestedScrollEnabled={true}
                 />
-                    <Button title="Customize with AI" onPress={openFeedbackModal} color='#016e03'/>
+                <Button title="Customize with AI" onPress={openFeedbackModal} color='#016e03'/>
             </KeyboardAvoidingView>
 
             <ExercisePickerModal

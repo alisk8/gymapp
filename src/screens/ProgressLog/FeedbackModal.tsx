@@ -11,7 +11,7 @@ import {
     ActivityIndicator,
     TouchableOpacity, Touchable
 } from 'react-native';
-import axios from "axios/index";
+import axios from "axios";
 
 const FeedbackModal = ({ visible, onClose, exercises, template, useTemplateFeedback }) => {
     const [userGoal, setUserGoal] = useState('');  // State to store the user goal
@@ -79,7 +79,7 @@ const FeedbackModal = ({ visible, onClose, exercises, template, useTemplateFeedb
 
         try {
 
-            const response = await axios.post('http://18.191.185.112:80/generate/', {
+            const response = await axios.post('http://3.149.28.254:80/generate/', {
                 workout_template: templateToString,
                 user_goal: userGoal,
                 age: age,
