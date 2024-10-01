@@ -81,7 +81,7 @@ const TemplateRecords = ({ navigation }) => {
                     navigation.navigate('EditTemplateScreenUpdated', { template: [] });
                 }}
             >
-                <Text style={styles.createButtonText}>+ Create New Workout</Text>
+                <Text style={styles.createButtonText}>+ Create Workout Template</Text>
             </TouchableOpacity>
         </View>
     );

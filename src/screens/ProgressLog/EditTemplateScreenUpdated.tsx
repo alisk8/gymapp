@@ -48,9 +48,12 @@ export default function EditTemplateScreenUpdated({route}) {
     const [pickerModalVisible, setPickerModalVisible] = useState(false);
     const [feedbackModalVisible, setFeedbackModalVisible] = useState(false); // Modal visibility
     const [template, setTemplate] = useState(route?.params?.template);
+    const mode = route?.params?.template ? "create" : "edit" ;
+    console.log('mode:', mode);
+    const [newTemplateName, setNewTemplateName] = useState("");
     const [feedbackLoaded, setFeedbackLoaded] = useState(false);
     const timerHeight = useSharedValue(120);
-
+    const [templateModalVisible, setTemplateModalVisible] = useState(false);
 
     const preprocessTemplate = () => {
         let result = '';
@@ -157,7 +160,7 @@ export default function EditTemplateScreenUpdated({route}) {
                 </TouchableOpacity>
             )
         });
-    }, [nav, template]);
+    }, [nav, exercises, template]);
 
     const loadTemplate = async () => {
         try {
@@ -521,34 +524,13 @@ export default function EditTemplateScreenUpdated({route}) {
 
     const saveTemplate = async () => {
 
+        if (newTemplateName === ""){
+            toggleTemplateModal();
+            return false;
+        }
+
         console.log('NORMAL EXERCISES', exercises);
         console.log('CURRENT TEMPLATE', template);
-
-        const userId = firebase_auth.currentUser.uid;
-
-        const templateRef = collection(db, "userProfiles", userId, "templates");
-
-        const templateExercises = template.exercises;
-
-        console.log('TEMPLATE EXERCISES', templateExercises)
-
-        const existingTemplateRef = doc(templateRef, template.id);
-
-        await updateDoc(existingTemplateRef, {
-            exercises: templateExercises,
-            updatedAt: new Date()  // You can add an updatedAt field to track changes
-        });
-
-        console.log('EXISTING REF', existingTemplateRef);
-
-        Alert.alert('Template updated!');
-    };
-
-        /**
-        if (!firebase_auth.currentUser) {
-            Alert.alert("Error", "You must be logged in to save the template.");
-            return;
-        }
 
         const userId = firebase_auth.currentUser.uid;
 
@@ -562,20 +544,34 @@ export default function EditTemplateScreenUpdated({route}) {
             isSuperset: ex.isSuperset,
         }));
 
-        const existingTemplateRef = doc(templateRef, template.id);
+        console.log('TEMPLATE EXERCISES', templateExercises)
 
-        await updateDoc(existingTemplateRef, {
-            templateName: template.templateName,
-            exercises: templateExercises,
-            updatedAt: new Date()  // You can add an updatedAt field to track changes
-        });
+        if (mode === "create"){
+            await addDoc(templateRef, {
+                exercises: templateExercises,
+                createdAt: new Date(), // You can add an updatedAt field to track changes
+                templateName: newTemplateName
+            });
+            console.log('Im at create mode');
+            Alert.alert('Template Created!');
+        }
+        else {
+            console.log('Im at edit mode');
+            const existingTemplateRef = doc(templateRef, template.id);
 
-        Alert.alert('Template updated!');
+            await updateDoc(existingTemplateRef, {
+                exercises: templateExercises,
+                updatedAt: new Date()  // You can add an updatedAt field to track changes
+            });
+            Alert.alert('Template updated!');
+        }
+
         nav.goBack();
-
     };
 
-            **/
+    const toggleTemplateModal = () => {
+        setTemplateModalVisible(!templateModalVisible);
+    };
 
     const camelCase = (str) => {
         return str
@@ -723,6 +719,46 @@ export default function EditTemplateScreenUpdated({route}) {
                 exercises={exercises}  // Pass exercises state to the modal
                 template={template}    // Pass template to the modal
             />
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={templateModalVisible}
+                onRequestClose={toggleTemplateModal}
+            >
+                <View style={styles.templateModalContainer}>
+                    <View style={styles.modalView}>
+                        <Text style={styles.modalTitle}>Save as Template</Text>
+                        <Text style={styles.modalText}>Would you like to save this workout as a template for future use?</Text>
+
+                        <TextInput
+                            style={styles.textInput}
+                            placeholder="Template Name"
+                            value={newTemplateName}
+                            onChangeText={setNewTemplateName}
+                        />
+
+                        <TouchableOpacity
+                            style={styles.saveButton}
+                            onPress={async () => {
+                                if (newTemplateName !== ""){
+                                    toggleTemplateModal();
+                                    await saveTemplate();
+                                }
+                            }}
+                        >
+                            <Text style={styles.saveButtonText}>Save</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.cancelButton}
+                            onPress={toggleTemplateModal}
+                        >
+                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
         </GestureHandlerRootView>
     );
@@ -1380,6 +1416,53 @@ const styles = StyleSheet.create({
         marginTop: 10,
         marginBottom: 10,
     },
+    templateModalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    cancelButton: {
+        backgroundColor: '#d9534f',
+        paddingVertical: 15,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 10,
+    },
+    cancelButtonText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
+        paddingHorizontal: 10,
+    },
+    modalView: {
+        margin: 20,
+        backgroundColor: 'white',
+        borderRadius: 20,
+        padding: 35,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    modalText: {
+        marginBottom: 15,
+        textAlign: 'center',
+    },
+    textInput: {
+        height: 40,
+        borderColor: 'gray',
+        borderWidth: 1,
+        paddingLeft: 8,
+        borderRadius: 8,
+        marginBottom: 16,
+    },
 });
 
 const pickerSelectStyles = StyleSheet.create({
@@ -1407,6 +1490,7 @@ const pickerSelectStyles = StyleSheet.create({
         color: 'black',
         paddingRight: 30,
     },
+
 });
 
 export default EditTemplateScreenUpdated;

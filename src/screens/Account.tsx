@@ -30,6 +30,7 @@ import {
 import useMarkedDates from "../../hooks/setMarkedDates";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "@react-navigation/native";
+import GPSModal from "./Community/GPSModal";
 
 type AdditionalInfo = {
   firstName: string;
@@ -215,7 +216,7 @@ export default function Account({ navigation }) {
         ...additionalInfo,
         height: combinedHeight,
         sex: finalSex,
-        gym_interests: gymInterests,
+        gym_interests: gymInterests || [],
         followers: [],
         following: [],
       });
@@ -224,7 +225,7 @@ export default function Account({ navigation }) {
       clearMarkedDates();
     } catch (error) {
       console.error("Signup Error:", error);
-      Alert.alert("Error", "Error creating account");
+      Alert.alert("Error", "Error creating account " + error);
     }
   };
 
@@ -261,19 +262,13 @@ export default function Account({ navigation }) {
   const isStepThreeComplete =
       heightFeet &&
       heightInches &&
-      additionalInfo.weight &&
       additionalInfo.age &&
       (sex !== "Other" || otherSex);
 
-  const isStepFourComplete =
-      additionalInfo.location &&
-      gymInterests.length > 0 &&
-      additionalInfo.experienceLevel &&
-      additionalInfo.favoriteGym &&
-      additionalInfo.bio;
+  const isStepFourComplete = additionalInfo.experienceLevel && additionalInfo.location;
 
-  const handleSelectLocation = (selectedLocation) => {
-    setAdditionalInfo((prev) => ({ ...prev, location: selectedLocation.name }));
+  const handleSelectHomeGym = (selectedLocation) => {
+    setAdditionalInfo((prev) => ({ ...prev, favoriteGym: selectedLocation.name }));
     setLocationModalVisible(false);
   };
 
@@ -412,9 +407,16 @@ export default function Account({ navigation }) {
               {displaySettings.experienceLevel &&
                   additionalInfo.experienceLevel && (
                       <Text style={styles.experience}>
-                        {additionalInfo.experienceLevel} years
+                        {additionalInfo.experienceLevel} year lifter
                       </Text>
                   )}
+            </View>
+            <View style={styles.row}>
+              {displaySettings.location && additionalInfo.location && (
+                  <Text style={styles.favoriteGym}>
+                    Current Gym:  {additionalInfo.favoriteGym.split(",")[0]}
+                  </Text>
+              )}
             </View>
             <View style={styles.row}>
               {displaySettings.height && additionalInfo.height && (
@@ -445,7 +447,7 @@ export default function Account({ navigation }) {
                       </Text>
                     </>
                 )}
-            {displaySettings.gym_interests && additionalInfo.gym_interests && (
+            {displaySettings.gym_interests && additionalInfo.gym_interests.length > 0 && (
                 <>
                   <Text style={styles.sectionTitle}>Gym Interests:</Text>
                   <Text style={styles.sectionContent}>
@@ -634,7 +636,7 @@ export default function Account({ navigation }) {
                           )}
                           {step === 3 && (
                               <View>
-                                <Text style={styles.label}>Sex</Text>
+                                <Text style={styles.label}>Gender</Text>
                                 <View style={styles.sexOptionsContainer}>
                                   {["Male", "Female", "Other"].map((option) => (
                                       <TouchableOpacity
@@ -702,7 +704,7 @@ export default function Account({ navigation }) {
                                   />
                                 </View>
                                 <TextInput
-                                    placeholder="Weight (lbs)"
+                                    placeholder="Weight in lbs (optional)"
                                     value={additionalInfo.weight}
                                     onChangeText={(text) =>
                                         handleFieldUpdate("weight", text)
@@ -739,16 +741,14 @@ export default function Account({ navigation }) {
                           )}
                           {step === 4 && (
                               <View>
-                                <TouchableOpacity
+                                <TextInput
+                                    placeholder="Home city, state (required)"
+                                    value={additionalInfo.location}
+                                    onChangeText={(text) =>
+                                        handleFieldUpdate("location", text)
+                                    }
                                     style={styles.input}
-                                    onPress={() => setLocationModalVisible(true)}
-                                >
-                                  <Text>
-                                    {additionalInfo.location
-                                        ? additionalInfo.location
-                                        : "Where are you based?"}
-                                  </Text>
-                                </TouchableOpacity>
+                                />
                                 <TextInput
                                     placeholder="Favorite Exercises"
                                     value={exerciseInput}
@@ -790,7 +790,7 @@ export default function Account({ navigation }) {
                                   ))}
                                 </View>
                                 <TextInput
-                                    placeholder="Gym Interests (Press Return)"
+                                    placeholder="Gym Interests (Separate with Return)"
                                     value={gymInterestInput}
                                     onChangeText={setGymInterestInput}
                                     style={styles.input}
@@ -818,22 +818,24 @@ export default function Account({ navigation }) {
                                       </View>
                                   ))}
                                 </View>
+                                <TouchableOpacity
+                                    style={styles.input}
+                                    onPress={() => setLocationModalVisible(true)}
+                                >
+                                  <Text>
+                                    {additionalInfo.favoriteGym
+                                        ? additionalInfo.favoriteGym
+                                        : "Current Gym"}
+                                  </Text>
+                                </TouchableOpacity>
                                 <TextInput
-                                    placeholder="Years of Experience"
+                                    placeholder="Years of Experience (required)"
                                     value={additionalInfo.experienceLevel}
                                     onChangeText={(text) =>
                                         handleFieldUpdate("experienceLevel", text)
                                     }
                                     keyboardType="numeric"
                                     maxLength={2}
-                                    style={styles.input}
-                                />
-                                <TextInput
-                                    placeholder="Favorite Gym"
-                                    value={additionalInfo.favoriteGym}
-                                    onChangeText={(text) =>
-                                        handleFieldUpdate("favoriteGym", text)
-                                    }
                                     style={styles.input}
                                 />
                                 <TextInput
@@ -861,6 +863,13 @@ export default function Account({ navigation }) {
                                 >
                                   <Text style={styles.buttonText}>Back</Text>
                                 </TouchableOpacity>
+
+                                <GPSModal
+                                    isVisible={locationModalVisible}
+                                    onClose={() => setLocationModalVisible(false)}
+                                    onSelectLocation={handleSelectHomeGym}
+                                />
+
                               </View>
                           )}
                         </>
@@ -965,6 +974,11 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   location: {
+    fontSize: 16,
+    color: "#6A0DAD",
+    fontWeight:'bold'
+  },
+  favoriteGym: {
     fontSize: 16,
     color: "#6A0DAD",
   },

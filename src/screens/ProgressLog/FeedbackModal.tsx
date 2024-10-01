@@ -197,6 +197,7 @@ const FeedbackModal = ({ visible, onClose, exercises, template, useTemplateFeedb
                         placeholder="Customize: Strength/hypertrophy, Time limits, muscle focus..."
                         value={userGoal}
                         onChangeText={(text) => setUserGoal(text)}
+                        multiline
                     />
                         <Button title="Submit" onPress={sendWorkoutDetails} disabled={loading} />
 
