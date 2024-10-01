@@ -19,12 +19,13 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
-import { useFocusEffect } from "@react-navigation/native";
+import {useFocusEffect, useNavigation} from "@react-navigation/native";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Icon from "react-native-vector-icons/FontAwesome";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import DropDownPicker from "react-native-dropdown-picker";
-import {center} from "@shopify/react-native-skia"; // Import dropdown picker
+import {center} from "@shopify/react-native-skia";
+import CommunityUserModal from "./CommunityUserModal"; // Import dropdown picker
 
 
 const auth = getAuth(app);
@@ -49,6 +50,7 @@ const useAuth = () => {
 
 const CommunityLandingPage = ({ route, navigation }) => {
   const { communityId } = route.params;
+  const nav = useNavigation();
   const [communityData, setCommunityData] = useState(null);
   const [posts, setPosts] = useState([]);
   const [commentText, setCommentText] = useState({});
@@ -57,6 +59,9 @@ const CommunityLandingPage = ({ route, navigation }) => {
   const [userProfiles, setUserProfiles] = useState({});
   const [selectedLeaderboardExercise, setSelectedLeaderboardExercise] = useState(null); // For selected exercise
   const [openExerciseSelector, setOpenExerciseSelector] = useState(false); // Dropdown state
+  const [members, setMembers] = useState([]);
+  const [isUsersModalVisible, setIsUsersModalVisible] = useState(false);
+
 
   const user = useAuth();
   const userId = user?.uid; // Fetch the userId of the logged-in user
@@ -72,12 +77,36 @@ const CommunityLandingPage = ({ route, navigation }) => {
     }, [])
   );
 
+  const handleOpenUsersModal = async () => {
+    const fetchedMembers = await fetchMembers(); // Fetch the members
+    setMembers(fetchedMembers);
+    setIsUsersModalVisible(true);
+  };
+
+  const handleCloseUsersModal = () => {
+    setIsUsersModalVisible(false);
+  };
+
+
   useEffect(() => {
     if (communityData) {
       fetchCommunityPosts(communityId);
       fetchCommunityEvents(); // Now fetch events after community data is available
     }
   }, [communityData]); // Run when communityData changes
+
+
+
+  useEffect(() => {
+    nav.setOptions({
+      headerRight: () => (
+          <TouchableOpacity onPress={() => navigation.navigate("NewCommunity", {community: communityData, isEdit: true})} style={styles.hideButton}>
+            <Text style={styles.hideButtonText}>Edit</Text>
+          </TouchableOpacity>
+      )
+    });
+  }, [nav, communityData]);
+
 
   // Function to fetch user profiles
   const fetchUserProfiles = async (userIds) => {
@@ -94,6 +123,24 @@ const CommunityLandingPage = ({ route, navigation }) => {
     });
 
     setUserProfiles((prevProfiles) => ({ ...prevProfiles, ...profiles }));
+  };
+
+  const fetchMembers = async () => {
+    try {
+      const memberPromises = communityData.members.map((memberId) =>
+          getDoc(doc(db, "userProfiles", memberId))
+      );
+      const memberDocs = await Promise.all(memberPromises);
+
+      const membersList = memberDocs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      return membersList;
+    } catch (error) {
+      console.error("Error fetching members: ", error);
+    }
   };
 
   const fetchCommunityData = async (id) => {
@@ -304,9 +351,11 @@ const CommunityLandingPage = ({ route, navigation }) => {
           containerStyle={styles.profileImage}
         />
         <Text style={styles.communityName}>{communityData.name}</Text>
+        <TouchableOpacity onPress={handleOpenUsersModal}>
         <Text style={styles.communityDetails}>
           {visibility} · {membersCount} Members
         </Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.createEventButton}
@@ -477,6 +526,13 @@ const CommunityLandingPage = ({ route, navigation }) => {
         />
         </View>
       </ScrollView>
+
+      <CommunityUserModal
+          visible={isUsersModalVisible}
+          onClose={handleCloseUsersModal}
+          members={members}
+      />
+
     </View>
   );
 };
@@ -672,6 +728,15 @@ const styles = StyleSheet.create({
   },
   selectedItemLabelStyle: {
     fontWeight: "bold", // Highlight selected item
+  },
+  hideButton: {
+    padding: 10,
+    backgroundColor: '#016e03',
+    borderRadius: 5,
+  },
+  hideButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 

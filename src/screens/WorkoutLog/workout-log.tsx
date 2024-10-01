@@ -859,11 +859,14 @@ export default function WorkoutLogScreen({route}) {
                 {renderSets(exercise.sets, exerciseIndex)}
 
                 <View style={styles.buttonsRow}>
-                    <Button title="+ add set" color='#016e03' onPress={() => addSet(exerciseIndex)} />
-                    {!item.supersetExercise && <Button title="+ add superset" color='#016e03' onPress={() => {
-                        setSelectedExerciseIndex(exerciseIndex);
-                        setPickerModalVisible(true);
-                    }} />}
+
+                    {exercise.repsConfig !== "Cardio" && <View style={styles.buttonsRow}>
+                        <Button title="+ add set" color='#016e03' onPress={() => addSet(exerciseIndex)}/>
+                        {!item.supersetExercise && <Button title="+ add superset" color='#016e03' onPress={() => {
+                            setSelectedExerciseIndex(exerciseIndex);
+                            setPickerModalVisible(true);
+                        }} />}
+                    </View>}
                 </View>
                 {item.supersetExercise && exercises.find((ex) => ex.id === item.supersetExercise) &&
                     renderExerciseItem({ item: exercises.find((ex) => ex.id === item.supersetExercise), index: exercises.findIndex((ex) => ex.id === item.supersetExercise),isSuperset: true })}

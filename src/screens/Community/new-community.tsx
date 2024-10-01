@@ -37,15 +37,18 @@ import { FontAwesome5 } from '@expo/vector-icons';
 
 const CreateCommunity = ({ route }) => {
   const {community, isEdit} = route.params || {};
+  const communityNamePlaceholder = community? community.name : "";
+  const communityDescriptionPlaceholder = community? community.description : "";
+  const communityLeaderboardPlaceholder = community? community.leaderboardExercises : [];
   console.log('is edit', isEdit);
-  const [communityName, setCommunityName] = useState("");
-  const [communityDescription, setCommunityDescription] = useState("");
+  const [communityName, setCommunityName] = useState(communityNamePlaceholder);
+  const [communityDescription, setCommunityDescription] = useState(communityDescriptionPlaceholder);
   const [isPrivate, setIsPrivate] = useState(false);
   const [communities, setCommunities] = useState([]);
   const [image, setImage] = useState(null);
   const [bannerImage, setBannerImage] = useState(null);
   const navigation = useNavigation();
-  const [leaderboardExercises, setLeaderboardExercises] = useState([]);
+  const [leaderboardExercises, setLeaderboardExercises] = useState(communityLeaderboardPlaceholder);
   const [pickerModalVisible, setPickerModalVisible] = useState(false);
 
 
