@@ -193,8 +193,8 @@ const FeedbackModal = ({ visible, onClose, exercises, template, useTemplateFeedb
                         onChangeText={(text) => setInjuryConcerns(text)}
                     />
                     <TextInput
-                        style={styles.modalInput}
-                        placeholder="Goals (strength, aesthetics etc.)"
+                        style={styles.modalInputLong}
+                        placeholder="Customize: Strength/hypertrophy, Time limits, muscle focus..."
                         value={userGoal}
                         onChangeText={(text) => setUserGoal(text)}
                     />
@@ -244,6 +244,15 @@ const styles = StyleSheet.create({
     },
     modalInput: {
         width: '100%',
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        marginBottom: 20,
+    },
+    modalInputLong: {
+        width: '100%',
+        height: '20%',
         padding: 10,
         borderWidth: 1,
         borderColor: '#ccc',

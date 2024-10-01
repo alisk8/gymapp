@@ -129,13 +129,13 @@ export default function EditTemplateScreenUpdated({route}) {
 
     const useTemplateFeedback = (newTemplate) => {
         console.log('old template', template);
+        console.log('newTemplate', newTemplate);
         setTemplate(newTemplate);  // Add new template to existing templates
         setFeedbackLoaded(true);
     };
 
     useEffect(() => {
         console.log('new template', template);
-        console.log('new exercises', exercises);
     }, [template]);
 
     useEffect(() => {
@@ -150,14 +150,14 @@ export default function EditTemplateScreenUpdated({route}) {
         nav.setOptions({
             title: 'Edit Template',  // Set your desired title here
             headerRight: () => (
-                <TouchableOpacity onPress={() => {
-                    saveTemplate();
+                <TouchableOpacity onPress={async () => {
+                    await saveTemplate();
                 }} style={styles.hideButton}>
                     <Text style={styles.hideButtonText}>Save</Text>
                 </TouchableOpacity>
             )
         });
-    }, [nav]);
+    }, [nav, template]);
 
     const loadTemplate = async () => {
         try {
@@ -181,7 +181,6 @@ export default function EditTemplateScreenUpdated({route}) {
                 };
             }));
             setExercises(mappedExercises);
-            console.log('exerciceslist after loading', exercises);
         } catch (error) {
             console.log('Error loading template:', error);
             console.log('template when loading:', template);
@@ -605,23 +604,6 @@ export default function EditTemplateScreenUpdated({route}) {
             };
 
 
-            const toggleAllCompleted = () => {
-                const newExercises = [...exercises];
-                newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.map(set => ({
-                    ...set,
-                    completed: true,
-                }));
-                setExercises(newExercises);
-            };
-
-            const toggleAllFailure = () => {
-                const newExercises = [...exercises];
-                newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.map(set => ({
-                    ...set,
-                    isFailure: !set.isFailure,
-                }));
-                setExercises(newExercises);
-            };
 
             const repsAreTimed = exercise.repsConfig !== "Reps";
 
