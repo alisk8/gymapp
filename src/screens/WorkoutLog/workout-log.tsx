@@ -154,7 +154,7 @@ export default function WorkoutLogScreen({route}) {
                         id: ex.id,
                         name: ex.name,
                         weightUnit: 'lbs', // can adjust to default weight unit preferred by user
-                        repsUnit: exercisePresets[ex.name].repsConfig === 'R' ? 'reps' : 'time',
+                        repsUnit: exercisePresets[ex.name].repsConfig === 'Reps' ? 'reps' : 'time',
                         sets: ex.setsKeys.map((setKey, index) => {
                             return {
                                 key: setKey,
@@ -319,7 +319,7 @@ export default function WorkoutLogScreen({route}) {
             name: selectedExercise,
             sets: [{ key: 'set1', weight: '', reps: '', isFailure: null, completed: false}],
             weightUnit:'lbs',
-            repsUnit: exercisePresets[selectedExercise].repsConfig === 'R'? 'reps': 'time',
+            repsUnit: exercisePresets[selectedExercise].repsConfig === 'Reps'? 'reps': 'time',
             supersetExercise: '',
             weightConfig: exercisePresets[selectedExercise].weightConfig || 'W',
             repsConfig: exercisePresets[selectedExercise].repsConfig || 'R',
@@ -436,7 +436,7 @@ export default function WorkoutLogScreen({route}) {
         exercise.sets[setIndex].weight = convertedValue;
 
         if (exercise.repsUnit === 'time'){
-            exercise.sets[setIndex].reps = formatTimeMilliseconds (previousSet.reps);
+            exercise.sets[setIndex].reps = formatTimeMilliseconds(previousSet.reps);
         }
         else{
             exercise.sets[setIndex].reps = previousSet.reps;

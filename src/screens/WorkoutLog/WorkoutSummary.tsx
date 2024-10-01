@@ -172,6 +172,7 @@ const WorkoutSummaryScreen = ({ route }) => {
         }
 
         try {
+            console.log('workout currently', workoutState);
             const filteredExercises = workoutState.exercises.map(ex => ({
                 id: camelCase(ex.name),
                 name: ex.name,

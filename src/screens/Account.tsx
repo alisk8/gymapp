@@ -215,7 +215,7 @@ export default function Account({ navigation }) {
         ...additionalInfo,
         height: combinedHeight,
         sex: finalSex,
-        gym_interests: gymInterests.join(", "),
+        gym_interests: gymInterests,
         followers: [],
         following: [],
       });
