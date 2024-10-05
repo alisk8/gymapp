@@ -46,6 +46,7 @@ import Comments from './src/screens/Feed/Comments';
 import { LogBox } from 'react-native';
 import CustomTabBar from "./src/components/CustomTabBar";
 import CommunityTopTabs from "./src/screens/Community/CommunityTopTabs";
+import AIFrontPage from './src/screens/AI/AIFrontPage';
 LogBox.ignoreLogs(['Warning: ...']); // Ignore log notification by message
 LogBox.ignoreAllLogs();//Ignore all log notifications
 
@@ -102,6 +103,22 @@ function HomeStack() {
             <Stack.Screen name='WorkoutLog' component={WorkoutLogScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
             <Stack.Screen name='TemplateScreen' component={TemplateScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
             <Stack.Screen name='WorkoutSummaryScreen' component={WorkoutSummaryScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+        </Stack.Navigator>
+    );
+}
+
+function AIStack() {
+    return (
+        <Stack.Navigator initialRouteName="AIFrontPage">
+        <Stack.Screen
+            name="AIFrontPage"
+            component={AIFrontPage}
+            options={({ navigation }) => ({
+            ...screenOptions({ navigation }),
+            title: "Create a Workout",  // This title can still be used if needed later
+            headerShown: false,         // This hides the top header
+            })}
+        />
         </Stack.Navigator>
     );
 }
@@ -430,13 +447,14 @@ function App() {
                                 }}
                             />
                             <Tab.Screen
-                                name='AccountStack'
-                                component={AccountStack}
+                                name='AIStack'
+                                component={AIStack}
                                 options={{
                                     headerShown: false,
-                                    title: 'Account',
+                                    title: 'Plan',
                                 }}
                             />
+
                             <Tab.Screen
                                 name='CommunitiesStack'
                                 component={CommunitiesStack}
@@ -445,6 +463,15 @@ function App() {
                                     title: 'Community',
                                 }}
                             />
+                            <Tab.Screen
+                                name='AccountStack'
+                                component={AccountStack}
+                                options={{
+                                    headerShown: false,
+                                    title: 'Account',
+                                }}
+                            />
+
                         </Tab.Navigator>
                     ) : (
                         <Stack.Navigator initialRouteName='Account'>
