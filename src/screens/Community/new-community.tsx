@@ -33,10 +33,11 @@ import {
 import exercisePickerModal from "../WorkoutLog/ExercisePickerModal";
 import ExercisePickerModal from "../WorkoutLog/ExercisePickerModal";
 import { FontAwesome5 } from '@expo/vector-icons';
+import EditTemplateScreenUpdated from "../ProgressLog/EditTemplateScreenUpdated";
 
 
 const CreateCommunity = ({ route }) => {
-  const {community, isEdit} = route.params || {};
+  const {community, isEdit, communityId} = route.params || {};
   const communityNamePlaceholder = community? community.name : "";
   const communityDescriptionPlaceholder = community? community.description : "";
   const communityLeaderboardPlaceholder = community? community.leaderboardExercises : [];
@@ -98,21 +99,39 @@ const CreateCommunity = ({ route }) => {
         bannerImageUrl = await uploadImage(bannerImage, "communityBanners");
       }
 
-      const communityData = {
-        name: communityName,
-        description: communityDescription || "",
-        private: isPrivate,
-        owner: userId,
-        members: [userId],
-        imageUrl: imageUrl, // Add image URL to the community document
-        bannerImageUrl: bannerImageUrl,
-        leaderboardExercises: leaderboardExercises
-      }
 
       if (isEdit){
-        await updateDoc(doc(db, "communities", community.id), communityData);
+
+        console.log('community exercises', leaderboardExercises);
+        console.log('community exercises', communityName);
+        console.log('community description', communityDescription);
+        console.log('community description', isPrivate);
+        console.log(community.id);
+
+
+        const communityData = {
+          name: communityName,
+          description: communityDescription || "",
+          private: isPrivate,
+          leaderboardExercises: leaderboardExercises
+        }
+
+        await updateDoc(doc(db, "communities", communityId), communityData);
+        console.log('editing mode ');
         Alert.alert("Event updated successfully.");
       }else{
+
+        const communityData = {
+          name: communityName,
+          description: communityDescription || "",
+          private: isPrivate,
+          owner: userId,
+          members: [userId],
+          imageUrl: imageUrl || "", // Add image URL to the community document
+          bannerImageUrl: bannerImageUrl || "",
+          leaderboardExercises: leaderboardExercises
+        }
+
         await setDoc(newCommunityRef, communityData);
 
         // Add the new community ID to the user's document
@@ -127,7 +146,7 @@ const CreateCommunity = ({ route }) => {
       navigation.goBack();
     } catch (error) {
       Alert.alert("Error", "Failed to create community.");
-      console.error("Error creating community: ", error);
+      console.error("Error with community: ", error);
     }
   };
 
@@ -310,7 +329,7 @@ const CreateCommunity = ({ route }) => {
         />
       </View>
       <TouchableOpacity style={styles.createButton} onPress={handleCreate}>
-        <Text style={styles.createButtonText}>Create Group</Text>
+        <Text style={styles.createButtonText}>{isEdit? "Edit": "Create"} Group</Text>
       </TouchableOpacity>
 
       <ExercisePickerModal

@@ -481,7 +481,7 @@ export default function WorkoutLogScreen({route}) {
 
                     const repsPlaceholder = lastFilledRep? lastFilledRep.toString(): repsString;
 
-                    const isWeightDisabled = exercise.weightConfig === 'BW';
+                    const isWeightDisabled = exercise.repsConfig === 'Cardio';
 
                     const previousReps = exercise.repsUnit === 'time'? formatTimeMilliseconds(previousSet.reps) : previousSet.reps;
 
@@ -590,13 +590,13 @@ export default function WorkoutLogScreen({route}) {
                                             </View>
                                         )}
                                     </View>
-                                    <TextInput
+                                    {!isWeightDisabled && <TextInput
                                         style={styles.weightInput}
                                         keyboardType="numeric"
                                         placeholder={weightPlaceholder}
                                         value={set.weight !== '' ? set.weight.toString() : ''}
                                         onChangeText={text => handleWeightChange(text)}
-                                    />
+                                    />}
                                     {!repsAreTimed? (<TextInput
                                         style={styles.repsInput}
                                         keyboardType="numeric"
@@ -748,7 +748,7 @@ export default function WorkoutLogScreen({route}) {
         const filteredExercises = exercises.map(ex => ({
             id: camelCase(ex.name),
             name: ex.name,
-            sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'bodyWeight') && (set.reps !== '')).map(set => ({
+            sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'BW' || ex.repsConfig === 'Cardio') && (set.reps !== '')).map(set => ({
                 ...set,
                 weight: set.weight,
                 reps: set.reps,
@@ -818,6 +818,8 @@ export default function WorkoutLogScreen({route}) {
             setExercises(newExercises);
         };
 
+        const isWeightDisabled = exercise.repsConfig === "Cardio";
+
         const repsAreTimed = exercise.repsConfig !== 'Reps';
 
         return(
@@ -840,11 +842,11 @@ export default function WorkoutLogScreen({route}) {
                     <Text style={[styles.setIndicator]}>Set</Text>
                     <Text style={[styles.previousAttemptHeader]}>Previous</Text>
 
-                    <TouchableOpacity onPress={toggleWeightUnit} style={styles.weightToggleContainer}>
-                        <Text style={styles.weightHeader}>
-                            {exercise.weightConfig === 'BW'? '+': ''}{exercise.weightUnit}
-                        </Text>
-                    </TouchableOpacity>
+                    {!isWeightDisabled && <TouchableOpacity onPress={toggleWeightUnit} style={styles.weightToggleContainer}>
+                        {<Text style={styles.weightHeader}>
+                            {exercise.weightConfig === 'BW+'? '+': ''}{exercise.weightUnit}
+                        </Text>}
+                    </TouchableOpacity>}
                     <Text style={[styles.repsIndicatorText]}>{repsAreTimed? 'TIME': 'REPS'}</Text>
                     {isFailureTracking && <TouchableOpacity onPress={toggleAllFailure} style={[styles.allFailureButton, styles.failureButtonActive]}>
                         <Text style={styles.failureButtonTextActive}>FF</Text>

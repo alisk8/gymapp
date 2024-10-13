@@ -100,7 +100,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
   useEffect(() => {
     nav.setOptions({
       headerRight: () => (
-          <TouchableOpacity onPress={() => navigation.navigate("NewCommunity", {community: communityData, isEdit: true})} style={styles.hideButton}>
+          <TouchableOpacity onPress={() => navigation.navigate("NewCommunity", {community: communityData, isEdit: true, communityId: communityId})} style={styles.hideButton}>
             <Text style={styles.hideButtonText}>Edit</Text>
           </TouchableOpacity>
       )
@@ -142,6 +142,30 @@ const CommunityLandingPage = ({ route, navigation }) => {
       console.error("Error fetching members: ", error);
     }
   };
+
+  const formatTime = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+
+    return `${hours > 0 ? `${hours}:` : ''}${hours > 0 ? minutes.toString().padStart(2, '0') : minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const formatTimeMilliseconds = (milliseconds) => {
+    // Convert milliseconds to total seconds
+    const totalSeconds = Math.floor(milliseconds / 1000);
+
+    // Calculate minutes and remaining seconds
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    // Format the time as mm:ss, ensuring two digits for minutes and seconds
+    const formattedMinutes = String(minutes).padStart(2, '0');
+    const formattedSeconds = String(seconds).padStart(2, '0');
+
+    return `${formattedMinutes}:${formattedSeconds}`;
+  };
+
 
   const fetchCommunityData = async (id) => {
     try {
@@ -191,7 +215,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
           );
           const workoutsSnapshot = await getDocs(workoutsCollection);
 
-          let latestBenchPress = null;
+          let latestExercise = null;
 
           workoutsSnapshot.forEach((workoutDoc) => {
             const workoutData = workoutDoc.data();
@@ -199,12 +223,21 @@ const CommunityLandingPage = ({ route, navigation }) => {
               (exercise) => exercise.name.toLowerCase() === exerciseName.toLowerCase()
             );
             if (exercise && exercise.sets) {
-              console.log('bench',exercise);
-              const estimated1RM =
-                exercise.sets[0].weight * (1 + 0.0333 * exercise.sets[0].reps);
+              let estimated1RM = 0;
 
-              if (!latestBenchPress || workoutDoc.id > latestBenchPress.date) {
-                latestBenchPress = {
+              if (exercise.sets[0].reps) {
+                estimated1RM = exercise.sets[0].weight * (1 + 0.0333 * exercise.sets[0].reps);
+                console.log('1rm at reps', estimated1RM);
+
+              }
+              if (exercise.sets[0].time){
+                const weight = exercise.sets[0].weight || 0;
+                estimated1RM = weight? exercise.sets[0].weight * (1 + 0.0333 * exercise.sets[0].time): (1 + 0.0333 * exercise.sets[0].time);
+                console.log('1rm at time', estimated1RM);
+              }
+
+              if (!latestExercise || workoutDoc.id > latestExercise.date) {
+                latestExercise = {
                   userId,
                   ...exercise.sets[0],
                   estimated1RM,
@@ -215,8 +248,8 @@ const CommunityLandingPage = ({ route, navigation }) => {
             }
           });
 
-          if (latestBenchPress) {
-            leaderboardData.push(latestBenchPress);
+          if (latestExercise) {
+            leaderboardData.push(latestExercise);
           }
         }
       }
@@ -465,7 +498,8 @@ const CommunityLandingPage = ({ route, navigation }) => {
                   <Text style={styles.leaderboardName}>{item.userName}</Text>
                   <Text style={styles.leaderboardDetails}>
                     {item.weight}
-                    {item.weightUnit} x {item.reps} reps
+                    {item.weightUnit} {item.weight? "x": ""}
+                    {item.reps? item.reps : formatTimeMilliseconds(item.time)} {item.reps? "reps": ""}
                   </Text>
                 </View>
               )}

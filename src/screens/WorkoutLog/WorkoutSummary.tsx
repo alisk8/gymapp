@@ -16,11 +16,11 @@ import { db, firebase_auth, storage } from '../../../firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
 import DropDownPicker from "react-native-dropdown-picker";
 import { useWorkout } from "../../contexts/WorkoutContext";
-import {addDoc, collection} from "@firebase/firestore";
+import {addDoc, arrayUnion, collection, getDoc, updateDoc} from "@firebase/firestore";
 import Video from "react-native-video";
 import * as ImagePicker from "expo-image-picker";
 import { getDownloadURL, ref as storageRef, uploadBytes } from "@firebase/storage";
-import {getDocs} from "firebase/firestore";
+import {doc, getDocs} from "firebase/firestore";
 
 const WorkoutSummaryScreen = ({ route }) => {
     const [visibilityItems, setVisibilityItems] = useState([
@@ -44,6 +44,8 @@ const WorkoutSummaryScreen = ({ route }) => {
 
     const [expandedExercises, setExpandedExercises] = useState({});
 
+
+
     const toggleExpandExercise = (exerciseIndex) => {
         setExpandedExercises(prevState => ({
             ...prevState,
@@ -60,6 +62,69 @@ const WorkoutSummaryScreen = ({ route }) => {
     const calculate1RM = (weight, reps) => {
         return weight * (1 + 0.0333 * reps);
     };
+
+    const convertLbs = (weight, unit) => {
+        if (unit === "kgs"){
+            return Math.floor(weight * 2.204);
+        }
+        return weight;
+    }
+
+    const convertReps = (reps, repsUnit) => {
+        if (repsUnit === "time"){
+            return convertTimeToMilliseconds(reps) / 1000;
+        }
+
+        return reps;
+    }
+
+    const scoreWorkout = () => {
+        const timeScore = Math.floor(elapsedTime / 60) /60;
+        const experienceScore = 0.833;
+
+        let exerciseWeightScore = 0;
+        let totalSets = 0;
+        let cardioScore = 0;
+
+        workoutState.exercises.forEach(exercise => {
+
+            // Only process if the weight is tracked
+            if (exercise.repsConfig === "Cardio"){
+                console.log('before converting time', exercise.sets[0].reps);
+                cardioScore += convertTimeToMilliseconds(exercise.sets[0].reps) / 100;
+            }
+            else if (exercise.weightConfig === "Weight") {
+                // Iterate through each set
+                exercise.sets.forEach(set => {
+                    if (set.completed) {
+                        // Calculate weight * reps for each set and add to totalWeight
+                        exerciseWeightScore += convertLbs(set.weight, exercise.weightUnit) * convertReps(set.reps, exercise.repsUnit);
+                    }
+                });
+            }
+            else if (exercise.weightConfig === "Bodyweight"){
+                exercise.sets.forEach(set => {
+                    if (set.completed) {
+                            // Calculate weight * reps for each set and add to totalWeight
+                      exerciseWeightScore += 50 * convertReps(set.reps, exercise.repsUnit);
+                    }
+                });
+            }
+            console.log(exercise.name);
+            console.log('each exercise score:', exerciseWeightScore);
+
+            // Add to total sets regardless of weight tracking
+            totalSets += exercise.sets.length;
+        });
+
+        const weightsScore = (timeScore * experienceScore * exerciseWeightScore * totalSets) / 10000;
+
+        console.log('cardio score', cardioScore / 275);
+        console.log('weights score', weightsScore);
+        console.log('combined', Math.floor(weightsScore + cardioScore/275));
+        return Math.floor(weightsScore + cardioScore/275);
+
+    }
 
     const camelCase = (str) => {
         return str
@@ -87,6 +152,7 @@ const WorkoutSummaryScreen = ({ route }) => {
     const templateCheck = async () => {
         try {
             const userId = firebase_auth.currentUser.uid;
+
             const templateRef = collection(db, "userProfiles", userId, "templates");
             const querySnapshot = await getDocs(templateRef);
             const existingTemplates = querySnapshot.docs.map(doc => doc.data().templateName.toLowerCase());
@@ -125,12 +191,12 @@ const WorkoutSummaryScreen = ({ route }) => {
     };
 
     const calculateTotalWeightLifted = (exercises) => {
-        return exercises.reduce((totalWeight, exercise) => {
+        return exercises.filter((exercise) => exercise.weightConfig === "Weight").reduce((totalWeight, exercise) => {
             const exerciseWeight = exercise.sets.reduce((exerciseTotal, set) => {
                 let weight = parseFloat(set.weight);
                 // Standardize weight to kg if it's in lbs
-                if (exercise.weightUnit === 'lbs') {
-                    weight = weight * 0.453592; // Convert lbs to kg
+                if (exercise.weightUnit === 'kgs') {
+                    weight = weight * 2.20462; // Convert lbs to kg
                 }
                 return exerciseTotal + (weight * parseInt(set.reps, 10));
             }, 0);
@@ -165,6 +231,11 @@ const WorkoutSummaryScreen = ({ route }) => {
 
         const userId = firebase_auth.currentUser.uid;
 
+        const userDocRef = doc(db, "userProfiles", userId);
+        const userDoc = await getDoc(userDocRef);
+        const userData = userDoc.data();
+        const newXp = userData.xp +scoreWorkout();
+
         if (!loadedFromTemplate && !isTemplateSaveChecked){
             console.log('run here');
             toggleTemplateModal();
@@ -176,7 +247,7 @@ const WorkoutSummaryScreen = ({ route }) => {
             const filteredExercises = workoutState.exercises.map(ex => ({
                 id: camelCase(ex.name),
                 name: ex.name,
-                sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'BW') && (set.reps !== '')).map(({key, weight, reps}) => {
+                sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'BW' || ex.repsConfig === "Cardio") && (set.reps !== '' || set.time !== '')).map(({key, weight, reps}) => {
                     if (ex.repsUnit === 'time') {
                         // For time-based exercises, store `time` instead of `reps`
                         const time = convertTimeToMilliseconds(reps);
@@ -200,6 +271,7 @@ const WorkoutSummaryScreen = ({ route }) => {
                 repsUnit: ex.repsUnit,
             })).filter(ex => ex.sets.length > 0);
 
+            console.log('exercises after filter', filteredExercises);
 
              if (isTemplateSaveChecked && newTemplateName) {
                  const templateRef = collection(db, "userProfiles", userId, "templates");
@@ -260,6 +332,11 @@ const WorkoutSummaryScreen = ({ route }) => {
                 description: description || '',
                 mediaUrls: uploadedMediaUrls,
                 visibility: visibility,
+                addedExp: scoreWorkout()
+            });
+
+            await updateDoc(userDocRef, {
+                xp: newXp, //add from scoreWorkout() to this existing field
             });
 
         } catch (error) {
@@ -363,7 +440,7 @@ const WorkoutSummaryScreen = ({ route }) => {
             <Text style={styles.subheading}>Total Workout Time: {formatTotalWorkoutTime(elapsedTime)}</Text>
                 <View style={styles.summaryHeaderContainer}>
                     <Text style={styles.summaryHeaderText}>
-                        Total Weight Lifted: {calculateTotalWeightLifted(workoutState.exercises).toFixed(2)} kg
+                        Total Weight Lifted: {calculateTotalWeightLifted(workoutState.exercises).toFixed(2)} lbs
                     </Text>
                     <Text style={styles.summaryHeaderText}>
                         Total Sets Done: {calculateTotalSetsDone(workoutState.exercises)}
@@ -372,6 +449,7 @@ const WorkoutSummaryScreen = ({ route }) => {
                 {workoutState.exercises.map((exercise, index) => {
                     const bestAttempt = getBestAttempts(exercise);
                     const predicted1RM = calculate1RM(bestAttempt.weight, bestAttempt.reps);
+                    const isWeightDisabled = exercise.repsConfig === "Cardio";
 
                     return (
                         <View key={index} style={styles.exerciseContainer}>
@@ -385,7 +463,7 @@ const WorkoutSummaryScreen = ({ route }) => {
                                 <View>
                                     <Text style={styles.exerciseName}>{exercise.name}</Text>
                                     <Text style={styles.predicted1RMText}>
-                                        {`Predicted 1RM: ${predicted1RM.toFixed(2)} ${exercise.weightUnit}`}
+                                        {exercise.weightConfig === 'Weight'? `Predicted 1RM: ${predicted1RM.toFixed(2)} ${exercise.weightUnit}`: ''}
                                     </Text>
                                 </View>
                             </TouchableOpacity>
@@ -481,6 +559,7 @@ const WorkoutSummaryScreen = ({ route }) => {
                         <TouchableOpacity
                             style={styles.dontSaveButton}
                             onPress={async () => {
+                                setIsTemplateSaveChecked(true);
                                 if (isTemplateSaveChecked){
                                     toggleTemplateModal();
                                     await saveWorkoutAndNavigate();

@@ -8,7 +8,7 @@ import Swiper from 'react-native-swiper';
 import { useFocusEffect } from "@react-navigation/native";
 import {Ionicons} from "@expo/vector-icons";
 
-const defaultProfilePicture = 'https://firebasestorage.googleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2Fpfp.jpeg?alt=media&token=dd124ee9-6c61-48ad-b41c-97f3acc3350c';
+const defaultProfilePicture = 'https://firebasestorage.goxogleapis.com/v0/b/gym-app-a79f9.appspot.com/o/media%2Fpfp.jpeg?alt=media&token=dd124ee9-6c61-48ad-b41c-97f3acc3350c';
 
 const FeedPage = ({ navigation }) => {
   const [highlights, setHighlights] = useState([]);
@@ -457,6 +457,8 @@ const FeedPage = ({ navigation }) => {
         const getBestSet = (sets) => {
             if (!sets || sets.length === 0) return null;
 
+            if (sets.length === 1) return sets[0];
+
             return sets.reduce((bestSet, currentSet) => {
                 if (currentSet.weight > bestSet.weight) {
                     return currentSet;
@@ -466,6 +468,7 @@ const FeedPage = ({ navigation }) => {
                 return bestSet;
             });
         };
+
 
         return (
             <View style={styles.highlightContainer}>
