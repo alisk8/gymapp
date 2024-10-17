@@ -11,6 +11,8 @@ import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { WorkoutProvider } from './src/contexts/WorkoutContext';
+import AIFrontPage from './src/screens/AI/AIFrontPage';
+
 
 // Import screens
 import Account from './src/screens/Account';
@@ -178,15 +180,8 @@ function AccountStack() {
 
 function ProgressStack() {
     return (
-        <Stack.Navigator initialRouteName='ProgressTopTabs'>
-            <Stack.Screen
-                name="ProgressTopTabs"
-                component={ProgressTopTabs}
-                options={{headerShown: false}} // Hide the header if not needed
-            />
+        <Stack.Navigator initialRouteName='Progress'>
             <Stack.Screen name='Progress' component={Progress} options={screenOptions} />
-            <Stack.Screen name='TemplateRecords' component={TemplateRecords}/>
-            <Stack.Screen name='EditTemplateScreenUpdated' component={EditTemplateScreenUpdated}/>
             <Stack.Screen name="TrackedExercise" component={TrackedExercise} />
             <Stack.Screen
                 name='WorkoutLog'
@@ -211,6 +206,45 @@ function ProgressStack() {
                     headerShown: false,
                     presentation: 'fullScreenModal',
                 }}
+            />
+        </Stack.Navigator>
+    );
+}
+
+
+/**
+ <Stack.Screen
+ name="AIFrontPage"
+ component={AIFrontPage}
+ options={({ navigation }) => ({
+ ...screenOptions({ navigation }),
+ title: "Create a Workout",  // This title can still be used if needed later
+ headerShown: false,         // This hides the top header
+ })}
+ />
+
+ **/
+
+function AIStack() {
+    return (
+        <Stack.Navigator initialRouteName="TemplateRecords">
+            <Stack.Screen name='TemplateRecords'
+                          component={TemplateRecords}
+                          options={({ navigation }) => ({
+                              ...screenOptions({ navigation }),
+                              title: "My Routines",  // This title can still be used if needed later
+                          })}
+            />
+            <Stack.Screen name='EditTemplateScreenUpdated' component={EditTemplateScreenUpdated}/>
+            <Stack.Screen
+                name="AIFrontPage"
+                component={AIFrontPage}
+                options={({ navigation }) => ({
+                    ...screenOptions({ navigation }),
+                    title: "Create a Workout",  // This title can still be used if needed later
+                    headerShown: "false",
+                    presentation: "fullScreenModal",
+                })}
             />
         </Stack.Navigator>
     );
@@ -426,6 +460,14 @@ function App() {
                                 options={{
                                     headerShown: false,
                                     title: 'Progress',
+                                }}
+                            />
+                            <Tab.Screen
+                                name='AIStack'
+                                component={AIStack}
+                                options={{
+                                    headerShown: false,
+                                    title: 'Plan',
                                 }}
                             />
                             <Tab.Screen

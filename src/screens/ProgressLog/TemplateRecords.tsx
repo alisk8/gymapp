@@ -22,11 +22,12 @@ import {
     updateDoc,
     Timestamp,
 } from "firebase/firestore";
-import { useFocusEffect } from "@react-navigation/native";
+import {useFocusEffect, useNavigation} from "@react-navigation/native";
 
 
 const TemplateRecords = ({ navigation }) => {
     const [templates, setTemplates] = useState([]);
+    const nav = useNavigation();
 
     useFocusEffect(
         React.useCallback(() => {
@@ -34,6 +35,17 @@ const TemplateRecords = ({ navigation }) => {
             fetchTemplates();
         }, [])
     );
+
+
+    useEffect(() => {
+        nav.setOptions({
+            headerRight: () => (
+                <TouchableOpacity onPress={() => navigation.navigate('EditTemplateScreenUpdated', { template: [] })}>
+                    <Text style={{fontSize: 30}}>+</Text>
+                </TouchableOpacity>
+            )
+        });
+    }, [nav]);
 
     const fetchTemplates = async () => {
         const user = firebase_auth.currentUser;
@@ -78,10 +90,10 @@ const TemplateRecords = ({ navigation }) => {
             <TouchableOpacity
                 style={styles.createButton}
                 onPress={() => {
-                    navigation.navigate('EditTemplateScreenUpdated', { template: [] });
+                    navigation.navigate('AIFrontPage');
                 }}
             >
-                <Text style={styles.createButtonText}>+ Create Workout Template</Text>
+                <Text style={styles.createButtonText}>+ Generate Routine with AI</Text>
             </TouchableOpacity>
         </View>
     );
