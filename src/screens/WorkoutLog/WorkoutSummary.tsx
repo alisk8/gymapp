@@ -16,7 +16,7 @@ import { db, firebase_auth, storage } from '../../../firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
 import DropDownPicker from "react-native-dropdown-picker";
 import { useWorkout } from "../../contexts/WorkoutContext";
-import {addDoc, arrayUnion, collection, getDoc, updateDoc} from "@firebase/firestore";
+import {addDoc, arrayUnion, collection, getDoc, limit, orderBy, query, updateDoc} from "@firebase/firestore";
 import Video from "react-native-video";
 import * as ImagePicker from "expo-image-picker";
 import { getDownloadURL, ref as storageRef, uploadBytes } from "@firebase/storage";
@@ -339,6 +339,8 @@ const WorkoutSummaryScreen = ({ route }) => {
                 xp: newXp, //add from scoreWorkout() to this existing field
             });
 
+            await updateStreak(userId);
+
         } catch (error) {
             console.error("Error adding document: ", error);
             Alert.alert("Error", "Failed to save workouts.");
@@ -384,6 +386,32 @@ const WorkoutSummaryScreen = ({ route }) => {
         setModalVisible(false);
     };
 
+    const updateStreak = async (userId: string) => {
+        const userRef = doc(db, "userProfiles", userId);
+
+        // Fetch the most recent workout
+        const workoutRef = collection(db, "userProfiles", userId, "workouts");
+        const recentWorkouts = await getDocs(query(workoutRef, orderBy("createdAt", "desc"), limit(1)));
+
+        let streak = 1; // Start a new streak by default
+        const now = new Date();
+
+        if (!recentWorkouts.empty) {
+            const lastWorkoutDate = recentWorkouts.docs[0].data().createdAt.toDate();
+            const timeDifference = now.getTime() - lastWorkoutDate.getTime();
+            const dayDifference = timeDifference / (1000 * 3600 * 24);
+
+            if (dayDifference <= 1) {
+                const userDoc = await getDoc(userRef);
+                const currentStreak = userDoc.data().consistencyStreak || 1;
+                streak = currentStreak + 1; // Increment streak if workout is within 1 day
+            }
+        }
+
+        // Update the consistency_streak field on the user profile
+        await updateDoc(userRef, { consistencyStreak: streak });
+    };
+
     if (!workoutState) {
         console.log('No workout state available');
         return (
@@ -392,8 +420,6 @@ const WorkoutSummaryScreen = ({ route }) => {
             </View>
         );
     }
-
-
 
 
     return (

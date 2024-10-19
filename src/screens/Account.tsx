@@ -14,7 +14,7 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { firebase_auth, db } from "../../firebaseConfig";
+import {firebase_auth, db, storage} from "../../firebaseConfig";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -31,6 +31,8 @@ import useMarkedDates from "../../hooks/setMarkedDates";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "@react-navigation/native";
 import GPSModal from "./Community/GPSModal";
+import * as ImageManipulator from "expo-image-manipulator";
+import {getDownloadURL, ref as storageRef, uploadBytes} from "firebase/storage";
 
 type AdditionalInfo = {
   firstName: string;
@@ -49,6 +51,8 @@ type AdditionalInfo = {
   experienceLevel: string;
   favoriteGym: string;
   displaySettings: Record<string, boolean>;
+  xp: number
+  consistencyStreak: number,
 };
 
 export default function Account({ navigation }) {
@@ -86,6 +90,8 @@ export default function Account({ navigation }) {
       experienceLevel: true,
       favoriteGym: true,
     },
+    xp: 0,
+    consistencyStreak:0
   });
   const [heightFeet, setHeightFeet] = useState("");
   const [heightInches, setHeightInches] = useState("");
@@ -127,7 +133,7 @@ export default function Account({ navigation }) {
                 gym_interests: true,
                 bio: true,
                 favoriteExercises: true,
-                experienceLevel: true,
+                xp: true,
                 favoriteGym: true,
               },
             });
@@ -178,6 +184,48 @@ export default function Account({ navigation }) {
     setPosts(combinedData);
   };
 
+  const generateUniqueFilename = () => {
+    const timestamp = Date.now();
+    const randomNumber = Math.floor(Math.random() * 1000000);
+    return `${timestamp}_${randomNumber}`;
+  };
+
+  const uploadImage = async (uri, folder) => {
+    try {
+      const response = await fetch(uri);
+      if (!response.ok) {
+        throw new Error(`Network response was not ok: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const resizedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          [
+            {
+              resize: { width: 200, height: 200 }
+            },
+          ], // Resize to 200x200 pixels for profile, 1280x720 for banner
+          { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      const resizedBlob = await (await fetch(resizedImage.uri)).blob();
+      const uniqueFileName = generateUniqueFilename();
+      const storageRefInstance = storageRef(
+          storage,
+          `${folder}/${uniqueFileName}`
+      );
+      await uploadBytes(storageRefInstance, resizedBlob);
+      return await getDownloadURL(storageRefInstance);
+    } catch (error) {
+      console.error("Error uploading image: ", error);
+      Alert.alert(
+          "Image Upload Error",
+          "Failed to upload the image. Please try again."
+      );
+      return null;
+    }
+  };
+
   const handleLogin = async () => {
     try {
       const response = await signInWithEmailAndPassword(
@@ -210,6 +258,13 @@ export default function Account({ navigation }) {
           password
       );
       setUser(response.user);
+
+      let imageUrl = "";
+      if (additionalInfo.profilePicture) {
+        imageUrl = await uploadImage(additionalInfo.profilePicture, "profilePictures");
+        additionalInfo.profilePicture = imageUrl;
+      }
+
       const userProfileRef = doc(db, "userProfiles", response.user.uid);
       await setDoc(userProfileRef, {
         email: username,
@@ -392,9 +447,20 @@ export default function Account({ navigation }) {
               style={styles.profileImage}
           />
           <View style={styles.profileDetails}>
-            <Text style={styles.name}>
-              {additionalInfo.firstName} {additionalInfo.lastName}
-            </Text>
+            <View style={{flexDirection: 'row',justifyContent:'space-between'}}>
+              <Text style={styles.name}>
+                {additionalInfo.firstName} {additionalInfo.lastName}
+              </Text>
+              <View style={{flexDirection:'column', alignItems:'center'}}>
+              <Text style={styles.scoreText}>
+                XP: {additionalInfo.xp}
+              </Text>
+              {additionalInfo.consistencyStreak >0 && <Text style={styles.scoreText}>
+                Streak: {additionalInfo.consistencyStreak} 🔥
+              </Text>
+              }
+              </View>
+            </View>
             {displaySettings.bio && additionalInfo.bio && (
                 <Text style={styles.bio}>{additionalInfo.bio}</Text>
             )}
@@ -1151,4 +1217,10 @@ const styles = StyleSheet.create({
     color: "#333",
     marginBottom: 5,
   },
+  scoreText:{
+    fontSize: 16,
+    color: '#0170c7',
+    marginRight: 5,
+    fontWeight:'bold'
+  }
 });

@@ -100,8 +100,8 @@ const CommunityLandingPage = ({ route, navigation }) => {
   useEffect(() => {
     nav.setOptions({
       headerRight: () => (
-          <TouchableOpacity onPress={() => navigation.navigate("NewCommunity", {community: communityData, isEdit: true, communityId: communityId})} style={styles.hideButton}>
-            <Text style={styles.hideButtonText}>Edit</Text>
+          <TouchableOpacity onPress={() => navigation.navigate("NewCommunity", {community: communityData, isEdit: true, communityId: communityId})}>
+            <Text style={styles.editButtonText}>Edit</Text>
           </TouchableOpacity>
       )
     });
@@ -201,17 +201,45 @@ const CommunityLandingPage = ({ route, navigation }) => {
 
     try {
       const leaderboardData = [];
+      console.log('exercise name', exerciseName);
 
+      if(exerciseName.toLowerCase() === "consistency"){
+        // Fetch each member's consistency streak data
+        console.log('im here');
+        for (let userId of communityData.members) {
+          const userProfileDoc = await getDoc(doc(db, "userProfiles", userId));
+          if (userProfileDoc.exists()) {
+            const userProfileData = userProfileDoc.data();
+            const consistencyStreak = userProfileData.consistencyStreak || 0; // Default to 0 if not present
+
+            leaderboardData.push({
+              userId,
+              consistencyStreak,
+              userName: `${userProfileData.firstName} ${userProfileData.lastName}`,
+            });
+          }
+        }
+
+        // Sort the leaderboard by consistencyStreak
+        leaderboardData.sort((a, b) => b.consistencyStreak - a.consistencyStreak);
+
+        console.log('leaderboard', leaderboardData);
+        return leaderboardData.map((item, index) => ({
+          ...item,
+          rank: index + 1,
+        }));
+      }
+      else{
       // Fetch each member's bench press data
       for (let userId of communityData.members) {
         const userProfileDoc = await getDoc(doc(db, "userProfiles", userId));
         if (userProfileDoc.exists()) {
           const userProfileData = userProfileDoc.data();
           const workoutsCollection = collection(
-            db,
-            "userProfiles",
-            userId,
-            "workouts"
+              db,
+              "userProfiles",
+              userId,
+              "workouts"
           );
           const workoutsSnapshot = await getDocs(workoutsCollection);
 
@@ -220,7 +248,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
           workoutsSnapshot.forEach((workoutDoc) => {
             const workoutData = workoutDoc.data();
             const exercise = workoutData.exercises.find(
-              (exercise) => exercise.name.toLowerCase() === exerciseName.toLowerCase()
+                (exercise) => exercise.name.toLowerCase() === exerciseName.toLowerCase()
             );
             if (exercise && exercise.sets) {
               let estimated1RM = 0;
@@ -230,9 +258,9 @@ const CommunityLandingPage = ({ route, navigation }) => {
                 console.log('1rm at reps', estimated1RM);
 
               }
-              if (exercise.sets[0].time){
+              if (exercise.sets[0].time) {
                 const weight = exercise.sets[0].weight || 0;
-                estimated1RM = weight? exercise.sets[0].weight * (1 + 0.0333 * exercise.sets[0].time): (1 + 0.0333 * exercise.sets[0].time);
+                estimated1RM = weight ? exercise.sets[0].weight * (1 + 0.0333 * exercise.sets[0].time) : (1 + 0.0333 * exercise.sets[0].time);
                 console.log('1rm at time', estimated1RM);
               }
 
@@ -254,12 +282,13 @@ const CommunityLandingPage = ({ route, navigation }) => {
         }
       }
 
-      // Sort the data by estimated 1RM
-      leaderboardData.sort((a, b) => b.estimated1RM - a.estimated1RM);
+        // Sort the data by estimated 1RM
+        leaderboardData.sort((a, b) => b.estimated1RM - a.estimated1RM);
 
-      return leaderboardData;
+        return leaderboardData;
+    }
     } catch (error) {
-      console.error("Error fetching bench press data: ", error);
+      console.error("Error fetching leaderboard data: ", error);
     }
   };
 
@@ -468,8 +497,9 @@ const CommunityLandingPage = ({ route, navigation }) => {
         )}
 
         <Text style={styles.leaderboardTitle}>{selectedLeaderboardExercise ? `${selectedLeaderboardExercise} Leaderboard` : "Leaderboard"}</Text>
-        <View style={{paddingHorizontal: 30,justifyContent: 'center'}}>
+        <View style={{paddingHorizontal: 30,justifyContent: 'center', flex: 1}}>
           <DropDownPicker
+              zIndex={100000}
               open={openExerciseSelector}
               value={selectedLeaderboardExercise}
               items={communityData.leaderboardExercises.map((exercise) => ({
@@ -478,7 +508,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
               }))}
               setOpen={setOpenExerciseSelector}
               setValue={setSelectedLeaderboardExercise}
-              placeholder="Select an exercise"
+              placeholder="Select a leaderboard"
               style={styles.dropdownPicker}
               containerStyle={styles.dropdownContainerStyle}
               dropDownContainerStyle={styles.dropDownContainerStyle}
@@ -497,18 +527,22 @@ const CommunityLandingPage = ({ route, navigation }) => {
                   <Text style={styles.leaderboardRank}>{index + 1}.</Text>
                   <Text style={styles.leaderboardName}>{item.userName}</Text>
                   <Text style={styles.leaderboardDetails}>
-                    {item.weight}
-                    {item.weightUnit} {item.weight? "x": ""}
-                    {item.reps? item.reps : formatTimeMilliseconds(item.time)} {item.reps? "reps": ""}
+                    {item.consistencyStreak? item.consistencyStreak: ''}
+                    {item.consistencyStreak && item.consistencyStreak > 1? ' days': ''}
+                    {item.consistencyStreak && item.consistencyStreak === 1? ' day': ''}
+                    {item.weight? item.weight: ''}
+                    {item.weightUnit? item.weightUnit: ''} {item.weight? "x": ""}
+                    {item.reps? item.reps: ''} {item.reps? "reps": ""}
+                    {item.time? formatTimeMilliseconds(item.time): ''}
                   </Text>
                 </View>
               )}
             />
           ) : (
-            <Text>No exercise data available.</Text>
+            <Text>No leaderboard data available.</Text>
           )}
         </View>
-        <View>
+        <View style={{zIndex: -1, }}>
         <TouchableOpacity
           style={styles.createPostButton}
           onPress={() =>
@@ -560,7 +594,6 @@ const CommunityLandingPage = ({ route, navigation }) => {
         />
         </View>
       </ScrollView>
-
       <CommunityUserModal
           visible={isUsersModalVisible}
           onClose={handleCloseUsersModal}
@@ -622,6 +655,7 @@ const styles = StyleSheet.create({
     marginTop: 40,
     backgroundColor: "#fff",
     marginBottom: 40,
+    zIndex: 1,
   },
   postActions: {
     flexDirection: "row",
@@ -713,6 +747,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
+
   },
   leaderboardRank: {
     fontSize: 16,
@@ -734,27 +769,36 @@ const styles = StyleSheet.create({
     borderColor: "#ccc", // Border color
     borderRadius: 10, // Rounded corners
     height: 50, // Height of the dropdown
+    marginBottom: 10,
+    zIndex: 1000,
   },
   dropdownContainerStyle: {
     height: 50, // Adjust the height of the picker container
     borderColor: "#ccc", // Same border color as dropdown picker
+    zIndex: 1000, // Ensure it is on top when open
   },
   dropDownContainerStyle: {
     backgroundColor: "#fafafa", // Background for the dropdown options
     borderColor: "#ccc", // Same border color as the picker
     borderRadius: 10, // Rounded corners
+    marginBottom: 5,
+    zIndex: 1000,
+    position: 'absolute'
   },
   dropdownTextStyle: {
     fontSize: 16,
     color: "#333", // Text color
+    zIndex: 1000,
   },
   dropdownLabelStyle: {
     fontSize: 16,
     color: "#333", // Label text color
+    zIndex: 1000,
   },
   arrowIconStyle: {
     width: 20,
     height: 20, // Arrow icon size
+    zIndex: 1000,
   },
   placeholderStyle: {
     fontSize: 16,
@@ -771,6 +815,11 @@ const styles = StyleSheet.create({
   hideButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  editButtonText: {
+    color: '#016e03',
+    fontWeight: 'bold',
+    fontSize: 16
   },
 });
 

@@ -164,6 +164,8 @@ const FeedPage = ({ navigation }) => {
                     await getDoc(doc(db, "userProfiles", userId))
                 ).data();
 
+                console.log('user data fetched', userProfileData)
+
                 // Fetch highlights
                 const highlightsQuery = query(
                     collection(db, "userProfiles", userId, "highlights"),
@@ -227,6 +229,7 @@ const FeedPage = ({ navigation }) => {
                         allHighlightsAndWorkouts.push({
                             id: doc.id,
                             ...workoutData,
+                            userProfileData,
                             userId,
                             profilePicture:
                                 userProfileData.profilePicture || defaultProfilePicture, // Add user's profile picture
@@ -419,39 +422,26 @@ const FeedPage = ({ navigation }) => {
                 });
             };
 
+            console.log('item', item);
+
             return (
                 <View style={styles.highlightContainer}>
                     <View style={styles.userInfoContainer}>
+
                         <TouchableOpacity
-                            onPress={() =>
-                                navigation.navigate("UserDetails", {
-                                    user: item.userProfileData,
-                                })
-                            }
+                            onPress={() => navigation.navigate("UserDetails", { user: item.userProfileData })}
                         >
                             <Image
-                                source={{
-                                    uri:
-                                        item.userProfileData?.profilePicture ||
-                                        defaultProfilePicture,
-                                }}
+                                source={{ uri: item.userProfileData.profilePicture }}
                                 style={styles.profilePicture}
                             />
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            onPress={() => navigation.navigate("UserDetails", { user: item })}
-                        >
-                            <Image
-                                source={{ uri: item.profilePicture }}
-                                style={styles.profilePicture}
-                            />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate("UserDetails", { user: item })}
+                            onPress={() => navigation.navigate("UserDetails", { user: item.userProfileData })}
                         >
                             <Text style={styles.userNameText}>
-                                {item.firstName} {item.lastName}
+                                {item.userProfileData.firstName} {item.userProfileData.lastName}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -737,7 +727,7 @@ const FeedPage = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     profilePicture: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
-    userNameText: { fontSize: 16, fontFamily: "Rubik-Bold", color: "#000" },
+    userNameText: { fontSize: 16, fontFamily: "Rubik-Bold", color: "#000"},
     swiper: { height: 300 },
     highlightContainer: {
         padding: 15,

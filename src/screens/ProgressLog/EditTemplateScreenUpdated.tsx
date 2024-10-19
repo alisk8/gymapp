@@ -28,6 +28,7 @@ import findLastIndex from "@react-navigation/stack/lib/typescript/src/utils/find
 import axios from 'axios';
 import FeedbackModal from "./FeedbackModal";
 import {doc, updateDoc} from "@firebase/firestore";
+import AIModal from "../AI/AIModal";
 
 
 export default function EditTemplateScreenUpdated({route}) {
@@ -46,7 +47,7 @@ export default function EditTemplateScreenUpdated({route}) {
     const [proceedWithSave, setProceedWithSave] = useState(false);
     const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
     const [pickerModalVisible, setPickerModalVisible] = useState(false);
-    const [feedbackModalVisible, setFeedbackModalVisible] = useState(false); // Modal visibility
+    const [feedbackModalVisible, setFeedbackModalVisible] = useState(route?.params?.AIModalOpen); // Modal visibility
     const [template, setTemplate] = useState(route?.params?.template);
     const mode = route?.params?.template ? "create" : "edit" ;
     console.log('mode:', mode);
@@ -712,7 +713,7 @@ export default function EditTemplateScreenUpdated({route}) {
                 }}
             />
 
-            <FeedbackModal
+            <AIModal
                 visible={feedbackModalVisible}
                 onClose={closeFeedbackModal}
                 useTemplateFeedback={useTemplateFeedback}

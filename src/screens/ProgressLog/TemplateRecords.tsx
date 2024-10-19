@@ -40,7 +40,7 @@ const TemplateRecords = ({ navigation }) => {
     useEffect(() => {
         nav.setOptions({
             headerRight: () => (
-                <TouchableOpacity onPress={() => navigation.navigate('EditTemplateScreenUpdated', { template: [] })}>
+                <TouchableOpacity onPress={() => navigation.navigate('EditTemplateScreenUpdated', { template: [], AIModalOpen: false })}>
                     <Text style={{fontSize: 30}}>+</Text>
                 </TouchableOpacity>
             )
@@ -80,7 +80,7 @@ const TemplateRecords = ({ navigation }) => {
                     <TouchableOpacity
                         style={styles.templateItem}
                         onPress={() => {
-                            navigation.navigate('EditTemplateScreenUpdated', { template: item });
+                            navigation.navigate('EditTemplateScreenUpdated', { template: item, AIModalOpen: false});
                         }}
                     >
                         <Text style={styles.templateName}>{item.templateName}</Text>
@@ -90,7 +90,7 @@ const TemplateRecords = ({ navigation }) => {
             <TouchableOpacity
                 style={styles.createButton}
                 onPress={() => {
-                    navigation.navigate('AIFrontPage');
+                    navigation.navigate('EditTemplateScreenUpdated', { template:[], AIModalOpen: true});
                 }}
             >
                 <Text style={styles.createButtonText}>+ Generate Routine with AI</Text>

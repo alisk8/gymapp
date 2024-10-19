@@ -40,14 +40,14 @@ const CreateCommunity = ({ route }) => {
   const {community, isEdit, communityId} = route.params || {};
   const communityNamePlaceholder = community? community.name : "";
   const communityDescriptionPlaceholder = community? community.description : "";
-  const communityLeaderboardPlaceholder = community? community.leaderboardExercises : [];
+  const communityLeaderboardPlaceholder = community? community.leaderboardExercises : ["Consistency"];
   console.log('is edit', isEdit);
   const [communityName, setCommunityName] = useState(communityNamePlaceholder);
   const [communityDescription, setCommunityDescription] = useState(communityDescriptionPlaceholder);
   const [isPrivate, setIsPrivate] = useState(false);
   const [communities, setCommunities] = useState([]);
-  const [image, setImage] = useState(null);
-  const [bannerImage, setBannerImage] = useState(null);
+  const [image, setImage] = useState(community?.imageUrl || null);
+  const [bannerImage, setBannerImage] = useState(community?.bannerImageUrl || null);
   const navigation = useNavigation();
   const [leaderboardExercises, setLeaderboardExercises] = useState(communityLeaderboardPlaceholder);
   const [pickerModalVisible, setPickerModalVisible] = useState(false);
@@ -290,7 +290,7 @@ const CreateCommunity = ({ route }) => {
         onChangeText={setCommunityDescription}
       />
 
-      <Text style={styles.leaderboardHeading}>Leaderboard Exercises</Text>
+      <Text style={styles.leaderboardHeading}>Leaderboards</Text>
 
       <ScrollView style={styles.leaderboardScroll}>
         {leaderboardExercises.length > 0 ? (

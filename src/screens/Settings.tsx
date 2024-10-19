@@ -14,7 +14,7 @@ import {
   FlatList, ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { db } from "../../firebaseConfig";
+import {db, storage} from "../../firebaseConfig";
 import {
   doc,
   updateDoc,
@@ -23,6 +23,8 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImageManipulator from "expo-image-manipulator";
+import {getDownloadURL, ref as storageRef, uploadBytes} from "firebase/storage";
 
 type AdditionalInfo = {
   firstName: string;
@@ -190,6 +192,8 @@ export default function Settings({ route, navigation }) {
           onPress: async () => {
             try {
               const docRef = doc(db, "userProfiles", userId);
+              const imageUrl = await uploadImage(tempInfo.profilePicture, 'profilePictures');
+              handleUpdateField('profilePicture', imageUrl);
               await updateDoc(docRef, tempInfo);
               setAdditionalInfo(tempInfo);
               Alert.alert("Success", "Profile updated successfully");
@@ -202,6 +206,48 @@ export default function Settings({ route, navigation }) {
         },
       ]
     );
+  };
+
+  const generateUniqueFilename = () => {
+    const timestamp = Date.now();
+    const randomNumber = Math.floor(Math.random() * 1000000);
+    return `${timestamp}_${randomNumber}`;
+  };
+
+  const uploadImage = async (uri, folder) => {
+    try {
+      const response = await fetch(uri);
+      if (!response.ok) {
+        throw new Error(`Network response was not ok: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const resizedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          [
+            {
+              resize: { width: 200, height: 200 }
+            },
+          ], // Resize to 200x200 pixels for profile, 1280x720 for banner
+          { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      const resizedBlob = await (await fetch(resizedImage.uri)).blob();
+      const uniqueFileName = generateUniqueFilename();
+      const storageRefInstance = storageRef(
+          storage,
+          `${folder}/${uniqueFileName}`
+      );
+      await uploadBytes(storageRefInstance, resizedBlob);
+      return await getDownloadURL(storageRefInstance);
+    } catch (error) {
+      console.error("Error uploading image: ", error);
+      Alert.alert(
+          "Image Upload Error",
+          "Failed to upload the image. Please try again."
+      );
+      return null;
+    }
   };
 
   const pickImage = async () => {

@@ -64,7 +64,7 @@ const screenOptions = ({ navigation, iconType }) => ({
             onPress = () => navigation.navigate('Notifications');
         } else if (iconType === 'newCommunity') {
             icon = <Ionicons name="add-circle-outline" size={24} color="black" />;
-            onPress = () => navigation.navigate('NewCommunity');
+            onPress = () => navigation.navigate('NewCommunity', {isEdit: false});
         } else if (iconType === 'CreateOutline') {
             icon = <Ionicons name="create-outline" size={24} color="black" />;
             onPress = () => navigation.navigate('SaveGymHighlightScreen');
