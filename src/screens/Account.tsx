@@ -76,6 +76,8 @@ export default function Account({ navigation }) {
     followers: [],
     following: [],
     favoriteExercises: [],
+    //adding community for testing purposes
+    communities: ["Sjj402aMI2s9wbmlzLig"],
     experienceLevel: "",
     favoriteGym: "",
     displaySettings: {
@@ -347,9 +349,10 @@ export default function Account({ navigation }) {
         pickerResult.assets &&
         pickerResult.assets.length > 0
     ) {
+      const updatedProfilePicture = await uploadImage(pickerResult.assets[0].uri, 'profilePictures');
       setAdditionalInfo((prev) => ({
         ...prev,
-        profilePicture: pickerResult.assets[0].uri,
+        profilePicture: updatedProfilePicture,
       }));
     }
   };
@@ -614,6 +617,7 @@ export default function Account({ navigation }) {
                 </>
             ) : (
                 <View style={styles.authContainer}>
+                  <Text style={styles.nameHeading}>{signingUp ? "" : "225"}</Text>
                   <Text style={styles.pageHeading}>
                     {signingUp ? "Create Account" : "Log In"}
                   </Text>
@@ -1140,6 +1144,11 @@ const styles = StyleSheet.create({
   },
   switchText: {
     color: '#016e03',
+  },
+  nameHeading: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    marginBottom: 5,
   },
   pageHeading: {
     fontSize: 30,

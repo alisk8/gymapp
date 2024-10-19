@@ -178,6 +178,8 @@ export default function Settings({ route, navigation }) {
     }));
   };
 
+  const timeout = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
   const confirmUpdateProfile = async () => {
     Alert.alert(
       "Confirm Update",
@@ -192,8 +194,7 @@ export default function Settings({ route, navigation }) {
           onPress: async () => {
             try {
               const docRef = doc(db, "userProfiles", userId);
-              const imageUrl = await uploadImage(tempInfo.profilePicture, 'profilePictures');
-              handleUpdateField('profilePicture', imageUrl);
+
               await updateDoc(docRef, tempInfo);
               setAdditionalInfo(tempInfo);
               Alert.alert("Success", "Profile updated successfully");
@@ -259,7 +260,7 @@ export default function Settings({ route, navigation }) {
     });
 
     if (!result.canceled) {
-      const updatedProfilePicture = result.assets[0].uri;
+      const updatedProfilePicture = await uploadImage(result.assets[0].uri, 'profilePictures');
       handleUpdateField("profilePicture", updatedProfilePicture);
     }
   };
