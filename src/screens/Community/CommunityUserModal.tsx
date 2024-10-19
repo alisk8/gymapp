@@ -1,15 +1,20 @@
 import React from "react";
 import { View, Text, Modal, FlatList, Image, TouchableOpacity, StyleSheet } from "react-native";
 import { Avatar } from "react-native-elements";
+import {useNavigation} from "@react-navigation/native";
 
 const CommunityUserModal = ({ visible, onClose, members }) => {
+    const nav = useNavigation();
     const renderMemberItem = ({ item }) => (
+        <TouchableOpacity onPress={() => {onClose;
+                                                nav.navigate('UserDetails', {user: item});}}>
         <View style={styles.memberItem}>
             <Avatar source={{ uri: item.profilePicture }} rounded size="medium" />
             <Text style={styles.memberName}>
                 {item.firstName} {item.lastName}
             </Text>
         </View>
+        </TouchableOpacity>
     );
     return (
         <Modal visible={visible} transparent={true} animationType="slide">

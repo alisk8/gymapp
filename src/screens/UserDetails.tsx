@@ -185,10 +185,26 @@ const UserDetails = ({ route, navigation }) => {
           }
           style={styles.profileImage}
         />
-        <Text style={styles.name}>
-          {additionalInfo.firstName} {additionalInfo.lastName}
-        </Text>
-        <Text style={styles.bio}>{additionalInfo.bio}</Text>
+        <View style={styles.profileHeader}>
+          <Text style={styles.name}>
+            {additionalInfo.firstName} {additionalInfo.lastName}
+          </Text>
+          <View style={styles.scoreContainer}>
+            <Text style={styles.scoreText}>XP: {additionalInfo.xp}</Text>
+            {additionalInfo.consistencyStreak > 0 && (
+                <Text style={styles.scoreText}>
+                  Streak: {additionalInfo.consistencyStreak} 🔥
+                </Text>
+            )}
+          </View>
+          {additionalInfo.bio && (
+              <View style={styles.row}>
+                <Text style={styles.bio}>{additionalInfo.bio}</Text>
+              </View>
+          )}
+        </View>
+
+
         <TouchableOpacity
           style={isFollowing ? styles.followingButton : styles.followButton}
           onPress={handleFollowButtonPress}
@@ -202,12 +218,30 @@ const UserDetails = ({ route, navigation }) => {
           </Text>
         </TouchableOpacity>
       </View>
-      <View style={styles.detailsContainer}>
-        <Text style={styles.label}>Gym Interests:</Text>
-        <Text style={styles.value}>
-          {additionalInfo.gym_interests?.join(", ")}
-        </Text>
-      </View>
+
+      <View style={styles.locationInfoContainer}>
+        <View style={styles.infoRow}>
+          {additionalInfo.location && (
+              <Text style={styles.location}>
+                {additionalInfo.location.split(",")[0]}
+              </Text>
+          )}
+          {additionalInfo.experienceLevel && (
+                  <Text style={styles.experience}>
+                    {additionalInfo.experienceLevel} year lifter
+                  </Text>
+              )}
+        </View>
+        <View style={[styles.infoRow, styles.homeGymRow]}>
+          {additionalInfo.location && (
+              <Text style={styles.favoriteGym}>
+                Home gym:  {additionalInfo.favoriteGym.split(",")[0]}
+              </Text>
+          )}
+        </View>
+    </View>
+
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0000ff" />
@@ -217,7 +251,7 @@ const UserDetails = ({ route, navigation }) => {
           {posts.length > 0 ? (
             posts.map((post, index) => (
               <View key={index} style={styles.postWrapper}>
-                {index % 3 === 0 && <View style={styles.row} />}
+                {index % 3 === 0 && <View style={styles.infoRow} />}
                 <TouchableOpacity
                   style={styles.card}
                   onPress={() => handlePostPress(index)}
@@ -308,7 +342,7 @@ const styles = StyleSheet.create({
   },
   followingButton: {
     marginTop: 10,
-    backgroundColor: "#32cd32",
+    backgroundColor: "#1e90ff",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 20,
@@ -342,6 +376,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     width: "100%",
+    justifyContent: 'center',
   },
   card: {
     backgroundColor: "#f9f9f9",
@@ -392,4 +427,64 @@ const styles = StyleSheet.create({
     color: "#fff",
     textAlign: "center",
   },
+  profileHeader: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  scoreContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 3,
+  },
+  scoreText:{
+    fontSize: 16,
+    color: '#0170c7',
+    fontWeight:'bold',
+    marginHorizontal: 4,
+    marginTop: 5,
+  },
+  infoText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 15,
+  },
+  location: {
+    fontSize: 16,
+    color: "#6A0DAD",
+    fontWeight:'bold'
+  },
+  favoriteGym: {
+    fontSize: 16,
+    color: "#6A0DAD",
+  },
+  experience: {
+    fontSize: 16,
+    color: "#333",
+  },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 3,
+    width: '80%',
+    alignSelf:'center'
+  },
+  homeGymRow:{
+    marginBottom:10
+  },
+  locationInfoContainer:{
+    borderRadius: 5,
+    padding: 2,
+    marginBottom: 5,
+    shadowColor: "#000",
+    backgroundColor: "#fff",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  }
 });

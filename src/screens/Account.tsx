@@ -437,7 +437,7 @@ export default function Account({ navigation }) {
     };
 
     return (
-        <View style={styles.profileContainer}>
+        <ScrollView style={styles.profileContainer}>
           <Image
               source={
                 additionalInfo.profilePicture
@@ -447,22 +447,24 @@ export default function Account({ navigation }) {
               style={styles.profileImage}
           />
           <View style={styles.profileDetails}>
-            <View style={{flexDirection: 'row',justifyContent:'space-between'}}>
+            <View style={styles.profileHeader}>
               <Text style={styles.name}>
                 {additionalInfo.firstName} {additionalInfo.lastName}
               </Text>
-              <View style={{flexDirection:'column', alignItems:'center'}}>
+              <View style={styles.scoreContainer}>
               <Text style={styles.scoreText}>
                 XP: {additionalInfo.xp}
               </Text>
               {additionalInfo.consistencyStreak >0 && <Text style={styles.scoreText}>
-                Streak: {additionalInfo.consistencyStreak} 🔥
+                🔥 streak: {additionalInfo.consistencyStreak}
               </Text>
               }
               </View>
             </View>
             {displaySettings.bio && additionalInfo.bio && (
+                <View style={styles.row}>
                 <Text style={styles.bio}>{additionalInfo.bio}</Text>
+                </View>
             )}
             <View style={styles.row}>
               {displaySettings.location && additionalInfo.location && (
@@ -480,10 +482,11 @@ export default function Account({ navigation }) {
             <View style={styles.row}>
               {displaySettings.location && additionalInfo.location && (
                   <Text style={styles.favoriteGym}>
-                    Current Gym:  {additionalInfo.favoriteGym.split(",")[0]}
+                    Home gym:  {additionalInfo.favoriteGym.split(",")[0]}
                   </Text>
               )}
             </View>
+            <Text style={styles.sectionTitle}>Personal Info</Text>
             <View style={styles.row}>
               {displaySettings.height && additionalInfo.height && (
                   <Text style={styles.infoText}>
@@ -498,7 +501,7 @@ export default function Account({ navigation }) {
             </View>
             <View style={styles.row}>
               {displaySettings.sex && additionalInfo.sex && (
-                  <Text style={styles.infoText}>Sex: {additionalInfo.sex}</Text>
+                  <Text style={styles.infoText}>Gender: {additionalInfo.sex}</Text>
               )}
               {displaySettings.age && additionalInfo.age && (
                   <Text style={styles.infoText}>Age: {additionalInfo.age}</Text>
@@ -522,7 +525,7 @@ export default function Account({ navigation }) {
                 </>
             )}
           </View>
-        </View>
+        </ScrollView>
     );
   };
 
@@ -1037,7 +1040,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 5,
+    marginBottom: 3,
   },
   location: {
     fontSize: 16,
@@ -1142,6 +1145,9 @@ const styles = StyleSheet.create({
     fontSize: 30,
     marginBottom: 50,
   },
+  firstRow: {
+    marginTop: 10,
+  },
   errorText: {
     color: "red",
     marginBottom: 10,
@@ -1220,7 +1226,22 @@ const styles = StyleSheet.create({
   scoreText:{
     fontSize: 16,
     color: '#0170c7',
-    marginRight: 5,
     fontWeight:'bold'
-  }
+  },
+  infoItem: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 5,
+  },
+  profileHeader: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  scoreContainer: {
+    flexDirection: "column",
+    alignItems: "flex-end",
+    marginBottom: 3,
+  },
 });

@@ -6,27 +6,38 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
+  ActivityIndicator, Alert,
 } from "react-native";
 import { firebase_auth, db } from "../../firebaseConfig";
-import { collection, getDocs } from "firebase/firestore";
+import {arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, updateDoc} from "firebase/firestore";
+import {useNavigation} from "@react-navigation/native";
 
 const ExploreScreen = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const currentUser = firebase_auth.currentUser;
+  const nav = useNavigation();
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
+
+      const currentUserRef = doc(db, "userProfiles", currentUser.uid);
+      const currentUserDoc = await getDoc(currentUserRef);
+      const currentUserData = currentUserDoc.data();
+
+      const followingList = currentUserData?.following || [];
+
       const userCollection = collection(db, "userProfiles");
       const userSnapshot = await getDocs(userCollection);
       const userList = userSnapshot.docs
         .map((doc) => ({
           id: doc.id,
           ...doc.data(),
+          isFollowing: followingList.includes(doc.id),
         }))
         .filter((user) => user.id !== currentUser.uid);
+      //add an attribute to the user list above like isFollowing checking if its in the current user's doc
 
       setUsers(userList);
     } catch (error) {
@@ -40,8 +51,69 @@ const ExploreScreen = () => {
     fetchUsers();
   }, []);
 
+
+  const handleFollow = async (otherUserId) => {
+
+    if (currentUser) {
+      const currentUserRef = doc(db, "userProfiles", currentUser.uid);
+      const otherUserRef = doc(db, "userProfiles", otherUserId);
+      try {
+        await updateDoc(currentUserRef, {
+          following: arrayUnion(otherUserId),
+        });
+
+        //for the sake of testing keep this
+        await updateDoc(otherUserRef, {
+          followers: arrayUnion(currentUser.uid),
+        });
+
+        //need to update the users list here to update the isFollowing field
+        setUsers((prevUsers) =>
+            prevUsers.map((user) =>
+                user.id === otherUserId ? { ...user, isFollowing: true } : user
+            )
+        );
+
+
+      } catch (error) {
+        console.error("Error updating document: ", error);
+        Alert.alert("Error", "Error following user. Please try again.");
+      }
+    } else {
+      Alert.alert("Error", "No user is logged in");
+    }
+  };
+
+  const handleUnfollow = async (otherUserId) => {
+
+    if (currentUser) {
+      const userRef = doc(db, "userProfiles", currentUser.uid);
+
+      try {
+        await updateDoc(userRef, {
+          following: arrayRemove(otherUserId),
+        });
+
+        //need to update the users list here to update the isFollowing field
+        setUsers((prevUsers) =>
+            prevUsers.map((user) =>
+                user.id === otherUserId ? { ...user, isFollowing: false} : user
+            )
+        );
+
+
+      } catch (error) {
+        console.error("Error updating document: ", error);
+        Alert.alert("Error", "Error unfollowing user. Please try again.");
+      }
+    } else {
+      Alert.alert("Error", "No user is logged in");
+    }
+  };
+
   const renderUserItem = (user) => (
     <View key={user.id} style={styles.userItem}>
+      <TouchableOpacity onPress={()=>{nav.navigate('UserDetails', {user: user})}}>
       <Image
         source={{
           uri: user.profilePicture || "https://via.placeholder.com/100",
@@ -51,8 +123,9 @@ const ExploreScreen = () => {
       <Text style={styles.userName}>
         {`${user.firstName} ${user.lastName}`}
       </Text>
-      <TouchableOpacity style={styles.connectButton}>
-        <Text style={styles.connectButtonText}>Connect</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.connectButton} onPress={() => user.isFollowing? handleUnfollow(user.id): handleFollow(user.id)}>
+        <Text style={styles.connectButtonText}>{user.isFollowing ? "Following" : "Connect"}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -143,17 +216,19 @@ const styles = StyleSheet.create({
   },
   connectButton: {
     backgroundColor: '#016e03',
-    paddingVertical: 8,
+    paddingVertical: 5,
     paddingHorizontal: 16,
     borderRadius: 20,
     shadowColor: "#007BFF",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
+    zIndex: 100,
   },
   connectButtonText: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "bold",
+    zIndex: 100,
   },
 });
