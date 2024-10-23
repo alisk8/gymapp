@@ -9,17 +9,18 @@ import {
     Image,
     Modal,
     TextInput,
-    ScrollView
+    ScrollView,
+    KeyboardAvoidingView, Platform
 } from 'react-native';
 import { db, firebase_auth, storage } from '../../../firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
 import DropDownPicker from "react-native-dropdown-picker";
 import { useWorkout } from "../../contexts/WorkoutContext";
-import {addDoc, collection} from "@firebase/firestore";
+import {addDoc, arrayUnion, collection, getDoc, limit, orderBy, query, updateDoc} from "@firebase/firestore";
 import Video from "react-native-video";
 import * as ImagePicker from "expo-image-picker";
 import { getDownloadURL, ref as storageRef, uploadBytes } from "@firebase/storage";
-import {getDocs} from "firebase/firestore";
+import {doc, getDocs} from "firebase/firestore";
 
 const WorkoutSummaryScreen = ({ route }) => {
     const [visibilityItems, setVisibilityItems] = useState([
@@ -41,15 +42,89 @@ const WorkoutSummaryScreen = ({ route }) => {
     const [isTemplateSaveChecked, setIsTemplateSaveChecked] = useState(false);
     const [newTemplateName, setNewTemplateName] = useState('');
 
+    const [expandedExercises, setExpandedExercises] = useState({});
+
+
+
+    const toggleExpandExercise = (exerciseIndex) => {
+        setExpandedExercises(prevState => ({
+            ...prevState,
+            [exerciseIndex]: !prevState[exerciseIndex]
+        }));
+    };
 
     useEffect(() => {
-        finishWorkout();
-    }, []);
-
+        navigation.setOptions({
+            headerShown: false,
+        });
+    }, [navigation]);
 
     const calculate1RM = (weight, reps) => {
         return weight * (1 + 0.0333 * reps);
     };
+
+    const convertLbs = (weight, unit) => {
+        if (unit === "kgs"){
+            return Math.floor(weight * 2.204);
+        }
+        return weight;
+    }
+
+    const convertReps = (reps, repsUnit) => {
+        if (repsUnit === "time"){
+            return convertTimeToMilliseconds(reps) / 1000;
+        }
+
+        return reps;
+    }
+
+    const scoreWorkout = () => {
+        const timeScore = Math.floor(elapsedTime / 60);
+        const experienceScore = 0.833;
+
+        let exerciseWeightScore = 0;
+        let totalSets = 0;
+        let cardioScore = 0;
+
+        workoutState.exercises.forEach(exercise => {
+
+            // Only process if the weight is tracked
+            if (exercise.repsConfig === "Cardio"){
+                console.log('before converting time', exercise.sets[0].reps);
+                cardioScore += convertTimeToMilliseconds(exercise.sets[0].reps) / 100;
+            }
+            else if (exercise.weightConfig === "Weight") {
+                // Iterate through each set
+                exercise.sets.forEach(set => {
+                    if (set.completed) {
+                        // Calculate weight * reps for each set and add to totalWeight
+                        exerciseWeightScore += convertLbs(set.weight, exercise.weightUnit) * convertReps(set.reps, exercise.repsUnit);
+                    }
+                });
+            }
+            else if (exercise.weightConfig === "Bodyweight"){
+                exercise.sets.forEach(set => {
+                    if (set.completed) {
+                            // Calculate weight * reps for each set and add to totalWeight
+                      exerciseWeightScore += 50 * convertReps(set.reps, exercise.repsUnit);
+                    }
+                });
+            }
+            console.log(exercise.name);
+            console.log('each exercise score:', exerciseWeightScore);
+
+            // Add to total sets regardless of weight tracking
+            totalSets += exercise.sets.length;
+        });
+
+        const weightsScore = (timeScore * experienceScore * exerciseWeightScore * totalSets) / 800;
+
+        console.log('cardio score', cardioScore / 275);
+        console.log('weights score', weightsScore);
+        console.log('combined', Math.floor(weightsScore + cardioScore/275));
+        return Math.floor(weightsScore + cardioScore/275);
+
+    }
 
     const camelCase = (str) => {
         return str
@@ -77,6 +152,7 @@ const WorkoutSummaryScreen = ({ route }) => {
     const templateCheck = async () => {
         try {
             const userId = firebase_auth.currentUser.uid;
+
             const templateRef = collection(db, "userProfiles", userId, "templates");
             const querySnapshot = await getDocs(templateRef);
             const existingTemplates = querySnapshot.docs.map(doc => doc.data().templateName.toLowerCase());
@@ -100,18 +176,11 @@ const WorkoutSummaryScreen = ({ route }) => {
         }
     };
 
-    useEffect(() => {
-        console.log('isPaused state changed:', isPaused);
-    }, [isPaused]);
-
     const getBestAttempts = (exercise) => {
-        if(exercise.bestSet){
-            return exercise.bestSet;
-        }
 
         return exercise.sets.reduce((best, set) => {
-            const weight = parseFloat(set.weight);
-            const reps = parseInt(set.reps, 10);
+            const weight = set.weight;
+            const reps = set.reps;
             const predicted1RM = calculate1RM(weight, reps);
 
             if (!best || predicted1RM > best.predicted1RM) {
@@ -122,9 +191,14 @@ const WorkoutSummaryScreen = ({ route }) => {
     };
 
     const calculateTotalWeightLifted = (exercises) => {
-        return exercises.reduce((totalWeight, exercise) => {
+        return exercises.filter((exercise) => exercise.weightConfig === "Weight").reduce((totalWeight, exercise) => {
             const exerciseWeight = exercise.sets.reduce((exerciseTotal, set) => {
-                return exerciseTotal + (parseFloat(set.weight) * parseInt(set.reps, 10));
+                let weight = parseFloat(set.weight);
+                // Standardize weight to kg if it's in lbs
+                if (exercise.weightUnit === 'kgs') {
+                    weight = weight * 2.20462; // Convert lbs to kg
+                }
+                return exerciseTotal + (weight * parseInt(set.reps, 10));
             }, 0);
             return totalWeight + exerciseWeight;
         }, 0);
@@ -132,7 +206,7 @@ const WorkoutSummaryScreen = ({ route }) => {
 
     const calculateTotalSetsDone = (exercises) => {
         return exercises.reduce((totalSets, exercise) => {
-            return totalSets + exercise.setsNum;
+            return totalSets + exercise.sets.length;
         }, 0);
     };
 
@@ -147,10 +221,20 @@ const WorkoutSummaryScreen = ({ route }) => {
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const convertTimeToMilliseconds = (timeString) => {
+        const [minutes, seconds] = timeString.split(':').map(Number);
+        return (minutes * 60 * 1000) + (seconds * 1000);
+    };
+
     const saveWorkout = async () => {
         if (!firebase_auth.currentUser || !workoutState) return false;
 
         const userId = firebase_auth.currentUser.uid;
+
+        const userDocRef = doc(db, "userProfiles", userId);
+        const userDoc = await getDoc(userDocRef);
+        const userData = userDoc.data();
+        const newXp = userData.xp +scoreWorkout();
 
         if (!loadedFromTemplate && !isTemplateSaveChecked){
             console.log('run here');
@@ -159,54 +243,35 @@ const WorkoutSummaryScreen = ({ route }) => {
         }
 
         try {
-            const mapDropSets = (sets) => {
-                return sets.map(set => ({
-                    dropSetsCount: set.dropSets.length, // Only include the count of drop sets
-                }));
-            };
+            console.log('workout currently', workoutState);
+            const filteredExercises = workoutState.exercises.map(ex => ({
+                id: camelCase(ex.name),
+                name: ex.name,
+                sets: ex.sets.filter(set => (set.weight !== '' || ex.weightConfig === 'BW' || ex.repsConfig === "Cardio") && (set.reps !== '' || set.time !== '')).map(({key, weight, reps}) => {
+                    if (ex.repsUnit === 'time') {
+                        // For time-based exercises, store `time` instead of `reps`
+                        const time = convertTimeToMilliseconds(reps);
+                        return {
+                            key,
+                            weight,
+                            time,  // Save the time instead of reps
+                        };
+                    } else {
+                        // For rep-based exercises, store `reps`
+                        return {
+                            key,
+                            weight,
+                            reps,  // Save the reps as usual
+                        };
+                    }
+                }),
+                isSuperset: ex.isSuperset,
+                supersetExercise: ex.supersetExercise,
+                weightUnit: ex.weightUnit,
+                repsUnit: ex.repsUnit,
+            })).filter(ex => ex.sets.length > 0);
 
-            const filteredExercises = workoutState.exercises.map(ex => {
-                const bestSet = ex.bestSet;
-
-                // Filter and validate the bestSet
-                if (
-                    (bestSet.weight !== '' || ex.weightConfig === 'BW') &&
-                    bestSet.reps !== '' &&
-                    ex.completed
-                ) {
-                    return {
-                        id: camelCase(ex.name),
-                        name: ex.name,
-                        bestSet: {
-                            ...bestSet,
-                            weight: ex.weightConfig === 'BW' ? 0 : bestSet.weight,
-                            weightUnit: bestSet.weightUnit,
-                            reps: bestSet.reps || '',
-                            repsUnit: bestSet.repsUnit || 'reps',
-                            dropSets: bestSet.dropSets.filter(dropSet =>
-                                (dropSet.weight !== '' || ex.weightConfig === 'BW') &&
-                                dropSet.reps !== ''
-                            ).map(dropSet => ({
-                                ...dropSet,
-                                weight: ex.weightConfig === 'BW' ? 0 : parseFloat(dropSet.weight),
-                                reps: dropSet.reps
-                            }))
-                        },
-                        setsNum: ex.setsNum,
-                        supersetExercise: ex.supersetExercise,
-                        isSuperset: ex.isSuperset,
-                    };
-                }
-
-                // If bestSet is not valid, return null to filter it out later
-                return null;
-            }).filter(ex => ex !== null); // Filter out exercises with no valid bestSet
-
-            if (filteredExercises.length === 0) {
-                Alert.alert("Error", "Please add reps/failure to all sets and mark completed.");
-                return;
-            }
-
+            console.log('exercises after filter', filteredExercises);
 
              if (isTemplateSaveChecked && newTemplateName) {
                  const templateRef = collection(db, "userProfiles", userId, "templates");
@@ -214,7 +279,7 @@ const WorkoutSummaryScreen = ({ route }) => {
                  const templateExercises = workoutState.exercises.map(ex => ({
                          id: camelCase(ex.name),
                          name: ex.name,
-                         setsNum: ex.setsNum,
+                         setsKeys: ex.sets.map(set => set.key),
                          supersetExercise: ex.supersetExercise,
                          isSuperset: ex.isSuperset,
                      }));
@@ -267,7 +332,14 @@ const WorkoutSummaryScreen = ({ route }) => {
                 description: description || '',
                 mediaUrls: uploadedMediaUrls,
                 visibility: visibility,
+                addedExp: scoreWorkout()
             });
+
+            await updateDoc(userDocRef, {
+                xp: newXp, //add from scoreWorkout() to this existing field
+            });
+
+            await updateStreak(userId);
 
         } catch (error) {
             console.error("Error adding document: ", error);
@@ -314,6 +386,32 @@ const WorkoutSummaryScreen = ({ route }) => {
         setModalVisible(false);
     };
 
+    const updateStreak = async (userId: string) => {
+        const userRef = doc(db, "userProfiles", userId);
+
+        // Fetch the most recent workout
+        const workoutRef = collection(db, "userProfiles", userId, "workouts");
+        const recentWorkouts = await getDocs(query(workoutRef, orderBy("createdAt", "desc"), limit(1)));
+
+        let streak = 1; // Start a new streak by default
+        const now = new Date();
+
+        if (!recentWorkouts.empty) {
+            const lastWorkoutDate = recentWorkouts.docs[0].data().createdAt.toDate();
+            const timeDifference = now.getTime() - lastWorkoutDate.getTime();
+            const dayDifference = timeDifference / (1000 * 3600 * 24);
+
+            if (dayDifference <= 1) {
+                const userDoc = await getDoc(userRef);
+                const currentStreak = userDoc.data().consistencyStreak || 1;
+                streak = currentStreak + 1; // Increment streak if workout is within 1 day
+            }
+        }
+
+        // Update the consistency_streak field on the user profile
+        await updateDoc(userRef, { consistencyStreak: streak });
+    };
+
     if (!workoutState) {
         console.log('No workout state available');
         return (
@@ -322,11 +420,6 @@ const WorkoutSummaryScreen = ({ route }) => {
             </View>
         );
     }
-
-    useEffect(() => {
-        console.log('im here bro');
-    }, []);
-
 
 
     return (
@@ -338,35 +431,6 @@ const WorkoutSummaryScreen = ({ route }) => {
                 <Text style={styles.heading}>Workout Summary</Text>
             </View>
             <ScrollView>
-            <View style={styles.mediaContainer}>
-                <FlatList
-                    data={[...media, { addNew: true }]}
-                    horizontal
-                    keyExtractor={(item, index) => index.toString()}
-                    renderItem={({ item }) => {
-                        if (item.addNew) {
-                            return (
-                                <TouchableOpacity style={styles.addMediaBox} onPress={handlePickMedia}>
-                                    <Text style={styles.addMediaText}>Add Media</Text>
-                                </TouchableOpacity>
-                            );
-                        } else {
-                            return (
-                                <TouchableOpacity
-                                    style={styles.mediaBox}
-                                    onLongPress={() => handleLongPressMedia(item)}
-                                >
-                                    {item.type === 'image' ? (
-                                        <Image source={{ uri: item.uri }} style={styles.mediaThumbnail} />
-                                    ) : (
-                                        <Video source={{ uri: item.uri }} style={styles.mediaThumbnail} resizeMode="contain" paused={true} />
-                                    )}
-                                </TouchableOpacity>
-                            );
-                        }
-                    }}
-                />
-            </View>
 
             <Modal
                 animationType="slide"
@@ -400,25 +464,76 @@ const WorkoutSummaryScreen = ({ route }) => {
             <Text style={styles.subheading}>Date: {new Date().toLocaleDateString()}</Text>
             <Text style={styles.subheading}>Start Time: {formatStartTime(startTime)}</Text>
             <Text style={styles.subheading}>Total Workout Time: {formatTotalWorkoutTime(elapsedTime)}</Text>
-            {workoutState.exercises
-                .filter(exercise => exercise.completed)
-                .map((exercise, index) => {
-                const bestAttempt = getBestAttempts(exercise);
-                const predicted1RM = calculate1RM(getBestAttempts(exercise).weight, getBestAttempts(exercise).reps)
-                return (
-                    <View key={index} style={styles.exerciseContainer}>
-                        <Text style={styles.exerciseName}>{exercise.name}</Text>
-                        {exercise.sets && exercise.sets.map((set, setIndex) => (
-                            <Text key={setIndex} style={styles.setText}>{`Set ${setIndex + 1}: ${set.weight} ${set.weightUnit} x ${set.reps}`}</Text>
-                        ))}
-                        {bestAttempt && bestAttempt.reps !== '' && bestAttempt.weight !== '' && (
-                            <>
-                                <Text style={styles.bestAttemptText}>{`Best Attempt: ${bestAttempt.weight} ${bestAttempt.weightUnit} x ${bestAttempt.reps}`}</Text>
-                                <Text style={styles.predicted1RMText}>{`Predicted 1RM: ${predicted1RM.toFixed(2)} ${bestAttempt.weightUnit}`}</Text>
-                            </> )}
-                    </View>
-                );
-            })}
+                <View style={styles.summaryHeaderContainer}>
+                    <Text style={styles.summaryHeaderText}>
+                        Total Weight Lifted: {calculateTotalWeightLifted(workoutState.exercises).toFixed(2)} lbs
+                    </Text>
+                    <Text style={styles.summaryHeaderText}>
+                        Total Sets Done: {calculateTotalSetsDone(workoutState.exercises)}
+                    </Text>
+                </View>
+                {workoutState.exercises.map((exercise, index) => {
+                    const bestAttempt = getBestAttempts(exercise);
+                    const predicted1RM = calculate1RM(bestAttempt.weight, bestAttempt.reps);
+                    const isWeightDisabled = exercise.repsConfig === "Cardio";
+
+                    return (
+                        <View key={index} style={styles.exerciseContainer}>
+                            <TouchableOpacity
+                                onPress={() => toggleExpandExercise(index)}
+                                style={styles.dropdownButton}
+                            >
+                                <Text style={styles.dropdownIcon}>
+                                    {expandedExercises[index] ? '▼' : '▶'}
+                                </Text>
+                                <View>
+                                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                                    <Text style={styles.predicted1RMText}>
+                                        {exercise.weightConfig === 'Weight'? `Predicted 1RM: ${predicted1RM.toFixed(2)} ${exercise.weightUnit}`: ''}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                            {expandedExercises[index] && (
+                                <View style={styles.setsContainer}>
+                                    {exercise.sets && exercise.sets.map((set, setIndex) => (
+                                        <Text key={setIndex} style={styles.setText}>
+                                            {`Set ${setIndex + 1}: ${set.weight} ${exercise.weightUnit} x ${set.reps}`}
+                                        </Text>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    );
+                })}
+                <View style={styles.mediaContainer}>
+                    <FlatList
+                        data={[...media, { addNew: true }]}
+                        horizontal
+                        keyExtractor={(item, index) => index.toString()}
+                        renderItem={({ item }) => {
+                            if (item.addNew) {
+                                return (
+                                    <TouchableOpacity style={styles.addMediaBox} onPress={handlePickMedia}>
+                                        <Text style={styles.addMediaText}>Add Media</Text>
+                                    </TouchableOpacity>
+                                );
+                            } else {
+                                return (
+                                    <TouchableOpacity
+                                        style={styles.mediaBox}
+                                        onLongPress={() => handleLongPressMedia(item)}
+                                    >
+                                        {item.type === 'image' ? (
+                                            <Image source={{ uri: item.uri }} style={styles.mediaThumbnail} />
+                                        ) : (
+                                            <Video source={{ uri: item.uri }} style={styles.mediaThumbnail} resizeMode="contain" paused={true} />
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            }
+                        }}
+                    />
+                </View>
             <Text style={styles.header}>Title</Text>
             <TextInput style={styles.textInput} placeholder="Title your workout!" value={title} onChangeText={setTitle} />
             <Text style={styles.header}>Description</Text>
@@ -470,6 +585,7 @@ const WorkoutSummaryScreen = ({ route }) => {
                         <TouchableOpacity
                             style={styles.dontSaveButton}
                             onPress={async () => {
+                                setIsTemplateSaveChecked(true);
                                 if (isTemplateSaveChecked){
                                     toggleTemplateModal();
                                     await saveWorkoutAndNavigate();
@@ -542,8 +658,8 @@ const styles = StyleSheet.create({
     bestAttemptText: {
         fontSize: 16,
         color: '#007bff',
-        marginTop: 10,
         fontWeight: 'bold',
+        marginTop: 2,
     },
     backButton: {
         backgroundColor: '#007bff',
@@ -762,6 +878,44 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         paddingHorizontal: 10,
+    },
+    summaryHeaderContainer: {
+        marginBottom: 20,
+        padding: 10,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+    },
+    summaryHeaderText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 5,
+    },
+    dropdownButton: {
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        padding: 10,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+    },
+    dropdownIcon: {
+        fontSize: 16,
+        color: '#666',
+        paddingRight: 40,
+        paddingLeft: 10,
+    },
+    setsContainer: {
+        marginTop: 10,
+        paddingLeft: 10,
     },
 });
 

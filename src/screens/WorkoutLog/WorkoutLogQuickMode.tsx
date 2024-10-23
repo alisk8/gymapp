@@ -406,6 +406,7 @@ export default function WorkoutLogQuickMode({route}) {
         return weight;
     };
 
+    /**
     const renderTotalWeightMessage = (exercise, sets) => {
         // Find the last set with a filled-in weight and its index
         let lastFilledSet = null;
@@ -439,6 +440,8 @@ export default function WorkoutLogQuickMode({route}) {
 
         return null;
     };
+
+     **/
 
     const loadPreviousAttempt = (exerciseIndex, setIndex, previousSet, isDropSet = false, dropSetIndex = null) => {
         const newExercises = [...exercises];

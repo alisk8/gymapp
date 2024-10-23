@@ -51,6 +51,19 @@ const useMarkedDates = () => {
         date: doc.data().createdAt.toDate().toISOString().split("T")[0],
       }));
 
+      // Fetch diary entries
+      const diaryRef = collection(userRef, "diaryEntries");
+      const diaryQuery = query(
+        diaryRef,
+        where("createdAt", ">=", Timestamp.fromDate(startOfMonth)),
+        where("createdAt", "<=", Timestamp.fromDate(endOfMonth))
+      );
+      const diarySnapshot = await getDocs(diaryQuery);
+      const diaryData = diarySnapshot.docs.map((doc) => ({
+        ...doc.data(),
+        date: doc.data().createdAt.toDate().toISOString().split("T")[0],
+      }));
+
       const newMarkedDates = {};
 
       for (
@@ -64,22 +77,12 @@ const useMarkedDates = () => {
         }
       }
 
-      highlightsData.forEach((highlight) => {
-        newMarkedDates[highlight.date] = {
+      const allEntries = [...highlightsData, ...templatesData, ...diaryData];
+      allEntries.forEach((entry) => {
+        newMarkedDates[entry.date] = {
           selected: true,
           selectedColor: "green",
         };
-      });
-
-      templatesData.forEach((template) => {
-        if (newMarkedDates[template.date]) {
-          newMarkedDates[template.date].selectedColor = "green";
-        } else {
-          newMarkedDates[template.date] = {
-            selected: true,
-            selectedColor: "green",
-          };
-        }
       });
 
       setMarkedDates(newMarkedDates);
@@ -92,7 +95,7 @@ const useMarkedDates = () => {
     setMarkedDates({});
   }, []);
 
-  return { markedDates, loadMonthData, clearMarkedDates };
+  return { markedDates, loadMonthData, clearMarkedDates, setMarkedDates };
 };
 
 export default useMarkedDates;
