@@ -107,13 +107,15 @@ const AIModal = ({ visible, onClose, exercises, template, useTemplateFeedback })
     const processWorkoutRoutine = (workoutString) => {
         // Split the workout string into individual exercise lines
         const exercisesArray = workoutString.split('\n').filter(line => line.trim() !== '');
+        console.log('exercises array', exercisesArray);
 
         // Initialize a list to hold the exercises
         let processedExercises = [];
 
         // Iterate over each exercise line and process it
         exercisesArray.forEach(exerciseLine => {
-            const match = exerciseLine.match(/^\d*\.\s*(.*?):\s*(\d+)\s*sets\s*total/i);
+            const match = exerciseLine.match(/^\d*\.\s*(.*?):\s*(\d+)\s*sets\s*(total)?/i);
+            console.log('match:', match);
             if (match) {
                 const exerciseName = match[1].trim();  // Extract the exercise name
                 const totalSets = parseInt(match[2], 10);  // Extract the number of sets
@@ -131,6 +133,8 @@ const AIModal = ({ visible, onClose, exercises, template, useTemplateFeedback })
                     supersetExercise: supersetExercise,
                     isSuperset: isSuperset,
                 };
+
+                console.log('exercise object:', exerciseObject);
 
                 // Add the exercise object to the list
                 processedExercises.push(exerciseObject);
@@ -158,7 +162,11 @@ const AIModal = ({ visible, onClose, exercises, template, useTemplateFeedback })
             setNewTemplate((prevState) => ({
                 ...prevState, // Copy the previous state
                 exercises: processWorkoutRoutine(feedback) // Set the new exercises list
-            }));        }
+            }));
+
+            console.log('unprocessed', feedback);
+            console.log('processed', processWorkoutRoutine(feedback));
+        }
     }, [feedback]);
 
     const handleSave = () => {
@@ -208,25 +216,42 @@ const AIModal = ({ visible, onClose, exercises, template, useTemplateFeedback })
 
     const sendWorkoutDetails = async () => {
 
-
         setLoading(true);
         const templateToString = preprocessTemplate();
 
         try {
-            const response = await axios.post('http://18.117.193.235:80/generate/', {
-                workout_template: templateToString,
-                user_goal: workoutDescription,
-                age: userAge,
-                gender: userProfile.sex,
-                years_lifting: yearsLifting,
-                goal_muscles: goalMuscles,
-                prior_injuries: injuryConcerns,
-                goal_workout_duration: workoutDuration,
-            });
+            if (templateToString) {
+                const response = await axios.post('http://3.139.234.216/edit/', {
+                    workout_template: templateToString,
+                    user_goal: workoutDescription,
+                    age: userAge,
+                    gender: userProfile.sex,
+                    years_lifting: yearsLifting,
+                    goal_muscles: goalMuscles,
+                    prior_injuries: injuryConcerns,
+                    goal_workout_duration: workoutDuration,
 
-            const feedback = response.data;
-            console.log('LLM Feedback:', response.data);
-            setFeedback(feedback);
+                },);
+                const feedback = response.data;
+                console.log('LLM Feedback:', response.data);
+                setFeedback(feedback);
+            }
+            else{
+                const response = await axios.post('http://3.139.234.216/create/', {
+                    workout_template: templateToString,
+                    user_goal: workoutDescription,
+                    age: userAge,
+                    gender: userProfile.sex,
+                    years_lifting: yearsLifting,
+                    goal_muscles: goalMuscles,
+                    prior_injuries: injuryConcerns,
+                    goal_workout_duration: workoutDuration,
+
+                },);
+                const feedback = response.data;
+                console.log('LLM Feedback:', response.data);
+                setFeedback(feedback);
+            }
         } catch (error) {
             console.error('Error:', error);
             Alert.alert("Error generating workout. please try again later.");

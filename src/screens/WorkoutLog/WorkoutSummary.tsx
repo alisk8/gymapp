@@ -79,7 +79,7 @@ const WorkoutSummaryScreen = ({ route }) => {
     }
 
     const scoreWorkout = () => {
-        const timeScore = Math.floor(elapsedTime / 60) /60;
+        const timeScore = Math.floor(elapsedTime / 60);
         const experienceScore = 0.833;
 
         let exerciseWeightScore = 0;
@@ -117,7 +117,7 @@ const WorkoutSummaryScreen = ({ route }) => {
             totalSets += exercise.sets.length;
         });
 
-        const weightsScore = (timeScore * experienceScore * exerciseWeightScore * totalSets) / 10000;
+        const weightsScore = (timeScore * experienceScore * exerciseWeightScore * totalSets) / 800;
 
         console.log('cardio score', cardioScore / 275);
         console.log('weights score', weightsScore);

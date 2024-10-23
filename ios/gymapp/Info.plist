@@ -39,6 +39,16 @@
     <dict>
       <key>NSAllowsArbitraryLoads</key>
       <false/>
+        <key>NSExceptionDomains</key>
+        <dict>
+          <key>3.139.234.216</key> <!-- Your server's IP or domain -->
+          <dict>
+            <key>NSExceptionAllowsInsecureHTTPLoads</key>
+            <true/>
+            <key>NSIncludesSubdomains</key>
+            <true/>
+          </dict>
+        </dict>
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>

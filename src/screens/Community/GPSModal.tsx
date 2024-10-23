@@ -49,13 +49,9 @@ const GPSModal = ({ isVisible, onClose, onSelectLocation }) => {
 
   return (
     <Modal visible={isVisible} animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior="padding"
-        style={styles.modalContainer}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 80}
-      >
+      <View style={styles.modalContainer}>
         <View style={styles.container}>
-          <View style={styles.autocompleteContainer}>
+          <View style={styles.autocompleteContainer} pointerEvents='auto'>
             <GooglePlacesAutocomplete
               placeholder="Search for a location"
               minLength={2}
@@ -72,9 +68,10 @@ const GPSModal = ({ isVisible, onClose, onSelectLocation }) => {
               styles={{
                 textInput: styles.input,
                 container: {
+                  marginTop: 20,
                   flex: 0,
                   width: "100%",
-                  zIndex: 1,
+                  zIndex: 1101,
                 },
                 listView: {
                   position: "absolute",
@@ -83,10 +80,11 @@ const GPSModal = ({ isVisible, onClose, onSelectLocation }) => {
                   borderWidth: 1,
                   borderColor: "#ccc",
                   width: "100%",
-                  zIndex: 2,
+                  zIndex: 999,
                 },
               }}
               debounce={200}
+              keyboardShouldPersistTaps='handled'
             />
           </View>
           <MapView
@@ -108,7 +106,7 @@ const GPSModal = ({ isVisible, onClose, onSelectLocation }) => {
             <Button title="Cancel" onPress={onClose} />
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
@@ -126,7 +124,7 @@ const styles = StyleSheet.create({
     top: 30, // Adjusted top value to bring the box slightly down
     left: 10,
     right: 10,
-    zIndex: 10,
+    zIndex: 1000,
     width: "95%",
     alignSelf: "center",
     backgroundColor: "#fff",
@@ -143,6 +141,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "70%",
     marginTop: 80, // Space for the autocomplete and a small gap
+    zIndex: 0,
   },
   buttonContainer: {
     flexDirection: "row",

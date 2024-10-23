@@ -75,8 +75,8 @@ const FeedPage = ({ navigation }) => {
     );
 
     const formatTotalWorkoutTime = (totalTime) => {
-        const minutes = Math.floor(totalTime / 60000); // Convert milliseconds to minutes
-        const seconds = Math.floor((totalTime % 60000) / 1000); // Get remaining seconds
+        const minutes = Math.floor(totalTime / 60); // Convert milliseconds to minutes
+        const seconds = Math.floor((totalTime % 60)); // Get remaining seconds
         return `${minutes} mins ${seconds} secs`;
     };
 
@@ -268,8 +268,14 @@ const FeedPage = ({ navigation }) => {
         }
     };
 
-    const handleLike = async (postId, userId, isLiked) => {
-        const postRef = doc(db, "userProfiles", userId, "highlights", postId);
+    const handleLike = async (postId, userId, isLiked, itemType) => {
+        let postRef = null;
+        if (itemType !== 'workout'){
+            postRef = doc(db, "userProfiles", userId, "highlights", postId);
+        }
+        else{
+            postRef = doc(db, "userProfiles", userId, "workouts", postId);
+        }
         const currentUser = firebase_auth.currentUser;
 
         if (!currentUser) return;
@@ -529,7 +535,7 @@ const FeedPage = ({ navigation }) => {
                             onPress={() =>
                                 item.liked
                                     ? handleUnlike(item.id, item.userId, true)
-                                    : handleLike(item.id, item.userId, true)
+                                    : handleLike(item.id, item.userId, false, item.type)
                             }
                         >
                             <Icon
@@ -621,7 +627,7 @@ const FeedPage = ({ navigation }) => {
                             onPress={() =>
                                 item.liked
                                     ? handleUnlike(item.id, item.userId, false)
-                                    : handleLike(item.id, item.userId, false)
+                                    : handleLike(item.id, item.userId, false, item.type)
                             }
                         >
                             <Icon

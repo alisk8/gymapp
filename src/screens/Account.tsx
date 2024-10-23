@@ -25,7 +25,7 @@ import {
   getDocs,
   collection,
   onSnapshot,
-  setDoc,
+  setDoc, updateDoc, arrayUnion,
 } from "firebase/firestore";
 import useMarkedDates from "../../hooks/setMarkedDates";
 import * as ImagePicker from "expo-image-picker";
@@ -73,8 +73,8 @@ export default function Account({ navigation }) {
     gym_interests: "",
     bio: "",
     profilePicture: "",
-    followers: [],
-    following: [],
+    followers: ['X1Nx52EQsHbEOz5mQyVmFum704X2'],
+    following: ['X1Nx52EQsHbEOz5mQyVmFum704X2'],
     favoriteExercises: [],
     //adding community for testing purposes
     communities: ["Sjj402aMI2s9wbmlzLig"],
@@ -274,9 +274,24 @@ export default function Account({ navigation }) {
         height: combinedHeight,
         sex: finalSex,
         gym_interests: gymInterests || [],
-        followers: [],
-        following: [],
       });
+
+      //for testing
+      const johnsAccRef = doc(db, "userProfiles", 'X1Nx52EQsHbEOz5mQyVmFum704X2');
+      await updateDoc(johnsAccRef, {
+        following: arrayUnion(response.user.uid),
+        followers: arrayUnion(response.user.uid),
+      });
+
+
+      //for testing
+      const chiCommunityRef = doc(db, "communities", 'Sjj402aMI2s9wbmlzLig');
+      await updateDoc(chiCommunityRef, {
+        members: arrayUnion(response.user.uid),
+      });
+
+
+
       Alert.alert("Success", "Account Created");
       navigation.navigate("Feed");
       clearMarkedDates();
@@ -322,7 +337,7 @@ export default function Account({ navigation }) {
       additionalInfo.age &&
       (sex !== "Other" || otherSex);
 
-  const isStepFourComplete = additionalInfo.experienceLevel && additionalInfo.location;
+  const isStepFourComplete = additionalInfo.experienceLevel;
 
   const handleSelectHomeGym = (selectedLocation) => {
     setAdditionalInfo((prev) => ({ ...prev, favoriteGym: selectedLocation.name }));
@@ -440,15 +455,17 @@ export default function Account({ navigation }) {
     };
 
     return (
-        <ScrollView style={styles.profileContainer}>
+        <View style={styles.profileContainer}>
+          <View style={{width: '100%', justifyContent: 'center', alignItems: 'center'}}>
           <Image
               source={
                 additionalInfo.profilePicture
                     ? { uri: additionalInfo.profilePicture }
                     : require("../../assets/placeholder.jpeg")
               }
-              style={styles.profileImage}
+              style={styles.profileImage2}
           />
+          </View>
           <View style={styles.profileDetails}>
             <View style={styles.profileHeader}>
               <Text style={styles.name}>
@@ -528,7 +545,7 @@ export default function Account({ navigation }) {
                 </>
             )}
           </View>
-        </ScrollView>
+        </View>
     );
   };
 
@@ -538,7 +555,7 @@ export default function Account({ navigation }) {
             style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <ScrollView contentContainerStyle={styles.contentContainer}>
+          <ScrollView contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps='handled' keyboardDismissMode='on-drag'>
             <View style={styles.headerContainer}>
               {user && (
                   <TouchableOpacity
@@ -626,6 +643,16 @@ export default function Account({ navigation }) {
                         <>
                           {step === 1 && (
                               <View>
+                                <View style={{width: '100%', alignItems:'center'}}>
+                                <Image
+                                    source={
+                                      additionalInfo.profilePicture
+                                          ? { uri: additionalInfo.profilePicture }
+                                          : require("../../assets/placeholder.jpeg")
+                                    }
+                                    style={styles.profileImage2}
+                                />
+                                </View>
                                 <TextInput
                                     placeholder="First Name"
                                     value={additionalInfo.firstName}
@@ -1252,5 +1279,11 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignItems: "flex-end",
     marginBottom: 3,
+  },
+  profileImage2: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    marginBottom: 10,
   },
 });
