@@ -125,7 +125,9 @@ const Progress = ({ navigation }) => {
       (highlight) => highlight.date === date
     );
 
-    const filteredWorkouts = allData.workouts;
+    const filteredWorkouts = allData.workouts.filter(
+      (workout) => workout.date === date
+    );
 
     return { filteredDiaryEntries, filteredHighlights, filteredWorkouts };
   };
@@ -310,8 +312,36 @@ const Progress = ({ navigation }) => {
             ))}
           </>
         )}
+        {filteredWorkouts.length > 0 && (
+          <>
+            <Text style={styles.subHeading}>Workouts:</Text>
+            {filteredWorkouts.map((workout, index) => (
+              <View style={styles.workoutCard}>
+                <Text style={styles.exerciseName}>
+                  {workout.date} Workout {index + 1} {"\n"}
+                </Text>
+                {workout.exercises.map((exercise) => (
+                  <Text>
+                    {exercise.name}
+                    {"\n"}
+                    {"\n"}
+                    {exercise.sets.map((set, setIndex) => (
+                      <Text>
+                        {" "}
+                        Set {setIndex + 1}: {set.reps} reps, {set.weight}{" "}
+                        {exercise.weightUnit}
+                        {"\n"}
+                      </Text>
+                    ))}
+                  </Text>
+                ))}
+              </View>
+            ))}
+          </>
+        )}
         {filteredHighlights.length === 0 &&
-          filteredDiaryEntries.length === 0 && (
+          filteredDiaryEntries.length === 0 &&
+          filteredWorkouts.length === 0 && (
             <Text style={styles.noEntriesText}>
               No highlights or diary entries found for this date.
             </Text>
@@ -319,8 +349,8 @@ const Progress = ({ navigation }) => {
 
         <Text style={styles.subHeading}>Exercises Tracker:</Text>
         <View style={styles.trackedExercisesContainer}>
-          {filteredWorkouts.length > 0 ? (
-            filteredWorkouts.map((workout, workoutIndex) =>
+          {allData.workouts.length > 0 ? (
+            allData.workouts.map((workout, workoutIndex) =>
               workout.exercises.map((exercise, exerciseIndex) => (
                 <TouchableOpacity
                   key={`${workoutIndex}-${exerciseIndex}`}
@@ -485,10 +515,22 @@ const styles = StyleSheet.create({
     margin: 5,
     alignItems: "center",
     width: "45%",
+    justifyContent: "center",
   },
   exerciseName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "bold",
     color: "#333",
+    textAlign: "center",
+  },
+  workoutCard: {
+    backgroundColor: "#f9f9f9",
+    padding: 15,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    marginVertical: 5,
   },
 });

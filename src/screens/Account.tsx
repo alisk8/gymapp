@@ -390,7 +390,7 @@ export default function Account({ navigation }) {
     };
 
     return (
-      <View style={styles.profileContainer}>
+      <ScrollView style={styles.profileContainer}>
         <Image
           source={
             additionalInfo.profilePicture
@@ -457,7 +457,7 @@ export default function Account({ navigation }) {
             </>
           )}
         </View>
-      </View>
+      </ScrollView>
     );
   };
 
@@ -467,7 +467,11 @@ export default function Account({ navigation }) {
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <ScrollView contentContainerStyle={styles.contentContainer}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContentContainer}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled={true}
+        >
           <View style={styles.headerContainer}>
             {user && (
               <TouchableOpacity
@@ -513,7 +517,7 @@ export default function Account({ navigation }) {
             </View>
           )}
           {user ? (
-            <>
+            <ScrollView>
               {renderProfile()}
               <View style={styles.postsContainer}>
                 {posts.length > 0 ? (
@@ -543,7 +547,7 @@ export default function Account({ navigation }) {
                   </Text>
                 )}
               </View>
-            </>
+            </ScrollView>
           ) : (
             <View style={styles.authContainer}>
               <Text style={styles.pageHeading}>
@@ -917,7 +921,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
   },
-  contentContainer: {
+  scrollContentContainer: {
     flexGrow: 1,
     justifyContent: "center",
     padding: 20,

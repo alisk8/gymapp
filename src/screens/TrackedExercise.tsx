@@ -22,7 +22,6 @@ const TrackedExercise = ({ route }) => {
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [selectedYear] = useState(new Date().getFullYear());
   const [cumulativeVolume, setCumulativeVolume] = useState(0);
-  const [availableMonths, setAvailableMonths] = useState([]);
 
   useEffect(() => {
     filterExerciseInstances();
@@ -31,10 +30,6 @@ const TrackedExercise = ({ route }) => {
   useEffect(() => {
     updateCumulativeVolume();
   }, [exerciseInstances, selectedMonth]);
-
-  useEffect(() => {
-    identifyAvailableMonths();
-  }, [exerciseInstances]);
 
   const filterExerciseInstances = () => {
     const instances = [];
@@ -177,58 +172,6 @@ const TrackedExercise = ({ route }) => {
     setCumulativeVolume(volume);
   };
 
-  const identifyAvailableMonths = () => {
-    const monthsWithData = new Set();
-    exerciseInstances.forEach((instance) => {
-      const month = new Date(instance.workoutDate).getMonth();
-      monthsWithData.add(month);
-    });
-    setAvailableMonths([...monthsWithData]);
-  };
-
-  const renderMonthButton = (monthIndex) => {
-    const isDisabled = !availableMonths.includes(monthIndex);
-    return (
-      <TouchableOpacity
-        key={monthIndex}
-        style={[
-          styles.monthButton,
-          selectedMonth === monthIndex && styles.selectedButton,
-        ]}
-        onPress={() => !isDisabled && setSelectedMonth(monthIndex)}
-        disabled={isDisabled}
-      >
-        <Text
-          style={[
-            styles.monthButtonText,
-            selectedMonth === monthIndex && styles.selectedText,
-          ]}
-        >
-          {months[monthIndex]}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderAllTimeButton = () => (
-    <TouchableOpacity
-      style={[
-        styles.monthButton,
-        selectedMonth === null && styles.selectedButton,
-      ]}
-      onPress={() => setSelectedMonth(null)}
-    >
-      <Text
-        style={[
-          styles.monthButtonText,
-          selectedMonth === null && styles.selectedText,
-        ]}
-      >
-        All Time
-      </Text>
-    </TouchableOpacity>
-  );
-
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
@@ -298,11 +241,6 @@ const TrackedExercise = ({ route }) => {
                 showTextOnFocus
                 focusedDataPointColor="blue"
               />
-            </View>
-
-            <View style={styles.monthButtonsContainer}>
-              {months.map((month, index) => renderMonthButton(index))}
-              {renderAllTimeButton()}
             </View>
 
             <Text style={styles.chartTitle}>

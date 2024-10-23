@@ -199,12 +199,12 @@ function ProgressStack() {
             <Stack.Screen
                 name="ProgressTopTabs"
                 component={ProgressTopTabs}
-                options={{headerShown: false}} // Hide the header if not needed
+                options={{headerShown: false, title:"Progress"}} // Hide the header if not needed
             />
             <Stack.Screen name='Progress' component={Progress} options={screenOptions} />
             <Stack.Screen name='TemplateRecords' component={TemplateRecords}/>
             <Stack.Screen name='EditTemplateScreenUpdated' component={EditTemplateScreenUpdated}/>
-            <Stack.Screen name="TrackedExercise" component={TrackedExercise} />
+            <Stack.Screen name="TrackedExercise" component={TrackedExercise} options={{title:"Tracker"}}/>
             <Stack.Screen
                 name='WorkoutLog'
                 component={WorkoutLogScreen}
