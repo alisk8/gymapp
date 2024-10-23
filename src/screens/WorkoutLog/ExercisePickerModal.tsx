@@ -27,7 +27,7 @@ const ExercisePickerModal = ({ visible, onClose, onSelectExercise, onCustomExerc
         try {
             const customExercise = {
                 name: newExerciseName,
-                repsConfig: repsType,
+                repsType: repsType,
                 weightConfig: weightConfig,
                 musclesWorked: [],
             }
@@ -128,7 +128,7 @@ const ExercisePickerModal = ({ visible, onClose, onSelectExercise, onCustomExerc
                             value={repsType}
                             items={[
                                 { label: 'Reps', value: 'Reps' },
-                                { label: 'Hold', value: 'Hold' },
+                                { label: 'Time', value: 'Hold' },
                                 { label: 'Cardio', value: 'Cardio' },
                             ]}
                             setOpen={setOpenRepsType}
