@@ -455,7 +455,7 @@ export default function Account({ navigation }) {
     };
 
     return (
-        <View style={styles.profileContainer}>
+        <ScrollView style={styles.profileContainer} keyboardShouldPersistTaps={"handled"} nestedScrollEnabled={true} keyboardDismissMode={"on-drag"}>
           <View style={{width: '100%', justifyContent: 'center', alignItems: 'center'}}>
           <Image
               source={
@@ -545,7 +545,7 @@ export default function Account({ navigation }) {
                 </>
             )}
           </View>
-        </View>
+        </ScrollView>
     );
   };
 
@@ -555,7 +555,7 @@ export default function Account({ navigation }) {
             style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <ScrollView contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps='handled' keyboardDismissMode='on-drag'>
+          <ScrollView contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps='handled' keyboardDismissMode='on-drag' nestedScrollEnabled={true}>
             <View style={styles.headerContainer}>
               {user && (
                   <TouchableOpacity

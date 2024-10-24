@@ -26,156 +26,136 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 const Progress = ({ navigation }) => {
-    const [selectedDate, setSelectedDate] = useState("");
-    const [highlights, setHighlights] = useState([]);
-    const [templates, setTemplates] = useState([]);
-    const [diaryEntries, setDiaryEntries] = useState([]);
-    const [refreshing, setRefreshing] = useState(false);
-    const [exercisesPerformed, setExercisesPerformed] = useState([]);
-    const [markedDates, setMarkedDates] = useState({});
-    const [diaryEntry, setDiaryEntry] = useState(""); // State for diary entry text
-    const [isDiaryModalVisible, setDiaryModalVisible] = useState(false); // Modal visibility for diary entry
-    const [currentDiaryId, setCurrentDiaryId] = useState(null); // State for current diary entry ID
+    const [allData, setAllData] = useState({
+        diaryEntries: [],
+        highlights: [],
+        workouts: [],
+    }); // Store all data here
+    const [selectedDate, setSelectedDate] = useState(
+        new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000)
+            .toISOString()
+            .split("T")[0]
+    ); // Initialize with today's date adjusted for timezone
+    const [diaryEntry, setDiaryEntry] = useState(""); // Diary entry input
+    const [isDiaryModalVisible, setDiaryModalVisible] = useState(false); // Diary modal visibility
+    const [currentDiaryId, setCurrentDiaryId] = useState(null); // Current diary entry ID for editing
+    const [markedDates, setMarkedDates] = useState({}); // Dates with entries
 
     useFocusEffect(
         React.useCallback(() => {
             const currentDate = new Date();
-            loadMonthData(currentDate);
-            fetchAllWorkouts();
+            fetchAllData(currentDate);
         }, [])
     );
 
-    useEffect(() => {
-        if (selectedDate) {
-            fetchData(selectedDate);
-        }
-    }, [selectedDate]);
+    useEffect(()=> {console.log('allData', allData)}
+    ,[allData]);
 
-    const onRefresh = () => {
-        const currentDate = new Date();
-        loadMonthData(currentDate);
-    };
+    // Fetch all data once and store in state
+    const fetchAllData = async (date) => {
+        try {
 
-    const loadMonthData = async (date) => {
-        const user = firebase_auth.currentUser;
-        if (user) {
-            const uid = user.uid;
-            const diaryRef = collection(db, "userProfiles", uid, "diaryEntries");
-            const month = date.getMonth();
-            const year = date.getFullYear();
-            const startDate = new Date(year, month, 1);
-            const endDate = new Date(year, month + 1, 0);
+            const user = firebase_auth.currentUser;
 
-            const marked = {};
-            const diaryQuery = query(
-                diaryRef,
-                where("createdAt", ">=", Timestamp.fromDate(startDate)),
-                where("createdAt", "<=", Timestamp.fromDate(endDate))
-            );
+            if (user) {
+                const uid = user.uid;
+                const userRef = doc(db, "userProfiles", uid);
+                const diaryRef = collection(userRef, "diaryEntries");
+                const highlightsRef = collection(userRef, "highlights");
+                const workoutsRef = collection(userRef, "workouts");
 
-            const diarySnapshot = await getDocs(diaryQuery);
-            diarySnapshot.forEach((doc) => {
-                const entryDate = doc
-                    .data()
-                    .createdAt.toDate()
-                    .toISOString()
-                    .split("T")[0];
-                marked[entryDate] = { selected: true, selectedColor: "green" };
-            });
+                const marked = {};
+                const allFetchedData = {diaryEntries: [], highlights: [], workouts: []};
 
-            setMarkedDates(marked);
-        }
-    };
-
-    const fetchData = async (date) => {
-        const user = firebase_auth.currentUser;
-        if (user) {
-            const uid = user.uid;
-            const userRef = doc(db, "userProfiles", uid);
-
-            const startDate = new Date(date);
-            startDate.setHours(0, 0, 0, 0);
-            const endDate = new Date(date);
-            endDate.setHours(23, 59, 59, 999);
-
-            const highlightsRef = collection(userRef, "highlights");
-            const highlightsQuery = query(
-                highlightsRef,
-                where("createdAt", ">=", Timestamp.fromDate(startDate)),
-                where("createdAt", "<=", Timestamp.fromDate(endDate))
-            );
-            const highlightsSnapshot = await getDocs(highlightsQuery);
-            const highlightsData = highlightsSnapshot.docs.map((doc) => doc.data());
-
-            const templatesRef = collection(userRef, "templates");
-            const templatesQuery = query(
-                templatesRef,
-                where("createdAt", ">=", Timestamp.fromDate(startDate)),
-                where("createdAt", "<=", Timestamp.fromDate(endDate))
-            );
-            const templatesSnapshot = await getDocs(templatesQuery);
-            const templatesData = templatesSnapshot.docs.map((doc) => doc.data());
-
-            const diaryRef = collection(userRef, "diaryEntries");
-            const diaryQuery = query(
-                diaryRef,
-                where("createdAt", ">=", Timestamp.fromDate(startDate)),
-                where("createdAt", "<=", Timestamp.fromDate(endDate))
-            );
-            const diarySnapshot = await getDocs(diaryQuery);
-            const diaryData = diarySnapshot.docs.map((doc) => ({
-                id: doc.id,
-                entry: doc.data().entry,
-                date: doc.data().createdAt.toDate().toISOString().split("T")[0],
-            }));
-
-            setHighlights(highlightsData);
-            setTemplates(templatesData);
-            setDiaryEntries(diaryData);
-        } else {
-            Alert.alert("Error", "No user is logged in");
-        }
-    };
-
-    const fetchAllWorkouts = async () => {
-        const user = firebase_auth.currentUser;
-        if (user) {
-            const uid = user.uid;
-            const userRef = doc(db, "userProfiles", uid);
-            const workoutsRef = collection(userRef, "workouts");
-            const snapshot = await getDocs(workoutsRef);
-            const workouts = snapshot.docs.map((doc) => doc.data());
-
-            const allExercises = {};
-            workouts.forEach((workout) => {
-                workout.exercises.forEach((exercise) => {
-                    if (!allExercises[exercise.id]) {
-                        allExercises[exercise.id] = {
-                            name: exercise.name,
-                            data: [],
-                        };
-                    }
-                    exercise.sets.forEach((set) => {
-                        allExercises[exercise.id].data.push({
-                            date: workout.createdAt.toDate(),
-                            reps: set.reps,
-                            weight: set.Weight,
-                        });
+                // Fetch diary entries
+                const diarySnapshot = await getDocs(diaryRef);
+                diarySnapshot.forEach((doc) => {
+                    const entryDate = doc
+                        .data()
+                        .createdAt.toDate()
+                        .toISOString()
+                        .split("T")[0]; // UTC date
+                    marked[entryDate] = {marked: true, dotColor: "#016e03"};
+                    allFetchedData.diaryEntries.push({
+                        ...doc.data(),
+                        id: doc.id,
+                        date: entryDate,
                     });
                 });
-            });
 
-            const exercisesArray = Object.values(allExercises);
-            setExercisesPerformed(exercisesArray);
-        } else {
-            Alert.alert("Error", "No user is logged in");
+                // Fetch highlights
+                const highlightsSnapshot = await getDocs(highlightsRef);
+                highlightsSnapshot.forEach((doc) => {
+                    const entryDate = doc
+                        .data()
+                        .timestamp.toDate()
+                        .toISOString()
+                        .split("T")[0]; // UTC date
+                    marked[entryDate] = {marked: true, dotColor: "#016e03"};
+                    allFetchedData.highlights.push({
+                        ...doc.data(),
+                        id: doc.id,
+                        date: entryDate,
+                    });
+                });
+
+                // Fetch workouts
+                const workoutsSnapshot = await getDocs(workoutsRef);
+                workoutsSnapshot.forEach((doc) => {
+                    console.log('sup fuck bitches');
+                    const entryDate = doc
+                        .data()
+                        .createdAt.toDate()
+                        .toISOString()
+                        .split("T")[0]; // UTC date
+                    marked[entryDate] = {marked: true, dotColor: "#016e03"};
+                    allFetchedData.workouts.push({
+                        ...doc.data(),
+                        id: doc.id,
+                        date: entryDate,
+                    });
+
+                });
+
+                setAllData(allFetchedData);
+                setMarkedDates(marked);
+            } else {
+                Alert.alert("Error", "No user is logged in");
+            }
+
+        }
+        catch (e) {
+            console.log('error', e);
+            Alert.alert('Error', "Info failed to load");
         }
     };
 
-    const handleExerciseClick = (exercise) => {
-        navigation.navigate("TrackedExercise", { exercise });
+    // Filter data by selected date
+    const getFilteredDataForDate = (date) => {
+        const filteredDiaryEntries = allData.diaryEntries.filter(
+            (entry) => entry.date === date
+        );
+        const filteredHighlights = allData.highlights.filter(
+            (highlight) => highlight.date === date
+        );
+
+        const filteredWorkouts = allData.workouts.filter(
+            (workout) => workout.date === date
+        );
+
+        return { filteredDiaryEntries, filteredHighlights, filteredWorkouts };
     };
 
+    // Open the diary modal
+    const openDiaryModal = () => {
+        if (!selectedDate) {
+            Alert.alert("Error", "Please select a date to add a diary entry.");
+            return;
+        }
+        setDiaryModalVisible(true);
+    };
+
+    // Save the diary entry to the selected date
     const handleSaveDiaryEntry = async () => {
         const user = firebase_auth.currentUser;
         if (user) {
@@ -183,43 +163,63 @@ const Progress = ({ navigation }) => {
             const diaryRef = collection(db, "userProfiles", uid, "diaryEntries");
 
             try {
-                // Ensure selectedDate is a valid date
-                if (!selectedDate) {
-                    Alert.alert("Error", "Please select a date for the diary entry.");
-                    return;
-                }
+                const date = new Date(selectedDate); // Use selected date in UTC
 
-                // Convert selectedDate to a Date object
-                const date = new Date(selectedDate);
-                if (isNaN(date.getTime())) {
-                    Alert.alert("Error", "Selected date is invalid.");
-                    return;
-                }
+                if (!currentDiaryId) {
+                    // Add a new diary entry for the selected date
+                    const docRef = await addDoc(diaryRef, {
+                        entry: diaryEntry,
+                        createdAt: Timestamp.fromDate(date), // Use selected date
+                    });
+                    Alert.alert("Success", "Diary entry added.");
 
-                if (currentDiaryId) {
-                    // Update existing diary entry
+                    // Update local state with new diary entry
+                    setAllData((prevData) => ({
+                        ...prevData,
+                        diaryEntries: [
+                            ...prevData.diaryEntries,
+                            {
+                                entry: diaryEntry,
+                                id: docRef.id,
+                                date: date.toISOString().split("T")[0],
+                            },
+                        ],
+                    }));
+                } else {
+                    // Update an existing diary entry
                     const diaryEntryRef = doc(diaryRef, currentDiaryId);
                     await updateDoc(diaryEntryRef, { entry: diaryEntry });
                     Alert.alert("Success", "Diary entry updated.");
-                } else {
-                    // Add new diary entry
-                    await addDoc(diaryRef, {
-                        entry: diaryEntry,
-                        createdAt: Timestamp.fromDate(date), // Ensure date is valid
-                    });
-                    Alert.alert("Success", "Diary entry added.");
+
+                    // Update local state with updated diary entry
+                    setAllData((prevData) => ({
+                        ...prevData,
+                        diaryEntries: prevData.diaryEntries.map((entry) =>
+                            entry.id === currentDiaryId
+                                ? { ...entry, entry: diaryEntry }
+                                : entry
+                        ),
+                    }));
                 }
 
-                setDiaryModalVisible(false);
-                fetchData(selectedDate);
-                setDiaryEntry("");
-                setCurrentDiaryId(null);
+                // Update markedDates
+                setMarkedDates((prev) => ({
+                    ...prev,
+                    [selectedDate]: {
+                        marked: true,
+                        dotColor: "#016e03",
+                    },
+                }));
+
+                setDiaryModalVisible(false); // Close modal
+                setDiaryEntry(""); // Clear diary entry
+                setCurrentDiaryId(null); // Reset diary ID
             } catch (error) {
                 console.error("Error saving diary entry:", error);
                 Alert.alert("Error", "Failed to save diary entry. Please try again.");
             }
         } else {
-            Alert.alert("Error", "No user is logged in");
+            Alert.alert("Error", "No user is logged in.");
         }
     };
 
@@ -229,66 +229,86 @@ const Progress = ({ navigation }) => {
         setDiaryModalVisible(false);
     };
 
+    // Render filtered data for the selected date
+    const { filteredDiaryEntries, filteredHighlights, filteredWorkouts } =
+        getFilteredDataForDate(selectedDate);
+
+    // Render tracked exercises
+    const handleExerciseClick = (exercise) => {
+        navigation.navigate("TrackedExercise", { exercise, allData });
+    };
+
     return (
         <ScrollView
             contentContainerStyle={styles.container}
             refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                <RefreshControl
+                    refreshing={false}
+                    onRefresh={() => fetchAllData(new Date())}
+                />
             }
         >
-            <Calendar
-                onMonthChange={(month) => {
-                    const newDate = new Date(month.year, month.month - 1);
-                    loadMonthData(newDate);
-                }}
-                markedDates={markedDates}
-                onDayPress={(day) => setSelectedDate(day.dateString)}
-                theme={{
-                    selectedDayBackgroundColor: '#016e03',
-                    todayTextColor: '#016e03',
-                    arrowColor: '#016e03',
-                    dotColor: '#016e03',
-                    selectedDotColor: "#ffffff",
-                    monthTextColor: '#016e03',
-                }}
-            />
+            <View style={styles.calenderContainer}>
+                <Calendar
+                    onMonthChange={(month) => {
+                        const newDate = new Date(month.year, month.month - 1);
+                        fetchAllData(newDate);
+                    }}
+                    markedDates={{
+                        // Today's date style
+                        [new Date().toISOString().split("T")[0]]: {
+                            textColor: "#016e03",
+                        },
+
+                        // Conditionally apply selected date style if it's also a marked date
+                        [selectedDate]: {
+                            selected: true,
+                            selectedColor: "#016e03",
+                            ...((markedDates[selectedDate] && {
+                                    // Merge marked date styles if it's selected
+                                    marked: true,
+                                    dotColor: "#016e03",
+                                }) ||
+                                {}),
+                        },
+
+                        // Apply marked dates for all other dates
+                        ...Object.keys(markedDates).reduce((acc, date) => {
+                            if (date !== selectedDate) {
+                                // Exclude the selected date
+                                acc[date] = {
+                                    ...markedDates[date],
+                                    marked: true,
+                                    dotColor: "#016e03",
+                                };
+                            }
+                            return acc;
+                        }, {}),
+                    }}
+                    onDayPress={(day) => {
+                        setSelectedDate(day.dateString);
+                    }}
+                />
+            </View>
+            <TouchableOpacity style={styles.addDiaryButton} onPress={openDiaryModal}>
+                <Ionicons name="book-outline" size={24} color="#016e03" />
+            </TouchableOpacity>
+
             <View style={styles.detailsContainer}>
-                <Text style={styles.heading}>Selected Date: {selectedDate}</Text>
-                {highlights.length > 0 && (
+                {filteredHighlights.length > 0 && (
                     <>
                         <Text style={styles.subHeading}>Highlights:</Text>
-                        {highlights.map((highlight, index) => (
+                        {filteredHighlights.map((highlight, index) => (
                             <View key={index} style={styles.card}>
                                 <Text style={styles.detailText}>{highlight.detail}</Text>
                             </View>
                         ))}
                     </>
                 )}
-                {templates.length > 0 && (
-                    <>
-                        <Text style={styles.subHeading}>Workouts:</Text>
-                        {templates.map((template, index) => (
-                            <View key={index} style={styles.card}>
-                                <Text style={styles.workoutTitle}>{template.templateName}</Text>
-                                {template.exercises.map((exercise, idx) => (
-                                    <View key={idx} style={styles.exerciseContainer}>
-                                        <Text style={styles.exerciseName}>{exercise.name}</Text>
-                                        <Text style={styles.exerciseDetail}>
-                                            Sets: {exercise.setsCount}
-                                        </Text>
-                                        <Text style={styles.exerciseDetail}>
-                                            Weight Unit: {exercise.weightUnit}
-                                        </Text>
-                                    </View>
-                                ))}
-                            </View>
-                        ))}
-                    </>
-                )}
-                {diaryEntries.length > 0 && (
+                {filteredDiaryEntries.length > 0 && (
                     <>
                         <Text style={styles.subHeading}>Diary Entries:</Text>
-                        {diaryEntries.map((entry, index) => (
+                        {filteredDiaryEntries.map((entry, index) => (
                             <TouchableOpacity
                                 key={index}
                                 style={styles.card}
@@ -306,32 +326,63 @@ const Progress = ({ navigation }) => {
                         ))}
                     </>
                 )}
-                {highlights.length === 0 &&
-                    templates.length === 0 &&
-                    diaryEntries.length === 0 && (
+                {filteredWorkouts.length > 0 && (
+                    <>
+                        <Text style={styles.subHeading}>Workouts:</Text>
+                        {filteredWorkouts.map((workout, index) => (
+                            <View style={styles.workoutCard}>
+                                <Text style={styles.exerciseName}>
+                                    {workout.date} Workout {index + 1} {"\n"}
+                                </Text>
+                                {workout.exercises.map((exercise) => (
+                                    <Text>
+                                        {exercise.name}
+                                        {"\n"}
+                                        {"\n"}
+                                        {exercise.sets.map((set, setIndex) => (
+                                            <Text>
+                                                {" "}
+                                                Set {setIndex + 1}: {set.reps} reps, {set.weight}{" "}
+                                                {exercise.weightUnit}
+                                                {"\n"}
+                                            </Text>
+                                        ))}
+                                    </Text>
+                                ))}
+                            </View>
+                        ))}
+                    </>
+                )}
+                {filteredHighlights.length === 0 &&
+                    filteredDiaryEntries.length === 0 &&
+                    filteredWorkouts.length === 0 && (
                         <Text style={styles.noEntriesText}>
-                            No highlights, templates, or diary entries found for this date.
+                            No highlights or diary entries found for this date.
                         </Text>
                     )}
-                <TouchableOpacity
-                    style={styles.addDiaryButton}
-                    onPress={() => setDiaryModalVisible(true)}
-                >
-                    <Text style={styles.addDiaryButtonText}>Add Diary Entry</Text>
-                </TouchableOpacity>
-                <Text style={styles.subHeading}>Progress Tracker:</Text>
+
+                <Text style={styles.subHeading}>Exercises Tracker:</Text>
                 <View style={styles.trackedExercisesContainer}>
-                    {exercisesPerformed.map((exercise, index) => (
-                        <TouchableOpacity
-                            key={index}
-                            style={styles.trackedExerciseCard}
-                            onPress={() => handleExerciseClick(exercise)}
-                        >
-                            <Text style={styles.exerciseName}>{exercise.name}</Text>
-                        </TouchableOpacity>
-                    ))}
+                    {allData.workouts.length > 0 ? (
+                        allData.workouts.map((workout, workoutIndex) =>
+                            workout.exercises.map((exercise, exerciseIndex) => (
+                                <TouchableOpacity
+                                    key={`${workoutIndex}-${exerciseIndex}`}
+                                    style={styles.trackedExerciseCard}
+                                    onPress={() => handleExerciseClick(exercise)}
+                                >
+                                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                                </TouchableOpacity>
+                            ))
+                        )
+                    ) : (
+                        <Text style={styles.noEntriesText}>
+                            Complete a workout to see individual exercise progress.
+                        </Text>
+                    )}
                 </View>
             </View>
+
             <Modal
                 visible={isDiaryModalVisible}
                 transparent={true}
@@ -342,6 +393,7 @@ const Progress = ({ navigation }) => {
                         <Text style={styles.modalTitle}>
                             {currentDiaryId ? "Edit Diary Entry" : "Add Diary Entry"}
                         </Text>
+                        <Text style={styles.modalDateText}>Date: {selectedDate}</Text>
                         <TextInput
                             style={styles.diaryInput}
                             value={diaryEntry}
@@ -375,21 +427,17 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         backgroundColor: "#fff",
     },
+    calenderContainer: {
+        paddingTop: 40,
+    },
     detailsContainer: {
         padding: 20,
         paddingBottom: 100,
     },
-    heading: {
-        fontSize: 22,
-        fontWeight: "bold",
-        color: "#333",
-        marginBottom: 10,
-        textAlign: "center",
-    },
     subHeading: {
         fontSize: 20,
         fontWeight: "bold",
-        color: '#016e03',
+        color: "#016e03",
         marginTop: 20,
         marginBottom: 10,
     },
@@ -401,27 +449,8 @@ const styles = StyleSheet.create({
     noEntriesText: {
         fontSize: 16,
         color: "#555",
-        textAlign: "center",
-        marginTop: 20,
-    },
-    workoutTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: '#016e03',
-        marginBottom: 5,
-    },
-    exerciseContainer: {
-        marginLeft: 10,
-        marginBottom: 5,
-    },
-    exerciseName: {
-        fontSize: 16,
-        fontWeight: "bold",
-        color: "#333",
-    },
-    exerciseDetail: {
-        fontSize: 14,
-        color: "#555",
+        textAlign: "left",
+        marginTop: 10,
     },
     card: {
         backgroundColor: "#f9f9f9",
@@ -433,35 +462,15 @@ const styles = StyleSheet.create({
         shadowRadius: 5,
         marginVertical: 5,
     },
-    trackedExercisesContainer: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-    },
-    trackedExerciseCard: {
-        backgroundColor: "#e0f7fa",
-        padding: 10,
-        borderRadius: 10,
-        margin: 5,
-        alignItems: "center",
-        width: "45%",
-    },
     diaryEntryContainer: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
     },
     addDiaryButton: {
-        backgroundColor: '#016e03',
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 25,
-        alignItems: "center",
-        marginVertical: 10,
-    },
-    addDiaryButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "bold",
+        position: "absolute",
+        right: 20,
+        top: 15,
     },
     modalContainer: {
         flex: 1,
@@ -481,6 +490,11 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
         marginBottom: 20,
     },
+    modalDateText: {
+        fontSize: 16,
+        fontWeight: "bold",
+        marginBottom: 10,
+    },
     diaryInput: {
         width: "100%",
         height: 100,
@@ -492,7 +506,7 @@ const styles = StyleSheet.create({
         textAlignVertical: "top",
     },
     modalButton: {
-        backgroundColor: '#016e03',
+        backgroundColor: "#016e03",
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 25,
@@ -503,5 +517,34 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontSize: 16,
         fontWeight: "bold",
+    },
+    trackedExercisesContainer: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+    },
+    trackedExerciseCard: {
+        backgroundColor: "#e0f7fa",
+        padding: 10,
+        borderRadius: 10,
+        margin: 5,
+        alignItems: "center",
+        width: "45%",
+        justifyContent: "center",
+    },
+    exerciseName: {
+        fontSize: 14,
+        fontWeight: "bold",
+        color: "#333",
+        textAlign: "center",
+    },
+    workoutCard: {
+        backgroundColor: "#f9f9f9",
+        padding: 15,
+        borderRadius: 10,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+        marginVertical: 5,
     },
 });
