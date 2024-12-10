@@ -11,6 +11,7 @@ import {
     Keyboard,
     ActivityIndicator,
     ScrollView, InteractionManager,
+    Switch
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import axios from "axios";
@@ -42,6 +43,9 @@ const AIFrontPage = ({ navigation }) => {
     const [yearsLifting, setYearsLifting] = useState("");
     const [goalMuscles, setGoalMuscles] = useState("");
     const [newTemplate, setNewTemplate] = useState([]);
+    const [isInjuryEnabled, setIsInjuryEnabled] = useState(false);
+    const [isTimeEnabled, setIsTimeEnabled] = useState(false);
+
 
     const fetchUserProfile = async () => {
         try {

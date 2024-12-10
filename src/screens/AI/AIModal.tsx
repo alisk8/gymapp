@@ -11,6 +11,7 @@ import {
     Keyboard,
     ActivityIndicator,
     ScrollView, InteractionManager, Modal, Alert,
+    Switch
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import axios from "axios";
@@ -20,29 +21,24 @@ import {useFocusEffect} from "@react-navigation/native";
 import {FontAwesome5} from "@expo/vector-icons"; // Assuming you'll be using axios for API calls
 
 
-
 const AIModal = ({ visible, onClose, exercises, template, useTemplateFeedback }) => {
     const [workoutDescription, setWorkoutDescription] = useState("");
     const [workoutDuration, setWorkoutDuration] = useState("");
     const [injuryConcerns, setInjuryConcerns] = useState("");
     const [loading, setLoading] = useState(false);
     const [feedback, setFeedback] = useState("");
-    const [open, setOpen] = useState(false);
-    const [selectedGoal, setSelectedGoal] = useState(null);
-    const [items, setItems] = useState([
-        { label: "Hypertrophy (Build Muscle/Aesthetics)", value: "Hypertrophy" },
-        { label: "Strength", value: "Strength" },
-        { label: "Rehabilitation", value: "Rehabilitation" },
-        { label: "Cardio and Endurance", value: "Cardio and Endurance" },
-        { label: "Flexibility and Mobility", value: "Flexibility and Mobility" },
-        { label: "Other...", value: "Other" }
-    ]);
     const [userProfile, setUserProfile] =useState(null);
     const [userProfileFetched, setUserProfileFetched] = useState(false);
     const [userAge, setUserAge] = useState("");
     const [yearsLifting, setYearsLifting] = useState("");
     const [goalMuscles, setGoalMuscles] = useState("");
+    const [workoutLocation, setWorkoutLocation] = useState(null); // Selected value
+    const [isWorkoutLocationOpen, setIsWorkoutLocationOpen] = useState(false); // Dropdown open state
     const [newTemplate, setNewTemplate] = useState([]);
+    const [isInjuryEnabled, setIsInjuryEnabled] = useState(false);
+    const [isDurationEnabled, setIsDurationEnabled] = useState(false);
+    const [isGoalEnabled, setIsGoalEnabled] = useState(true);
+    const [targetMuscleEnabled, setTargetMuscleEnabled] = useState(false);
 
     const fetchUserProfile = async () => {
         try {
@@ -287,8 +283,15 @@ const AIModal = ({ visible, onClose, exercises, template, useTemplateFeedback })
                         Please fill in the details below, and we will {exercises.length === 0? "generate": "customize"} a workout
                         plan tailored to your needs.
                     </Text>
-                    <View style={styles.topInputContainer}>
-                        <TextInput
+                    <View style={styles.optionalFieldContainer}>
+                        <View style={styles.toggleContainer}>
+                            <Text style={styles.toggleLabel}>Customize Target Muscles</Text>
+                            <Switch
+                                value={targetMuscleEnabled}
+                                onValueChange={setTargetMuscleEnabled}
+                            />
+                        </View>
+                        {targetMuscleEnabled && <TextInput
                             style={styles.muscleInput}
                             placeholder="Goal Muscles"
                             value={goalMuscles}
@@ -296,37 +299,90 @@ const AIModal = ({ visible, onClose, exercises, template, useTemplateFeedback })
                             numberOfLines={1}
                             returnKeyType="done"
                             onSubmitEditing={Keyboard.dismiss}
+                        />}
+                    </View>
+
+                    <View style={styles.optionalFieldContainer}>
+                        <View style={styles.toggleContainer}>
+                            <Text style={styles.toggleLabel}>Customize Goals</Text>
+                            <Switch
+                                value={isGoalEnabled}
+                                onValueChange={setIsGoalEnabled}
+                            />
+                        </View>
+                        {isGoalEnabled && (
+                            <TextInput
+                                style={styles.searchInput}
+                                placeholder="Describe your workout goal: Strength, building muscle/aesthetics, Sport-specific training..."
+                                value={workoutDescription}
+                                onChangeText={setWorkoutDescription}
+                                multiline={true}
+                                numberOfLines={4}
+                                returnKeyType="done"
+                                onSubmitEditing={Keyboard.dismiss}
+                            />
+                        )}
+                    </View>
+
+                    <View style={styles.optionalFieldContainer}>
+                        <View style={styles.toggleContainer}>
+                            <Text style={styles.toggleLabel}>Customize Workout Style</Text>
+                        </View>
+                        <DropDownPicker
+                            open={isWorkoutLocationOpen}
+                            value={workoutLocation}
+                            items={[
+                                { label: 'Home Workout', value: 'home' },
+                                { label: 'Gym Workout', value: 'gym' },
+                            ]}
+                            setOpen={setIsWorkoutLocationOpen}
+                            setValue={setWorkoutLocation}
+                            placeholder="Select Workout Location"
+                            style={styles.dropdown}
+                            dropDownContainerStyle={styles.dropDownStyle}
                         />
                     </View>
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Describe your workout goal: Strength, building muscle/aesthetics, Sport-specific training..."
-                        value={workoutDescription}
-                        onChangeText={setWorkoutDescription}
-                        multiline={true}
-                        numberOfLines={4}
-                        returnKeyType="done"
-                        onSubmitEditing={Keyboard.dismiss}
-                    />
 
-                    <View style={styles.bottomInputsContainer}>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Goal duration (mins)"
-                            value={workoutDuration}
-                            keyboardType="numeric"
-                            onChangeText={setWorkoutDuration}
-                            returnKeyType="done"
-                            onSubmitEditing={Keyboard.dismiss}
-                        />
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Any injuries?"
-                            value={injuryConcerns}
-                            onChangeText={setInjuryConcerns}
-                            returnKeyType="done"
-                            onSubmitEditing={Keyboard.dismiss}
-                        />
+                    <View style={styles.optionalFieldContainer}>
+                        <View style={styles.toggleContainer}>
+                            <Text style={styles.toggleLabel}>Customize Duration </Text>
+                            <Switch
+                                value={isDurationEnabled}
+                                onValueChange={setIsDurationEnabled}
+                            />
+                        </View>
+                        {isDurationEnabled && (
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Goal duration (mins)"
+                                value={workoutDuration}
+                                keyboardType="numeric"
+                                onChangeText={setWorkoutDuration}
+                                returnKeyType="done"
+                                onSubmitEditing={Keyboard.dismiss}
+                            />
+                        )}
+                    </View>
+
+
+                    <View style={styles.optionalFieldContainer}>
+                        <View style={styles.toggleContainer}>
+                            <Text style={styles.toggleLabel}>Any Injuries?</Text>
+                            <Switch
+                                value={isInjuryEnabled}
+                                onValueChange={setIsInjuryEnabled}
+                            />
+                        </View>
+                        {isInjuryEnabled && (
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Any injuries?"
+                                value={injuryConcerns}
+                                onChangeText={setInjuryConcerns}
+                                returnKeyType="done"
+                                onSubmitEditing={Keyboard.dismiss}
+                            />
+                        )}
                     </View>
 
                     <TouchableOpacity style={styles.button} onPress={sendWorkoutDetails}>
@@ -497,5 +553,19 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontSize: 16,
         fontWeight: "bold",
+    },
+    optionalFieldContainer: {
+        width: "100%",
+        marginBottom: 20,
+    },
+    toggleContainer: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 10,
+    },
+    toggleLabel: {
+        fontSize: 16,
+        color: "#666",
     },
 });
