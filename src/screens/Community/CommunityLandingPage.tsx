@@ -57,7 +57,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
   const [events, setEvents] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [userProfiles, setUserProfiles] = useState({});
-  const [selectedLeaderboardExercise, setSelectedLeaderboardExercise] = useState(null); // For selected exercise
+  const [selectedLeaderboardExercise, setSelectedLeaderboardExercise] = useState("Consistency"); // For selected exercise
   const [openExerciseSelector, setOpenExerciseSelector] = useState(false); // Dropdown state
   const [members, setMembers] = useState([]);
   const [isUsersModalVisible, setIsUsersModalVisible] = useState(false);
@@ -519,25 +519,45 @@ const CommunityLandingPage = ({ route, navigation }) => {
               selectedItemLabelStyle={styles.selectedItemLabelStyle}
           />
           {leaderboard ? (
-            <FlatList
-              data={leaderboard}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item, index }) => (
-                <View style={styles.leaderboardItem}>
-                  <Text style={styles.leaderboardRank}>{index + 1}.</Text>
-                  <Text style={styles.leaderboardName}>{item.userName}</Text>
-                  <Text style={styles.leaderboardDetails}>
-                    {item.consistencyStreak? item.consistencyStreak: ''}
-                    {item.consistencyStreak && item.consistencyStreak > 1? ' days': ''}
-                    {item.consistencyStreak && item.consistencyStreak === 1? ' day': ''}
-                    {item.weight? item.weight: ''}
-                    {item.weightUnit? item.weightUnit: ''} {item.weight? "x": ""}
-                    {item.reps? item.reps: ''} {item.reps? "reps": ""}
-                    {item.time? formatTimeMilliseconds(item.time): ''}
-                  </Text>
-                </View>
-              )}
-            />
+              <FlatList
+                  data={leaderboard}
+                  keyExtractor={(item, index) => index.toString()}
+                  renderItem={({ item, index }) => {
+                    // Determine the color and style for the rank
+                    const rankColors = ["#FFD700", "#C0C0C0", "#CD7F32"]; // Gold, Silver, Bronze
+                    const rankStyle = {
+                      color: rankColors[index] || "#333", // Default color for ranks beyond top 3
+                      fontWeight: index < 3 ? "bold" : "normal",
+                      fontSize: index < 3 ? 18 : 16, // Bigger font for top 3
+                    };
+
+                    return (
+                        <View
+                            style={[
+                              styles.leaderboardItem,
+                              index < 3 && styles.topRankItem, // Additional style for top 3
+                            ]}
+                        >
+                          <Text style={[styles.leaderboardRank, rankStyle]}>
+                            {index + 1}.
+                          </Text>
+                          <Text style={styles.leaderboardName}>{item.userName}</Text>
+                          <Text style={styles.leaderboardDetails}>
+                            {item.consistencyStreak
+                                ? `${item.consistencyStreak} ${
+                                    item.consistencyStreak > 1 ? "days" : "day"
+                                }`
+                                : ""}
+                            {item.weight ? item.weight : ""}
+                            {item.weightUnit ? item.weightUnit : ""}{" "}
+                            {item.weight ? "x" : ""}
+                            {item.reps ? item.reps : ""} {item.reps ? "reps" : ""}
+                            {item.time ? formatTimeMilliseconds(item.time) : ""}
+                          </Text>
+                        </View>
+                    );
+                  }}
+              />
           ) : (
             <Text>No leaderboard data available.</Text>
           )}
@@ -741,14 +761,6 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     marginTop: 20,
   },
-  leaderboardItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-
-  },
   leaderboardRank: {
     fontSize: 16,
     fontWeight: "bold",
@@ -821,6 +833,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16
   },
+  leaderboardItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+    alignItems: "center", // Center-align items vertically
+  },
+  topRankItem: {
+    backgroundColor: "#f9f9f9", // Light background for top 3
+    borderRadius: 10,
+    marginBottom: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+
+
 });
 
 export default CommunityLandingPage;

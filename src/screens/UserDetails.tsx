@@ -239,6 +239,24 @@ const UserDetails = ({ route, navigation }) => {
               </Text>
           )}
         </View>
+        <View style={styles.favoriteContainer}>
+          <View style={styles.favoriteSection}>
+            <Text style={styles.favoritesTitle}>Favorite Exercises:</Text>
+            {additionalInfo.favoriteExercises.map((exercise, index) => (
+                <Text key={index} style={styles.favoriteItem}>
+                  {exercise}
+                </Text>
+            ))}
+          </View>
+          <View style={styles.favoriteSection}>
+            <Text style={styles.favoritesTitle}>Gym Interests:</Text>
+            {additionalInfo.gym_interests.map((interest, index) => (
+                <Text key={index} style={styles.favoriteItem}>
+                  {interest}
+                </Text>
+            ))}
+          </View>
+        </View>
     </View>
 
 
@@ -486,5 +504,40 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-  }
+  },
+  favoriteContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: 20,
+  },
+  favoriteSection: {
+    flex: 0.48,
+    backgroundColor: "#fff", // Ensure a background color is set
+    borderRadius: 8, // Rounded corners
+    shadowColor: "#000",
+    shadowOpacity: 0.2, // Shadow transparency
+    shadowRadius: 4, // Shadow blur
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 4 },
+  },
+  infoSection: {
+    backgroundColor: "#fff", // Ensure a background color is set
+    borderRadius: 8, // Rounded corners
+    shadowColor: "#000",
+    shadowOpacity: 0.2, // Shadow transparency
+    shadowRadius: 4, // Shadow blur
+    paddingHorizontal: 10,
+    marginVertical: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  favoriteItem: {
+    fontSize: 15,
+    color: "#333",
+    marginVertical: 2,
+  },
+  favoritesTitle: {
+    fontSize: 15,
+    fontWeight: "bold",
+    marginTop: 15,
+  },
 });

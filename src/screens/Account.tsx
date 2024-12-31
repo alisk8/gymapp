@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
-  ScrollView,
+  ScrollView, Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {firebase_auth, db, storage} from "../../firebaseConfig";
@@ -33,6 +33,10 @@ import { useFocusEffect } from "@react-navigation/native";
 import GPSModal from "./Community/GPSModal";
 import * as ImageManipulator from "expo-image-manipulator";
 import {getDownloadURL, ref as storageRef, uploadBytes} from "firebase/storage";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import {Timestamp} from "firebase/firestore";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
 
 type AdditionalInfo = {
   firstName: string;
@@ -70,7 +74,7 @@ export default function Account({ navigation }) {
     age: "",
     sex: "",
     location: "",
-    gym_interests: "",
+    gym_interests: [],
     bio: "",
     profilePicture: "",
     followers: ['X1Nx52EQsHbEOz5mQyVmFum704X2'],
@@ -107,6 +111,12 @@ export default function Account({ navigation }) {
   const [gymInterestInput, setGymInterestInput] = useState("");
   const [gymInterests, setGymInterests] = useState<string[]>([]);
   const [exercisePresets, setExercisePresets] = useState([]);
+
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [workoutTime, setWorkoutTime] = useState(""); // Store time as HH:mm
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [selectedTime, setSelectedTime] = useState(new Date());
+
   const { clearMarkedDates } = useMarkedDates();
   const auth = firebase_auth;
 
@@ -115,6 +125,44 @@ export default function Account({ navigation }) {
         fetchExercisePresets();
       }, [])
   );
+
+
+  /**
+  // Add this function to fetch and save the FCM token
+  const initializeFCMToken = async (userId) => {
+    try {
+      // Request permission for notifications
+      const authStatus = await messaging().requestPermission();
+      const enabled =
+          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+      if (enabled) {
+        // Get FCM token
+        const token = await messaging().getToken();
+        console.log("FCM Token:", token);
+
+        // Save token to Firestore
+        const userRef = doc(db, `userProfiles/${userId}`);
+        await updateDoc(userRef, {
+          notificationToken: token,
+        });
+      }
+    } catch (error) {
+      console.error("Error initializing FCM token:", error);
+    }
+  };
+
+  messaging().onTokenRefresh(async (newToken) => {
+    const userRef = doc(db, `userProfiles/${user?.uid}`);
+    await updateDoc(userRef, {
+      notificationToken: newToken,
+    });
+    console.log("FCM Token refreshed and saved:", newToken);
+  });
+
+      **/
+
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -236,6 +284,7 @@ export default function Account({ navigation }) {
           password
       );
       setUser(response.user);
+
       Alert.alert("Success", "Logged in Successfully");
       navigation.navigate("Home");
     } catch (error) {
@@ -267,25 +316,40 @@ export default function Account({ navigation }) {
         additionalInfo.profilePicture = imageUrl;
       }
 
+      // Fetch all existing user IDs
+      const userProfilesSnapshot = await getDocs(collection(db, "userProfiles"));
+      const existingUserIds = userProfilesSnapshot.docs.map((doc) => doc.id);
+
       const userProfileRef = doc(db, "userProfiles", response.user.uid);
+
+      const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       await setDoc(userProfileRef, {
         email: username,
         ...additionalInfo,
         height: combinedHeight,
         sex: finalSex,
         gym_interests: gymInterests || [],
+        followers: existingUserIds,
+        following: existingUserIds,
+        workout_days: selectedDays || [],
+        preferred_workout_time: Timestamp.fromDate(selectedTime),
+        timeZone: userTimeZone,
       });
 
-      //for testing
-      const johnsAccRef = doc(db, "userProfiles", 'X1Nx52EQsHbEOz5mQyVmFum704X2');
-      await updateDoc(johnsAccRef, {
-        following: arrayUnion(response.user.uid),
-        followers: arrayUnion(response.user.uid),
+      // Update each existing user's profile
+      const updatePromises = userProfilesSnapshot.docs.map((doc) => {
+        const existingUserRef = doc.ref;
+        return updateDoc(existingUserRef, {
+          followers: arrayUnion(response.user.uid),
+          following: arrayUnion(response.user.uid),
+        });
       });
 
+      await Promise.all(updatePromises);
+
 
       //for testing
-      const chiCommunityRef = doc(db, "communities", 'Sjj402aMI2s9wbmlzLig');
+      const chiCommunityRef = doc(db, "communities", '8UH3Vdfp1hnkhKvAa0MO');
       await updateDoc(chiCommunityRef, {
         members: arrayUnion(response.user.uid),
       });
@@ -319,7 +383,7 @@ export default function Account({ navigation }) {
   };
 
   const handleNextStep = () => {
-    if (step < 4) setStep(step + 1);
+    if (step < 5) setStep(step + 1);
   };
 
   const handlePrevStep = () => {
@@ -337,7 +401,10 @@ export default function Account({ navigation }) {
       additionalInfo.age &&
       (sex !== "Other" || otherSex);
 
-  const isStepFourComplete = additionalInfo.experienceLevel;
+  const isStepFiveComplete = additionalInfo.experienceLevel;
+
+  const isStepFourComplete = selectedDays.length > 0 && selectedTime;
+
 
   const handleSelectHomeGym = (selectedLocation) => {
     setAdditionalInfo((prev) => ({ ...prev, favoriteGym: selectedLocation.name }));
@@ -440,6 +507,27 @@ export default function Account({ navigation }) {
     setExerciseSuggestions([]);
   };
 
+  const toggleDaySelection = (day: string) => {
+    setSelectedDays((prevDays) =>
+        prevDays.includes(day)
+            ? prevDays.filter((d) => d !== day)
+            : [...prevDays, day]
+    );
+  };
+
+
+  const showTimePicker = () => {
+    setTimePickerVisible(true);
+  };
+
+  const handleTimeChange = (event, selectedDate) => {
+    if (event.type === "set" && selectedDate) {
+      // Save the selected time but keep the picker open
+      setSelectedTime(selectedDate);
+    }
+  };
+
+
   const renderProfile = () => {
     const displaySettings = additionalInfo.displaySettings || {
       height: true,
@@ -455,7 +543,7 @@ export default function Account({ navigation }) {
     };
 
     return (
-        <ScrollView style={styles.profileContainer} keyboardShouldPersistTaps={"handled"} nestedScrollEnabled={true} keyboardDismissMode={"on-drag"}>
+        <View>
           <View style={{width: '100%', justifyContent: 'center', alignItems: 'center'}}>
           <Image
               source={
@@ -506,7 +594,8 @@ export default function Account({ navigation }) {
                   </Text>
               )}
             </View>
-            <Text style={styles.sectionTitle}>Personal Info</Text>
+            <View style={styles.infoSection}>
+            <Text style={styles.infoTitle}>Personal Info</Text>
             <View style={styles.row}>
               {displaySettings.height && additionalInfo.height && (
                   <Text style={styles.infoText}>
@@ -527,81 +616,83 @@ export default function Account({ navigation }) {
                   <Text style={styles.infoText}>Age: {additionalInfo.age}</Text>
               )}
             </View>
-            {displaySettings.favoriteExercises &&
-                additionalInfo.favoriteExercises && (
-                    <>
-                      <Text style={styles.sectionTitle}>Favorite Exercises:</Text>
-                      <Text style={styles.sectionContent}>
-                        {additionalInfo.favoriteExercises.join(", ")}
-                      </Text>
-                    </>
-                )}
-            {displaySettings.gym_interests && additionalInfo.gym_interests.length > 0 && (
-                <>
-                  <Text style={styles.sectionTitle}>Gym Interests:</Text>
-                  <Text style={styles.sectionContent}>
-                    {additionalInfo.gym_interests.join(', ')}
-                  </Text>
-                </>
-            )}
-          </View>
-        </ScrollView>
+            </View>
+            <View style={styles.favoriteContainer}>
+              <View style={styles.favoriteSection}>
+                <Text style={styles.favoritesTitle}>Favorite Exercises:</Text>
+                {additionalInfo.favoriteExercises.map((exercise, index) => (
+                    <Text key={index} style={styles.favoriteItem}>
+                      {exercise}
+                    </Text>
+                ))}
+              </View>
+              <View style={styles.favoriteSection}>
+                <Text style={styles.favoritesTitle}>Gym Interests:</Text>
+                {additionalInfo.gym_interests.map((interest, index) => (
+                    <Text key={index} style={styles.favoriteItem}>
+                      {interest}
+                    </Text>
+                ))}
+              </View>
+            </View>
+            </View>
+        </View>
     );
   };
 
+
   return (
-      <TouchableWithoutFeedback onPress={dismissSuggestions}>
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <ScrollView contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps='handled' keyboardDismissMode='on-drag' nestedScrollEnabled={true}>
-            <View style={styles.headerContainer}>
-              {user && (
-                  <TouchableOpacity
-                      style={styles.settingsIcon}
-                      onPress={toggleMenu}
-                  >
-                    <Ionicons name="settings-outline" size={24} color="#000" />
-                  </TouchableOpacity>
-              )}
-            </View>
-            {showMenu && (
-                <View style={styles.menu}>
-                  <TouchableOpacity
-                      style={styles.menuItem}
-                      onPress={() => {
-                        setShowMenu(false);
-                        navigation.navigate("Settings", {
-                          userId: user?.uid,
-                          onFieldUpdate: handleFieldUpdate,
-                        });
-                      }}
-                  >
-                    <Text style={styles.menuItemText}>Edit Profile</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                      style={styles.menuItem}
-                      onPress={() => {
-                        setShowMenu(false);
-                        navigation.navigate("Saved");
-                      }}
-                  >
-                    <Text style={styles.menuItemText}>My Saved</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                      style={styles.menuItem}
-                      onPress={() => {
-                        setShowMenu(false);
-                        handleSignOut();
-                      }}
-                  >
-                    <Text style={styles.menuItemText}>Sign Out</Text>
-                  </TouchableOpacity>
-                </View>
-            )}
+        <View style={{flex:1}}>
             {user ? (
                 <>
+                  <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+                              style={{backgroundColor: 'white'}}
+                              contentContainerStyle={{flexGrow: 1}}>
+                    <View style={styles.headerContainer}>
+                      {user && (
+                          <TouchableOpacity
+                              style={styles.settingsIcon}
+                              onPress={toggleMenu}
+                          >
+                            <Ionicons name="settings-outline" size={24} color="#000" />
+                          </TouchableOpacity>
+                      )}
+                    </View>
+                    {showMenu && (
+                        <View style={styles.menu}>
+                          <TouchableOpacity
+                              style={styles.menuItem}
+                              onPress={() => {
+                                setShowMenu(false);
+                                navigation.navigate("Settings", {
+                                  userId: user?.uid,
+                                  onFieldUpdate: handleFieldUpdate,
+                                });
+                              }}
+                          >
+                            <Text style={styles.menuItemText}>Edit Profile</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                              style={styles.menuItem}
+                              onPress={() => {
+                                setShowMenu(false);
+                                navigation.navigate("Saved");
+                              }}
+                          >
+                            <Text style={styles.menuItemText}>My Saved</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                              style={styles.menuItem}
+                              onPress={() => {
+                                setShowMenu(false);
+                                handleSignOut();
+                              }}
+                          >
+                            <Text style={styles.menuItemText}>Sign Out</Text>
+                          </TouchableOpacity>
+                        </View>
+                    )}
+
                   {renderProfile()}
                   <View style={styles.postsContainer}>
                     {posts.length > 0 ? (
@@ -631,8 +722,15 @@ export default function Account({ navigation }) {
                         </Text>
                     )}
                   </View>
+                  </ScrollView>
                 </>
             ) : (
+                  <TouchableWithoutFeedback onPress={dismissSuggestions}>
+                    <KeyboardAvoidingView
+                        style={styles.container}
+                        behavior={Platform.OS === "ios" ? "padding" : "height"}
+                    >
+                <View style={styles.contentContainer}>
                 <View style={styles.authContainer}>
                   <Text style={styles.nameHeading}>{signingUp ? "" : "225"}</Text>
                   <Text style={styles.pageHeading}>
@@ -841,6 +939,77 @@ export default function Account({ navigation }) {
                           )}
                           {step === 4 && (
                               <View>
+                                <Text style={styles.infoTitle}>Workout Preferences</Text>
+                                <Text style={styles.label}>What days do you plan to work out?</Text>
+                                <View style={styles.daysContainer}>
+                                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                                      <TouchableOpacity
+                                          key={day}
+                                          style={[
+                                            styles.dayButton,
+                                            selectedDays.includes(day) && styles.selectedDayButton,
+                                          ]}
+                                          onPress={() => toggleDaySelection(day)}
+                                      >
+                                        <Text
+                                            style={[
+                                              styles.dayButtonText,
+                                              selectedDays.includes(day) && styles.selectedDayButtonText,
+                                            ]}
+                                        >
+                                          {day}
+                                        </Text>
+                                      </TouchableOpacity>
+                                  ))}
+                                </View>
+                                <Text style={styles.label}>Preferred workout time:</Text>
+                                <TouchableOpacity onPress={showTimePicker} style={styles.timeButton}>
+                                  <Text style={styles.timeText}>
+                                    {selectedTime
+                                        ? `${selectedTime.getHours()}:${String(selectedTime.getMinutes()).padStart(2, "0")}`
+                                        : "Select Time"}
+                                  </Text>
+                                </TouchableOpacity>
+                                {timePickerVisible && (
+                                    <Modal transparent={true} animationType="slide">
+                                      <View style={styles.modalContainer}>
+                                        <View style={styles.pickerWrapper}>
+                                          <DateTimePicker
+                                              value={selectedTime}
+                                              mode="time"
+                                              display="spinner"
+                                              onChange={handleTimeChange}
+                                          />
+                                          <TouchableOpacity
+                                              onPress={() => setTimePickerVisible(false)}
+                                              style={styles.doneButton}
+                                          >
+                                            <Text style={styles.doneButtonText}>Done</Text>
+                                          </TouchableOpacity>
+                                        </View>
+                                      </View>
+                                    </Modal>
+                                )}
+                                <TouchableOpacity
+                                    style={[
+                                      styles.button,
+                                      selectedDays.length > 0 && selectedTime ? null : styles.disabledButton,
+                                    ]}
+                                    onPress={isStepFourComplete ? handleNextStep : null}
+                                    disabled={!isStepFourComplete}
+                                >
+                                  <Text style={styles.buttonText}>Next</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.button, styles.backButton]}
+                                    onPress={handlePrevStep}
+                                >
+                                  <Text style={styles.buttonText}>Back</Text>
+                                </TouchableOpacity>
+                              </View>
+                          )}
+                          {step === 5 && (
+                              <View>
                                 <TextInput
                                     placeholder="Home city, state (required)"
                                     value={additionalInfo.location}
@@ -950,10 +1119,10 @@ export default function Account({ navigation }) {
                                 <TouchableOpacity
                                     style={[
                                       styles.button,
-                                      !isStepFourComplete && styles.disabledButton,
+                                      !isStepFiveComplete && styles.disabledButton,
                                     ]}
-                                    onPress={isStepFourComplete ? handleSignUp : null}
-                                    disabled={!isStepFourComplete}
+                                    onPress={isStepFiveComplete ? handleSignUp : null}
+                                    disabled={!isStepFiveComplete}
                                 >
                                   <Text style={styles.buttonText}>Create Account</Text>
                                 </TouchableOpacity>
@@ -1008,10 +1177,11 @@ export default function Account({ navigation }) {
                     </Text>
                   </TouchableOpacity>
                 </View>
+                </View>
+                    </KeyboardAvoidingView>
+                  </TouchableWithoutFeedback>
             )}
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </TouchableWithoutFeedback>
+      </View>
   );
 }
 
@@ -1021,9 +1191,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   contentContainer: {
-    flexGrow: 1,
     justifyContent: "center",
-    padding: 20,
+    paddingHorizontal: 20,
+    flex:1,
   },
   headerContainer: {
     flexDirection: "row",
@@ -1048,6 +1218,7 @@ const styles = StyleSheet.create({
   },
   profileContainer: {
     width: "100%",
+    paddingBottom: 5,
   },
   profileImage: {
     width: "100%",
@@ -1091,7 +1262,17 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   sectionTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    marginTop: 15,
+  },
+  infoTitle: {
     fontSize: 18,
+    fontWeight: "bold",
+    marginVertical: 10,
+  },
+  favoritesTitle: {
+    fontSize: 15,
     fontWeight: "bold",
     marginTop: 15,
   },
@@ -1285,5 +1466,95 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 75,
     marginBottom: 10,
+  },
+  favoriteContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: 10,
+  },
+  favoriteSection: {
+    flex: 0.48,
+    backgroundColor: "#fff", // Ensure a background color is set
+    borderRadius: 8, // Rounded corners
+    shadowColor: "#000",
+    shadowOpacity: 0.2, // Shadow transparency
+    shadowRadius: 4, // Shadow blur
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 4 },
+  },
+  infoSection: {
+    backgroundColor: "#fff", // Ensure a background color is set
+    borderRadius: 8, // Rounded corners
+    shadowColor: "#000",
+    shadowOpacity: 0.2, // Shadow transparency
+    shadowRadius: 4, // Shadow blur
+    paddingHorizontal: 10,
+    marginVertical: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  favoriteItem: {
+    fontSize: 15,
+    color: "#333",
+    marginVertical: 2,
+  },
+  daysContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-around",
+    marginVertical: 10,
+  },
+  dayButton: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#cccccc",
+    borderRadius: 8,
+    marginBottom: 10,
+    minWidth: "30%",
+    alignItems: "center",
+  },
+  selectedDayButton: {
+    backgroundColor: "#016e03",
+  },
+  dayButtonText: {
+    color: "#333",
+  },
+  selectedDayButtonText: {
+    color: "#FFFFFF",
+  },
+  timeButton: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#cccccc",
+    borderRadius: 8,
+    marginVertical: 10,
+    alignItems: "center",
+  },
+  timeText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  pickerWrapper: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  doneButton: {
+    marginTop: 10,
+    backgroundColor: "#016e03",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  doneButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

@@ -1,23 +1,23 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {StyleSheet, View, TouchableOpacity, ActivityIndicator, Alert} from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { onAuthStateChanged } from 'firebase/auth';
-import { firebase_auth } from './firebaseConfig'; // Update this path as necessary
+import {db, firebase_auth} from './firebaseConfig'; // Update this path as necessary
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { WorkoutProvider } from './src/contexts/WorkoutContext';
 import AIFrontPage from './src/screens/AI/AIFrontPage';
-
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
 
 // Import screens
 import Account from './src/screens/Account';
 import Progress from './src/screens/ProgressLog/Progress';
-import Notifications from './src/screens/Notifications';
 import PersonalDetails from './src/screens/PersonalDetails';
 import WorkoutLogScreen from './src/screens/WorkoutLog/workout-log';
 import SaveGymHighlightScreen from "./src/screens/Feed/save-gym-highlight";
@@ -48,6 +48,8 @@ import Comments from './src/screens/Feed/Comments';
 import { LogBox } from 'react-native';
 import CustomTabBar from "./src/components/CustomTabBar";
 import CommunityTopTabs from "./src/screens/Community/CommunityTopTabs";
+import messaging from "@react-native-firebase/messaging";
+import {doc, updateDoc} from "@firebase/firestore";
 LogBox.ignoreLogs(['Warning: ...']); // Ignore log notification by message
 LogBox.ignoreAllLogs();//Ignore all log notifications
 
@@ -84,6 +86,8 @@ const screenOptions = ({ navigation, iconType }) => ({
         height: 80,
     },
 });
+
+
 
 function HomeStack() {
     return (
@@ -143,7 +147,6 @@ function AccountStack() {
     return (
         <Stack.Navigator initialRouteName='Account'>
             <Stack.Screen name='Account' component={Account} options={screenOptions} />
-            <Stack.Screen name='Notifications' component={Notifications} />
             <Stack.Screen name='Settings' component={Settings} />
             <Stack.Screen name='UserList' component={UserList} />
             <Stack.Screen name='UserDetails' component={UserDetails} />
@@ -393,14 +396,68 @@ function ExploreScreenStack() {
     );
 }
 
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+    }),
+});
+
+Notifications.addPushTokenListener((newToken) => {
+    const userId = firebase_auth.currentUser?.uid;
+    if (userId) {
+        const userRef = doc(db, `userProfiles/${userId}`);
+        updateDoc(userRef, { notificationToken: newToken.data });
+        console.log("Push Token refreshed:", newToken.data);
+    }
+});
+
+const registerForPushNotificationsAsync = async (userId) => {
+    if (!Device.isDevice) {
+        console.log("Must use a physical device for push notifications.");
+        return;
+    }
+
+    // Request permissions
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+    }
+
+    if (finalStatus !== "granted") {
+        console.log("Failed to get push token for push notifications!");
+        return;
+    }
+
+    // Get the push token
+    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    console.log("Push Token:", token);
+
+    // Save the push token to Firestore
+    if (userId) {
+        const userRef = doc(db, `userProfiles/${userId}`);
+        await updateDoc(userRef, { notificationToken: token });
+        console.log("Token updated successfully in Firestore.");
+    }
+};
+
 function App() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(firebase_auth, (user) => {
+        const unsubscribe = onAuthStateChanged(firebase_auth, async (user) => {
             setUser(user);
             setLoading(false);
+
+            if (user) {
+                // Register for push notifications and save the token
+                await registerForPushNotificationsAsync(user.uid);
+            }
         });
         return unsubscribe; 
     }, []);
@@ -412,6 +469,7 @@ function App() {
             </View>
         );
     }
+
 
     /**
 
