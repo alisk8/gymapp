@@ -5,7 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged} from 'firebase/auth';
 import {db, firebase_auth} from './firebaseConfig'; // Update this path as necessary
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -14,6 +14,7 @@ import { WorkoutProvider } from './src/contexts/WorkoutContext';
 import AIFrontPage from './src/screens/AI/AIFrontPage';
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
+import 'react-native-get-random-values';
 
 // Import screens
 import Account from './src/screens/Account';
@@ -450,17 +451,20 @@ function App() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(firebase_auth, async (user) => {
-            setUser(user);
+        const unsubscribe = onAuthStateChanged(firebase_auth, async (authUser) => {
+            setUser(authUser);
             setLoading(false);
 
-            if (user) {
+            if (authUser) {
                 // Register for push notifications and save the token
-                await registerForPushNotificationsAsync(user.uid);
+                await registerForPushNotificationsAsync(authUser.uid);
             }
         });
-        return unsubscribe; 
+
+        return unsubscribe;
     }, []);
+
+
 
     if (loading) {
         return (

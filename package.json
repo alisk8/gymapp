@@ -30,6 +30,7 @@
     "axios": "^1.7.5",
     "expo": "~51.0.34",
     "expo-av": "~14.0.6",
+    "expo-device": "~6.0.2",
     "expo-font": "~12.0.9",
     "expo-image-manipulator": "~12.0.5",
     "expo-image-picker": "~15.0.7",
@@ -56,8 +57,9 @@
     "react-native-elements": "^3.4.3",
     "react-native-geocoding": "^0.5.0",
     "react-native-gesture-handler": "~2.16.1",
+    "react-native-get-random-values": "^1.11.0",
     "react-native-gifted-charts": "^1.4.16",
-    "react-native-google-places-autocomplete": "^2.5.6",
+    "react-native-google-places-autocomplete": "^2.5.7",
     "react-native-graph": "^1.1.0",
     "react-native-image-picker": "^7.1.2",
     "react-native-linear-gradient": "^2.8.3",
@@ -74,8 +76,7 @@
     "react-native-swiper": "^1.6.0",
     "react-native-video": "^6.4.5",
     "typescript": "~5.3.3",
-    "uuid": "^10.0.0",
-    "expo-device": "~6.0.2"
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"

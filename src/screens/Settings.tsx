@@ -25,6 +25,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as ImageManipulator from "expo-image-manipulator";
 import {getDownloadURL, ref as storageRef, uploadBytes} from "firebase/storage";
+import GPSModal from "./Community/GPSModal";
 
 type AdditionalInfo = {
   firstName: string;
@@ -33,7 +34,7 @@ type AdditionalInfo = {
   weight: string;
   age: string;
   sex: string;
-  gym_interests: string;
+  gym_interests: string[];
   bio: string;
   profilePicture: string;
   favoriteExercises: string[];
@@ -65,7 +66,7 @@ export default function Settings({ route, navigation }) {
     weight: "",
     age: "",
     sex: "",
-    gym_interests: "",
+    gym_interests: [],
     bio: "",
     profilePicture: "",
     favoriteExercises: [],
@@ -81,7 +82,7 @@ export default function Settings({ route, navigation }) {
     weight: "",
     age: "",
     sex: "",
-    gym_interests: "",
+    gym_interests: [],
     bio: "",
     profilePicture: "",
     favoriteExercises: [],
@@ -91,9 +92,11 @@ export default function Settings({ route, navigation }) {
     displaySettings: { ...defaultDisplaySettings },
   });
   const [exerciseInput, setExerciseInput] = useState("");
+  const [interestInput, setInterestInput] = useState("");
   const [exerciseSuggestions, setExerciseSuggestions] = useState<string[]>([]);
   const [exercisePresets, setExercisePresets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
 
   useEffect(() => {
 
@@ -166,6 +169,27 @@ export default function Settings({ route, navigation }) {
 
   const handleUpdateField = (field: string, value: any) => {
     setTempInfo((prevInfo) => ({ ...prevInfo, [field]: value }));
+  };
+
+  const handleSelectHomeGym = (selectedLocation) => {
+    setAdditionalInfo((prev) => ({ ...prev, favoriteGym: selectedLocation.name }));
+    setLocationModalVisible(false);
+  };
+
+
+  const handleGymInterestInput = (text: string) => {
+    setTempInfo((prevInfo) => ({
+      ...prevInfo,
+      gym_interests: [...prevInfo.gym_interests, text.trim()],
+    }));
+    setInterestInput(""); // Clear input field after adding interest
+  };
+
+  const handleRemoveGymInterest = (interest: string) => {
+    setTempInfo((prevInfo) => ({
+      ...prevInfo,
+      gym_interests: prevInfo.gym_interests.filter((item) => item !== interest),
+    }));
   };
 
   const handleToggleDisplaySetting = (field: string) => {
@@ -339,10 +363,8 @@ export default function Settings({ route, navigation }) {
               {label: "Weight (lbs)", field: "weight", keyboardType: "numeric"},
               {label: "Age", field: "age", keyboardType: "numeric"},
               {label: "Sex", field: "sex"},
-              {label: "Gym Interests (comma-separated)", field: "gym_interests"},
               {label: "Bio", field: "bio"},
               {label: "Experience Level", field: "experienceLevel"},
-              {label: "Favorite Gym", field: "favoriteGym"},
               {label: "Location", field: "location"},
             ].map(({label, field, keyboardType}) => (
                 <View key={field} style={styles.inputGroup}>
@@ -368,6 +390,43 @@ export default function Settings({ route, navigation }) {
                   />
                 </View>
             ))}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Home Gym</Text>
+            <TouchableOpacity
+                onPress={() => setLocationModalVisible(true)}
+                style={{justifyContent:'center'}}
+            >
+              <Text style={styles.inputTextLocation}>
+                {additionalInfo.favoriteGym
+                    ? additionalInfo.favoriteGym
+                    : tempInfo["favoriteGym"]}
+              </Text>
+            </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Gym Interests</Text>
+              <TextInput
+                  style={styles.input}
+                  placeholder="Add Interest"
+                  value={interestInput}
+                  onChangeText={setInterestInput}
+                  onSubmitEditing={() => handleGymInterestInput(exerciseInput)}
+                  returnKeyType="done"
+              />
+              <View style={styles.selectedExercisesContainer}>
+                {tempInfo.gym_interests.map((interest) => (
+                    <View key={interest} style={styles.selectedExercise}>
+                      <Text>{interest}</Text>
+                      <TouchableOpacity onPress={() => handleRemoveGymInterest(interest)}>
+                        <Ionicons name="close" size={16} color="black" />
+                      </TouchableOpacity>
+                    </View>
+                ))}
+              </View>
+            </View>
+
             <View style={styles.inputGroup}>
               <View style={styles.labelContainer}>
                 <Text style={styles.label}>Favorite Exercises</Text>
@@ -419,6 +478,12 @@ export default function Settings({ route, navigation }) {
             <TouchableOpacity style={styles.button} onPress={confirmUpdateProfile}>
               <Text style={styles.buttonText}>Update Profile</Text>
             </TouchableOpacity>
+
+            <GPSModal
+                isVisible={locationModalVisible}
+                onClose={() => setLocationModalVisible(false)}
+                onSelectLocation={handleSelectHomeGym}
+            />
           </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -460,6 +525,17 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 50,
     padding: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    backgroundColor: "#fff",
+    borderRadius: 5,
+    fontSize: 16,
+  },
+  inputTextLocation: {
+    width: "100%",
+    height: 50,
+    paddingVertical: 15,
+    paddingHorizontal: 7,
     borderWidth: 1,
     borderColor: "#ccc",
     backgroundColor: "#fff",
