@@ -13,20 +13,36 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.twotwentyfive.gymapp"
+      "bundleIdentifier": "com.twotwentyfive.gymapp",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We need your location to allow gym check-ins.",
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.twotwentyfive.gymapp"
+      "package": "com.twotwentyfive.gymapp",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
-    ]
+      "expo-font",
+      ["expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow 225 to use your location."
+        }]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "17f61db2-cfd4-4dbb-8ef9-87dab2a3afcc"
+      }
+    }
   }
 }

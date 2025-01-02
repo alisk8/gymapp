@@ -5,7 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { onAuthStateChanged} from 'firebase/auth';
+import { onAuthStateChanged, setPersistence, browserLocalPersistence} from 'firebase/auth';
 import {db, firebase_auth} from './firebaseConfig'; // Update this path as necessary
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';

@@ -77,6 +77,7 @@ export default function SaveGymHighlightScreen() {
         const userId = firebase_auth.currentUser.uid; // Get the user's ID
 
         try {
+            /**
             // Check for existing bodyweight highlights for the current date
             if (highlightType === 'body') {
                 const today = new Date();
@@ -97,8 +98,11 @@ export default function SaveGymHighlightScreen() {
                     return;
                 }
             }
+                **/
 
             const mediaUploadPromises = media.map(async (mediaItem, index) => {
+
+
                 if (!mediaItem.uri) {
                     throw new Error(`Media item at index ${index} is missing a URI.`);
                 }
@@ -128,6 +132,8 @@ export default function SaveGymHighlightScreen() {
             });
 
             const uploadedMediaUrls = await Promise.all(mediaUploadPromises);
+
+            console.log('media urls', uploadedMediaUrls);
 
             const highlightData = {
                 type: highlightType,
