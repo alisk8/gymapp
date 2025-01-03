@@ -1,12 +1,12 @@
-import React, {useState, useEffect, useCallback} from 'react';
-import {View, Text, Button, FlatList, StyleSheet, ScrollView, Alert, TextInput} from 'react-native';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
+import {View, Text, Image, Button, FlatList, StyleSheet, ScrollView, Alert, TextInput, TouchableOpacity} from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { db, firebase_auth } from '../../../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import { useWorkout } from '../../contexts/WorkoutContext';
 import * as Location from 'expo-location';
-
+import {Camera, CameraView, CameraType} from 'expo-camera';
 
 const TemplateScreen = ({ route }) => {
     const [templates, setTemplates] = useState([]);
@@ -18,11 +18,14 @@ const TemplateScreen = ({ route }) => {
     const {workoutState, setWorkoutState, resetWorkout, handleWorkoutMode} = useWorkout();
     const [isCheckingIn, setIsCheckingIn] =  useState(null);
     const [location, setLocation] = useState(null); // User's location
-    const [description, setDescription] = useState(''); // Description for check-in
     const [showOptions, setShowOptions] = useState(true); // New state for workout/check-in choice
     const [locationServicesEnabled, setLocationServicesEnabled] = useState(false);
     const [gymName, setGymName] = useState(null); // Gym name from Places API
     const GOOGLE_PLACES_API_KEY = "AIzaSyCMogbDFxjNsReLGGKAo4AwE-6DdNUPRJI";
+    const [cameraPermission, setCameraPermission] = useState(null);
+    const cameraRef = useRef<Camera | null>(null);
+    const [photo, setPhoto] = useState(null);
+    const [facing, setFacing] = useState<CameraType>('back');
 
     useEffect(() => {
         fetchTemplates();
@@ -32,7 +35,6 @@ const TemplateScreen = ({ route }) => {
 
         return unsubscribe;
     }, []);
-
 
     const fetchTemplates = async () => {
         if (!firebase_auth.currentUser) return;
@@ -53,6 +55,13 @@ const TemplateScreen = ({ route }) => {
         }
     };
 
+    const takePhoto = async () => {
+        if (cameraRef) {
+            const photoData = await cameraRef.current.takePictureAsync();
+            setPhoto(photoData);
+        }
+    };
+
     const handleLoadTemplate = () => {
         const selected = templates.find(template => template.id === selectedTemplate);
         if (selected) {
@@ -64,6 +73,10 @@ const TemplateScreen = ({ route }) => {
 
     const startNewWorkout = () => {
           navigation.navigate('WorkoutLog', {previousScreen});
+    }
+
+    function toggleCameraFacing() {
+        setFacing(current => (current === 'back' ? 'front' : 'back'));
     }
 
     const checkIfLocationEnabled= async ()=>{
@@ -81,6 +94,13 @@ const TemplateScreen = ({ route }) => {
             setLocationServicesEnabled(enabled)         //store true into state
         }
     }
+
+    const requestCameraPermissions = async () => {
+        const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
+        console.log('camera status: ', cameraStatus);
+        setCameraPermission(cameraStatus === 'granted');
+    };
+
 
     const fetchLocationAndGym = async () => {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -112,6 +132,10 @@ const TemplateScreen = ({ route }) => {
             console.error('Error fetching nearby gyms:', error);
             Alert.alert('Error', 'Failed to identify nearby gyms.');
         }
+    };
+
+    const retakePhoto = () => {
+        setPhoto(null);
     };
 
     const handleCheckIn = async () => {
@@ -148,13 +172,19 @@ const TemplateScreen = ({ route }) => {
         // Show initial "Work Out" or "Check In" options
         return (
             <View style={styles.container}>
-                <Text style={[styles.title, {marginTop: 50}]}>What would you like to do?</Text>
-                <Button title="Work Out" color="#016e03" onPress={() => setShowOptions(false)} />
-                <Button title="Check In" color="#016e03" onPress={ () => {
-                    setIsCheckingIn(true);
-                    setShowOptions(false);
-                    fetchLocationAndGym();
-                }} />
+                <Text style={[styles.title, {marginTop: 50}]}>Workout Log</Text>
+                <View style={{alignItems: 'center', marginVertical: 10}}>
+                    <Button title="Track Workout" color="#016e03" onPress={() => setShowOptions(false)} />
+                </View>
+                <View style={{alignItems: 'center', marginVertical: 10, marginBottom: 20}}>
+                    <Button title="Check In" color="#016e03" onPress={ () => {
+                        setIsCheckingIn(true);
+                        setShowOptions(false);
+                        fetchLocationAndGym();
+                        requestCameraPermissions();
+                    }} />
+                <Text style={{color: '#aaaeb0', textAlign:'center'}}>Maintain your consistency streak without workout tracking.</Text>
+                </View>
                 <Button title="Cancel" color='#CE2029' onPress={() => navigation.goBack()} />
             </View>
         );
@@ -162,9 +192,11 @@ const TemplateScreen = ({ route }) => {
 
     if (isCheckingIn) {
         // Show Check-In Page
+
         return (
-            <View style={styles.container}>
-                <Text style={[styles.title, {marginTop: 50}]}>Check In</Text>
+            <ScrollView style={styles.container}>
+                <Text style={[styles.checkInTitle, {marginTop: 50}]}>Check In</Text>
+                <Text style={{color: '#aaaeb0', textAlign:'center', marginBottom: 10}}>Just showing up is already a win!</Text>
                 <Text style={styles.infoText}>
                     {gymName
                         ? `Gym: ${gymName}`
@@ -172,12 +204,22 @@ const TemplateScreen = ({ route }) => {
                             ? 'No nearby gym found.'
                             : 'Fetching location...'}
                 </Text>
-                <TextInput
-                    style={styles.textInput}
-                    placeholder="Add a description (optional)"
-                    value={description}
-                    onChangeText={setDescription}
-                />
+                {photo ? (
+                    <View style={styles.camera}>
+                        <Image source={{uri: photo.uri}} style={styles.imagePreview} />
+                        <TouchableOpacity style={styles.retakeButton} onPress={retakePhoto}>
+                            <Text style={styles.retakeText}>Retake</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (cameraPermission? (
+                    <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
+                        <TouchableOpacity style={styles.flipButton} onPress={toggleCameraFacing}>
+                            <Text style={styles.flipText}>🔄</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.captureButton} onPress={takePhoto} />
+                    </CameraView>
+                ):
+                    (<Text style={styles.errorText}>Camera access denied.</Text>))}
                 <Button title="Check In" color="#016e03" onPress={handleCheckIn} disabled={!gymName} />
                 <Button
                     title="Cancel"
@@ -188,13 +230,13 @@ const TemplateScreen = ({ route }) => {
                         navigation.goBack();
                     }}
                 />
-            </View>
+            </ScrollView>
         );
     }
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Select a Template</Text>
+            <Text style={[styles.title, {marginTop:30}]}>Select a Template</Text>
             <DropDownPicker
                 open={open}
                 value={selectedTemplate}
@@ -238,6 +280,13 @@ const styles = StyleSheet.create({
     title: {
         paddingTop: 40,
         paddingBottom: 20,
+        fontSize: 24,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    checkInTitle: {
+        paddingTop: 40,
+        paddingBottom: 10,
         fontSize: 24,
         fontWeight: 'bold',
         textAlign: 'center',
@@ -305,6 +354,82 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 10,
         marginBottom: 10,
+    },
+    errorText: {
+        color: 'red',
+        fontSize: 16,
+        marginBottom: 10,
+    },
+    camera: {
+        width: '100%',
+        height: 500,
+        marginBottom: 20,
+    },
+    photoPreview: {
+        width: 200,
+        height: 200,
+        marginBottom: 20,
+        borderRadius: 10,
+    },
+    buttonContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        backgroundColor: 'transparent',
+        margin: 64,
+    },
+    button: {
+        flex: 1,
+        alignSelf: 'flex-end',
+        alignItems: 'center',
+    },
+    text: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: 'white',
+    },
+    flipButton: {
+        position: 'absolute',
+        top: 20,
+        right: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        borderRadius: 25,
+        width: 50,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    flipText: {
+        fontSize: 24,
+        color: 'white',
+    },
+    captureButton: {
+        position: 'absolute',
+        bottom: 30,
+        alignSelf: 'center',
+        backgroundColor: 'white',
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        borderWidth: 5,
+        borderColor: 'black',
+    },
+    imagePreview: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+    },
+    retakeButton: {
+        position: 'absolute',
+        bottom: 30,
+        alignSelf: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 25,
+    },
+    retakeText: {
+        fontSize: 18,
+        color: 'white',
     },
 });
 

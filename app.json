@@ -15,7 +15,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.twotwentyfive.gymapp",
       "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"],
         "NSLocationWhenInUseUsageDescription": "We need your location to allow gym check-ins.",
+        "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you.",
+        "NSCameraUsageDescription": "We need access to your camera to allow you to take gym check-in pictures."
       }
     },
     "android": {
@@ -26,7 +29,8 @@
       "package": "com.twotwentyfive.gymapp",
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA"
       ]
     },
     "web": {
@@ -37,7 +41,13 @@
       ["expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow 225 to use your location."
-        }]
+        }],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera"
+        }
+      ]
     ],
     "extra": {
       "eas": {
