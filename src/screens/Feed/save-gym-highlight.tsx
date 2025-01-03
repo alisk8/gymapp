@@ -1,12 +1,25 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, TouchableOpacity, Image, View, FlatList, Text, Modal, Alert } from 'react-native';
+import {
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    Image,
+    View,
+    FlatList,
+    Text,
+    Modal,
+    Alert,
+    ActivityIndicator
+} from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { db, firebase_auth, storage } from '../../../firebaseConfig';
 import { addDoc, collection, getDocs, query, where, Timestamp, serverTimestamp } from '@firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from "@firebase/storage";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import Video from 'react-native-video';
 import DropDownPicker from 'react-native-dropdown-picker';
+import {useNavigation} from "@react-navigation/native";
 
 export default function SaveGymHighlightScreen() {
     const params = useLocalSearchParams();
@@ -27,6 +40,7 @@ export default function SaveGymHighlightScreen() {
         carbs: '',
         fat: ''
     });
+    const navigation = useNavigation();
     const [items, setItems] = useState([
         { label: 'Gym Highlight', value: 'gym' },
         { label: 'Daily Weight Update', value: 'body' },
@@ -40,7 +54,7 @@ export default function SaveGymHighlightScreen() {
     const [media, setMedia] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedMedia, setSelectedMedia] = useState(null);
-
+    const [loading, setLoading] = useState(false);
 
 
     const handlePickMedia = async () => {
@@ -100,15 +114,17 @@ export default function SaveGymHighlightScreen() {
             }
                 **/
 
+            setLoading(true);
             const mediaUploadPromises = media.map(async (mediaItem, index) => {
 
 
                 if (!mediaItem.uri) {
                     throw new Error(`Media item at index ${index} is missing a URI.`);
                 }
-
                 const fileName = `${userId}_${Date.now()}_${index}`; // A unique file name for the upload
+                console.log("File Name:", fileName);
                 const fileRef = storageRef(storage, `media/${fileName}`);
+                console.log('im here');
 
                 const response = await fetch(mediaItem.uri);
                 if (!response.ok) {
@@ -156,11 +172,14 @@ export default function SaveGymHighlightScreen() {
 
             const userHighlightsCollection = collection(db, 'userProfiles', userId, 'highlights');
             await addDoc(userHighlightsCollection, highlightData);
+            setLoading(false);
             alert('Highlight saved successfully!');
             console.log("Save successful");
+            navigation.goBack();
         } catch (error) {
             console.error('Error saving highlight:', error);
             alert('Error saving highlight: ' + error.message);
+            setLoading(false);
         }
     };
 
@@ -326,9 +345,10 @@ export default function SaveGymHighlightScreen() {
                 />
 
                 <View style={[styles.buttonContainer]}>
-                    <TouchableOpacity style={styles.saveButton} onPress={handleSaveHighlight}>
+                    {loading && <ActivityIndicator size="large" color="#0000ff" />}
+                    {!loading && <TouchableOpacity style={styles.saveButton} onPress={handleSaveHighlight}>
                         <Text style={styles.saveButtonText}>Save Highlight</Text>
-                    </TouchableOpacity>
+                    </TouchableOpacity>}
                 </View>
             </View>
         </ScrollView>

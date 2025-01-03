@@ -1,12 +1,26 @@
 import React, {useState, useEffect, useCallback, useRef} from 'react';
-import {View, Text, Image, Button, FlatList, StyleSheet, ScrollView, Alert, TextInput, TouchableOpacity} from 'react-native';
+import {
+    View,
+    Text,
+    Image,
+    Button,
+    FlatList,
+    StyleSheet,
+    ScrollView,
+    Alert,
+    TextInput,
+    TouchableOpacity,
+    ActivityIndicator
+} from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
-import { db, firebase_auth } from '../../../firebaseConfig';
+import { db, firebase_auth,storage} from '../../../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import { useWorkout } from '../../contexts/WorkoutContext';
 import * as Location from 'expo-location';
 import {Camera, CameraView, CameraType} from 'expo-camera';
+import {getDownloadURL, ref as storageRef, uploadBytes} from "firebase/storage";
+import {addDoc, Timestamp} from "@firebase/firestore";
 
 const TemplateScreen = ({ route }) => {
     const [templates, setTemplates] = useState([]);
@@ -26,6 +40,7 @@ const TemplateScreen = ({ route }) => {
     const cameraRef = useRef<Camera | null>(null);
     const [photo, setPhoto] = useState(null);
     const [facing, setFacing] = useState<CameraType>('back');
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         fetchTemplates();
@@ -144,8 +159,64 @@ const TemplateScreen = ({ route }) => {
             return;
         }
 
-        // Save check-in details to Firestore or any backend if needed
-        Alert.alert('Check-In Successful', 'Your check-in has been recorded.');
+        try {
+            // Get the current user's UID
+            const userId = firebase_auth.currentUser?.uid;
+            if (!userId) {
+                Alert.alert('Error', 'User not authenticated.');
+                return;
+            }
+
+            // Reference to the Firestore collection
+            const checkInsRef = collection(db, 'userProfiles', userId, 'checkIns');
+
+            // Data to save
+            const checkInData = {
+                gymName: gymName || 'Unknown Gym',
+                location: {
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                },
+                photoURL: "", // Placeholder for photo URL
+                timestamp: Timestamp.now() // Save current timestamp
+            };
+
+            // If a photo is available, upload it to Firebase Storage and get the URL
+            if (photo) {
+                setLoading(true);
+                const fileName = `${userId}_${Date.now()}.jpg`; // Unique file name
+                const photoRef = storageRef(storage, `checkIns/${fileName}`);
+                const response = await fetch(photo.uri);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch the photo.');
+                }
+                const blob = await response.blob();
+                console.log('Uploading photo...');
+                await uploadBytes(photoRef, blob); // Upload to Firebase Storage
+
+                const photoURL = await getDownloadURL(photoRef); // Retrieve the download URL
+                checkInData.photoURL = photoURL;
+                console.log('Photo uploaded successfully:', photoURL);
+            }
+
+            // Add the check-in data to Firestore
+            await addDoc(checkInsRef, checkInData);
+
+            Alert.alert('Check-In Successful', 'Your check-in has been recorded.');
+
+            // Reset the check-in state
+            setPhoto(null);
+            setGymName(null);
+            setLocation(null);
+            setIsCheckingIn(false);
+            setShowOptions(true);
+            setLoading(false);
+            navigation.goBack();
+        } catch (error) {
+            console.error('Error saving check-in:', error);
+            Alert.alert('Error', 'Failed to record your check-in. Please try again.');
+            setLoading(false);
+        }
     };
 
 
@@ -220,8 +291,9 @@ const TemplateScreen = ({ route }) => {
                     </CameraView>
                 ):
                     (<Text style={styles.errorText}>Camera access denied.</Text>))}
-                <Button title="Check In" color="#016e03" onPress={handleCheckIn} disabled={!gymName} />
-                <Button
+                {loading && <ActivityIndicator size="large" color="#0000ff" />}
+                {!loading && <Button title="Check In" color="#016e03" onPress={handleCheckIn} disabled={!gymName} />}
+                {!loading && <Button
                     title="Cancel"
                     color="#CE2029"
                     onPress={() => {
@@ -229,7 +301,7 @@ const TemplateScreen = ({ route }) => {
                         setIsCheckingIn(false);
                         navigation.goBack();
                     }}
-                />
+                />}
             </ScrollView>
         );
     }

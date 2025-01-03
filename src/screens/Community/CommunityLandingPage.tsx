@@ -17,7 +17,7 @@ import {
   getDocs,
   updateDoc,
   arrayUnion,
-  arrayRemove,
+  arrayRemove, Timestamp, where,
 } from "firebase/firestore";
 import {useFocusEffect, useNavigation} from "@react-navigation/native";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -25,7 +25,8 @@ import Icon from "react-native-vector-icons/FontAwesome";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import DropDownPicker from "react-native-dropdown-picker";
 import {center} from "@shopify/react-native-skia";
-import CommunityUserModal from "./CommunityUserModal"; // Import dropdown picker
+import CommunityUserModal from "./CommunityUserModal";
+import {query} from "@firebase/firestore"; // Import dropdown picker
 
 
 const auth = getAuth(app);
@@ -61,6 +62,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
   const [openExerciseSelector, setOpenExerciseSelector] = useState(false); // Dropdown state
   const [members, setMembers] = useState([]);
   const [isUsersModalVisible, setIsUsersModalVisible] = useState(false);
+  const [workedOutToday, setWorkedOutToday] = useState([]); // Users who worked out today
 
 
   const user = useAuth();
@@ -92,6 +94,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
     if (communityData) {
       fetchCommunityPosts(communityId);
       fetchCommunityEvents(); // Now fetch events after community data is available
+      fetchWorkedOutToday();
     }
   }, [communityData]); // Run when communityData changes
 
@@ -370,6 +373,63 @@ const CommunityLandingPage = ({ route, navigation }) => {
     }
   };
 
+  const fetchWorkedOutToday = async () => {
+    if (!communityData || !communityData.members) return;
+
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const midnightTimestamp = Timestamp.fromDate(today); // Start of today
+
+      const usersWhoWorkedOut = [];
+
+      for (let userId of communityData.members) {
+        // Check in `checkIns` collection
+        const checkInsCollection = collection(
+            db,
+            "userProfiles",
+            userId,
+            "checkIns"
+        );
+        const checkInsQuery = query(
+            checkInsCollection,
+            where("timestamp", ">=", midnightTimestamp)
+        );
+        const checkInsSnapshot = await getDocs(checkInsQuery);
+
+        // Check in `workouts` collection
+        const workoutsCollection = collection(
+            db,
+            "userProfiles",
+            userId,
+            "workouts"
+        );
+        const workoutsQuery = query(
+            workoutsCollection,
+            where("createdAt", ">=", midnightTimestamp)
+        );
+        const workoutsSnapshot = await getDocs(workoutsQuery);
+
+        // If user has either a check-in or a workout today
+        if (!checkInsSnapshot.empty || !workoutsSnapshot.empty) {
+          const userProfileDoc = await getDoc(doc(db, "userProfiles", userId));
+          if (userProfileDoc.exists()) {
+            const userProfile = userProfileDoc.data();
+            usersWhoWorkedOut.push({
+              id: userId,
+              profilePicture: userProfile.profilePicture,
+              name: `${userProfile.firstName} ${userProfile.lastName}`,
+            });
+          }
+        }
+      }
+
+      setWorkedOutToday(usersWhoWorkedOut);
+    } catch (error) {
+      console.error("Error fetching worked out today data: ", error);
+    }
+  };
+
   const handleComment = async (postId) => {
     try {
       const postRef = doc(db, "communities", communityId, "posts", postId);
@@ -419,6 +479,7 @@ const CommunityLandingPage = ({ route, navigation }) => {
         </Text>
         </TouchableOpacity>
 
+        <Text style={styles.workedOutTitle}>Open Workouts:</Text>
         <TouchableOpacity
           style={styles.createEventButton}
           onPress={() =>
@@ -495,6 +556,26 @@ const CommunityLandingPage = ({ route, navigation }) => {
             ))}
           </ScrollView>
         )}
+
+        <Text style={styles.workedOutTitle}>Worked Out Today</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.workedOutScroll}>
+          {workedOutToday.length > 0 ? (
+              workedOutToday.map((user) => (
+                  <View key={user.id} style={styles.profileCard}>
+                    <Avatar
+                        source={{ uri: user.profilePicture }}
+                        rounded
+                        size="medium"
+                        containerStyle={styles.profileAvatar}
+                    />
+                    <Text style={styles.profileName}>{user.name}</Text>
+                  </View>
+              ))
+          ) : (
+              <Text style={styles.noDataText}>No one has worked out today yet.</Text>
+          )}
+        </ScrollView>
+
 
         <Text style={styles.leaderboardTitle}>{selectedLeaderboardExercise ? `${selectedLeaderboardExercise} Leaderboard` : "Leaderboard"}</Text>
         <View style={{paddingHorizontal: 30,justifyContent: 'center', flex: 1}}>
@@ -699,7 +780,7 @@ const styles = StyleSheet.create({
   },
   createEventButton: {
     borderRadius: 10,
-    padding: 15,
+    paddingHorizontal: 5,
     margin: 10,
   },
   createEventText: {
@@ -850,7 +931,35 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-
+  workedOutTitle: {
+    fontSize: 15,
+    fontWeight: "bold",
+    marginVertical: 10,
+    marginTop: 20,
+    paddingHorizontal: 15,
+  },
+  workedOutScroll: {
+    paddingHorizontal: 15,
+    marginBottom: 20,
+  },
+  profileCard: {
+    alignItems: "center",
+    marginRight: 15,
+  },
+  profileAvatar: {
+    marginBottom: 5,
+    borderWidth: 2,
+    borderColor: "#ccc",
+  },
+  profileName: {
+    fontSize: 14,
+    textAlign: "center",
+    maxWidth: 80,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: "#999",
+  },
 
 });
 
