@@ -10,7 +10,7 @@ import {
     Alert,
     TextInput,
     TouchableOpacity,
-    ActivityIndicator
+    ActivityIndicator, Switch
 } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { db, firebase_auth,storage} from '../../../firebaseConfig';
@@ -25,6 +25,8 @@ import {addDoc, Timestamp} from "@firebase/firestore";
 const TemplateScreen = ({ route }) => {
     const [templates, setTemplates] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
+    const [quickModeTemplate, setQuickModeTemplate] = useState(null);
+    const [activateQuickMode, setActivateQuickMode] = useState(false);
     const [open, setOpen] = useState(false);
     const [items, setItems] = useState([]);
     const navigation = useNavigation();
@@ -41,6 +43,8 @@ const TemplateScreen = ({ route }) => {
     const [photo, setPhoto] = useState(null);
     const [facing, setFacing] = useState<CameraType>('back');
     const [loading, setLoading] = useState(false);
+
+
 
     useEffect(() => {
         fetchTemplates();
@@ -77,9 +81,19 @@ const TemplateScreen = ({ route }) => {
         }
     };
 
+    useEffect(() => {
+        if (activateQuickMode && selectedTemplate) {
+            const template = templates.find(t => t.id === selectedTemplate);
+            handleQuickMode(template)
+        }
+    }, [activateQuickMode, selectedTemplate]);
+
     const handleLoadTemplate = () => {
         const selected = templates.find(template => template.id === selectedTemplate);
-        if (selected) {
+        if (activateQuickMode && quickModeTemplate){
+            navigation.navigate('WorkoutLog', { template: quickModeTemplate, previousScreen});
+        }
+        else if (selected) {
             navigation.navigate('WorkoutLog', { template: selected, previousScreen});
         } else {
             Alert.alert('No template selected');
@@ -306,9 +320,35 @@ const TemplateScreen = ({ route }) => {
         );
     }
 
+
+    // Function to process the selected template for Quick Mode
+    const handleQuickMode = (template) => {
+        if (!template) return;
+
+        const compressedTemplate = template.exercises.map((exercise, index) => {
+            // Reduce the sets array by keeping only the first half of the sets
+            const reducedSets = exercise.setsKeys.slice(0, Math.ceil(exercise.setsKeys.length / 2));
+
+            if(template.exercises.length > 5) {
+                // Optionally remove some exercises (e.g., every second exercise for simplicity)
+                if (index % 2 !== 0) return null;
+            }
+
+            return {
+                ...exercise,
+                setsKeys: reducedSets,
+            };
+        }).filter(Boolean); // Remove null exercises
+
+        console.log('compressed template:', compressedTemplate);
+
+        setQuickModeTemplate({ ...template, exercises: compressedTemplate });
+    };
+
+
     return (
         <View style={styles.container}>
-            <Text style={[styles.title, {marginTop:30}]}>Select a Template</Text>
+            <Text style={[styles.title]}>Select a Template</Text>
             <DropDownPicker
                 open={open}
                 value={selectedTemplate}
@@ -322,19 +362,29 @@ const TemplateScreen = ({ route }) => {
                 dropDownStyle={styles.dropdown}
             />
             {selectedTemplate && (
-                <ScrollView style={styles.templatePreview}>
+                <View style={{flex:1}}>
                     <Text style={styles.previewTitle}>Template Preview:</Text>
                     <ScrollView style={styles.templatePreview}>
-                        {templates.find(template => template.id === selectedTemplate)?.exercises.map((exercise, index, exercises) => {
+                       {(activateQuickMode && quickModeTemplate?.exercises
+                           ? quickModeTemplate.exercises:
+                           templates.find(template => template.id === selectedTemplate)?.exercises
+                            )?.map((exercise, index, exercises) => {
                             if (!exercise.isSuperset) {
                                 return renderExercise(exercise, exercises);
                             }
                             return null;
                         })}
                     </ScrollView>
-                </ScrollView>
-            )}
 
+                <View style={styles.toggleContainer}>
+                    <Text style={styles.toggleLabel}>Quick Workout Mode</Text>
+                    <Switch
+                        value={activateQuickMode}
+                        onValueChange={setActivateQuickMode}
+                    />
+                </View>
+                </View>
+            )}
 
             <Button title="Load Template" color='#016e03' onPress={handleLoadTemplate} />
             <Button title="Start New Workout" color='#016e03' onPress={startNewWorkout} />
@@ -371,13 +421,13 @@ const styles = StyleSheet.create({
     },
     templatePreview: {
         marginTop: 20,
-        maxHeight: '90%',
+        maxHeight: '75%',
         paddingHorizontal: 10,
     },
     previewTitle: {
         fontSize: 22,
         fontWeight: 'bold',
-        marginBottom: 10,
+        marginBottom: 3,
     },
     previewItem: {
         marginBottom: 15,
@@ -502,6 +552,16 @@ const styles = StyleSheet.create({
     retakeText: {
         fontSize: 18,
         color: 'white',
+    },
+    toggleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 10,
+    },
+    toggleLabel: {
+        fontSize: 16,
+        color: '#333',
     },
 });
 

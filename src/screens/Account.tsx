@@ -77,14 +77,14 @@ export default function Account({ navigation }) {
     gym_interests: [],
     bio: "",
     profilePicture: "",
-    followers: ['X1Nx52EQsHbEOz5mQyVmFum704X2'],
-    following: ['X1Nx52EQsHbEOz5mQyVmFum704X2'],
+    followers: [],
+    following: [],
     favoriteExercises: [],
     //adding community for testing purposes
     communities: ["Sjj402aMI2s9wbmlzLig"],
     experienceLevel: "",
     favoriteGym: "",
-    displaySettings: {
+     displaySettings: {
       height: true,
       weight: true,
       age: true,
@@ -116,7 +116,8 @@ export default function Account({ navigation }) {
   const [workoutTime, setWorkoutTime] = useState(""); // Store time as HH:mm
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [selectedTime, setSelectedTime] = useState(new Date());
-
+  const [customGoal, setCustomGoal] = useState("");
+  const [goals, setGoals] = useState([]);
   const { clearMarkedDates } = useMarkedDates();
   const auth = firebase_auth;
 
@@ -126,42 +127,6 @@ export default function Account({ navigation }) {
       }, [])
   );
 
-
-  /**
-  // Add this function to fetch and save the FCM token
-  const initializeFCMToken = async (userId) => {
-    try {
-      // Request permission for notifications
-      const authStatus = await messaging().requestPermission();
-      const enabled =
-          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-      if (enabled) {
-        // Get FCM token
-        const token = await messaging().getToken();
-        console.log("FCM Token:", token);
-
-        // Save token to Firestore
-        const userRef = doc(db, `userProfiles/${userId}`);
-        await updateDoc(userRef, {
-          notificationToken: token,
-        });
-      }
-    } catch (error) {
-      console.error("Error initializing FCM token:", error);
-    }
-  };
-
-  messaging().onTokenRefresh(async (newToken) => {
-    const userRef = doc(db, `userProfiles/${user?.uid}`);
-    await updateDoc(userRef, {
-      notificationToken: newToken,
-    });
-    console.log("FCM Token refreshed and saved:", newToken);
-  });
-
-      **/
 
 
   useEffect(() => {
@@ -323,11 +288,18 @@ export default function Account({ navigation }) {
       const userProfileRef = doc(db, "userProfiles", response.user.uid);
 
       const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      const trimmedGoal = customGoal.trim();
+      if (trimmedGoal && !goals.includes(trimmedGoal)) {
+        setGoals( [...goals, trimmedGoal]); // Use functional form to avoid stale state
+      }
+
       await setDoc(userProfileRef, {
         email: username,
         ...additionalInfo,
         height: combinedHeight,
         sex: finalSex,
+        goals: goals,
         gym_interests: gymInterests || [],
         followers: existingUserIds,
         following: existingUserIds,
@@ -383,7 +355,7 @@ export default function Account({ navigation }) {
   };
 
   const handleNextStep = () => {
-    if (step < 5) setStep(step + 1);
+    if (step < 6) setStep(step + 1);
   };
 
   const handlePrevStep = () => {
@@ -401,9 +373,11 @@ export default function Account({ navigation }) {
       additionalInfo.age &&
       (sex !== "Other" || otherSex);
 
-  const isStepFiveComplete = additionalInfo.experienceLevel;
+  const isStepFourComplete = goals.length > 0;
 
-  const isStepFourComplete = selectedDays.length > 0 && selectedTime;
+  const isStepSixComplete = additionalInfo.experienceLevel;
+
+  const isStepFiveComplete = selectedDays.length > 0 && selectedTime;
 
 
   const handleSelectHomeGym = (selectedLocation) => {
@@ -939,6 +913,72 @@ export default function Account({ navigation }) {
                           )}
                           {step === 4 && (
                               <View>
+                                <Text style={styles.infoTitle}>What are your fitness goals?</Text>
+                                <View style={styles.checklistContainer}>
+                                  {[
+                                    "Better academic performance",
+                                    "Staying healthy/ improving mental health",
+                                    "Improving body image",
+                                    "Improving strength",
+                                    "Social life/connecting with community",
+                                  ].map((goal, index) => (
+                                      <TouchableOpacity
+                                          key={index}
+                                          style={[
+                                            styles.checklistItem,
+                                            goals?.includes(goal) && styles.selectedChecklistItem,
+                                          ]}
+                                          onPress={() => {
+                                            const newGoals = goals || [];
+                                            if (newGoals.includes(goal)) {
+                                              setGoals(newGoals.filter((g) => g !== goal));
+                                            } else {
+                                              setGoals([...newGoals, goal]);
+                                            }
+                                          }}
+                                      >
+                                        <Text
+                                            style={[
+                                              styles.checklistText,
+                                              goals?.includes(goal) &&
+                                              styles.selectedChecklistText,
+                                            ]}
+                                        >
+                                          {goal}
+                                        </Text>
+                                      </TouchableOpacity>
+                                  ))}
+                                  <View style={styles.customGoalContainer}>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Other (type your custom goal)"
+                                        value={customGoal}
+                                        onChangeText={setCustomGoal}
+                                    />
+                                  </View>
+                                </View>
+                                <TouchableOpacity
+                                    style={[
+                                      styles.button,
+                                      goals.length > 0 ? null : styles.disabledButton,
+                                    ]}
+                                    onPress={() => {
+                                      handleNextStep();
+                                    }}
+                                    disabled={!goals || goals.length === 0}
+                                >
+                                  <Text style={styles.buttonText}>Next</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.button, styles.backButton]}
+                                    onPress={handlePrevStep}
+                                >
+                                  <Text style={styles.buttonText}>Back</Text>
+                                </TouchableOpacity>
+                              </View>
+                          )}
+                          {step === 5 && (
+                              <View>
                                 <Text style={styles.infoTitle}>Workout Preferences</Text>
                                 <Text style={styles.label}>What days do you plan to work out?</Text>
                                 <View style={styles.daysContainer}>
@@ -995,8 +1035,8 @@ export default function Account({ navigation }) {
                                       styles.button,
                                       selectedDays.length > 0 && selectedTime ? null : styles.disabledButton,
                                     ]}
-                                    onPress={isStepFourComplete ? handleNextStep : null}
-                                    disabled={!isStepFourComplete}
+                                    onPress={isStepFiveComplete ? handleNextStep : null}
+                                    disabled={!isStepFiveComplete}
                                 >
                                   <Text style={styles.buttonText}>Next</Text>
                                 </TouchableOpacity>
@@ -1008,7 +1048,7 @@ export default function Account({ navigation }) {
                                 </TouchableOpacity>
                               </View>
                           )}
-                          {step === 5 && (
+                          {step === 6 && (
                               <View>
                                 <TextInput
                                     placeholder="Home city, state (required)"
@@ -1119,10 +1159,10 @@ export default function Account({ navigation }) {
                                 <TouchableOpacity
                                     style={[
                                       styles.button,
-                                      !isStepFiveComplete && styles.disabledButton,
+                                      !isStepSixComplete && styles.disabledButton,
                                     ]}
-                                    onPress={isStepFiveComplete ? handleSignUp : null}
-                                    disabled={!isStepFiveComplete}
+                                    onPress={isStepSixComplete ? handleSignUp : null}
+                                    disabled={!isStepSixComplete}
                                 >
                                   <Text style={styles.buttonText}>Create Account</Text>
                                 </TouchableOpacity>
@@ -1556,5 +1596,30 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  checklistContainer: {
+    marginVertical: 10,
+  },
+  checklistItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    marginVertical: 5,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+  },
+  selectedChecklistItem: {
+    backgroundColor: "#016e03",
+  },
+  checklistText: {
+    color: "#333",
+    fontSize: 16,
+  },
+  selectedChecklistText: {
+    color: "#fff",
+  },
+  customGoalContainer: {
+    marginTop: 10,
   },
 });

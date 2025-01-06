@@ -51,6 +51,7 @@ import CustomTabBar from "./src/components/CustomTabBar";
 import CommunityTopTabs from "./src/screens/Community/CommunityTopTabs";
 import messaging from "@react-native-firebase/messaging";
 import {doc, updateDoc} from "@firebase/firestore";
+import * as navigation from "expo-router/build/global-state/routing";
 LogBox.ignoreLogs(['Warning: ...']); // Ignore log notification by message
 LogBox.ignoreAllLogs();//Ignore all log notifications
 
@@ -87,7 +88,6 @@ const screenOptions = ({ navigation, iconType }) => ({
         height: 80,
     },
 });
-
 
 
 function HomeStack() {
@@ -309,6 +309,7 @@ function FeedStack() {
     );
 }
 
+/**
 function CommunitiesStack() {
     return (
         <Stack.Navigator initialRouteName='CommunityTopTabs'>
@@ -377,6 +378,68 @@ function CommunitiesStack() {
         </Stack.Navigator>
     );
 }
+    **/
+
+function CommunitiesStack() {
+    return (
+        <Stack.Navigator initialRouteName='CommunityLandingPage'>
+            <Stack.Screen name='Communities' component={Communities} />
+            <Stack.Screen name="EventDetailScreen" component={EventDetailScreen} />
+            <Stack.Screen name="UserDetails" component={UserDetails} options={{ title: "User Details" }} />
+            <Stack.Screen
+                name='NewCommunity'
+                component={NewCommunity}
+                options={{ title: "New Group" }}
+            />
+            <Stack.Screen
+                name='CommunityLandingPage'
+                component={communityLandingPage}
+                options={{ title: "" }}
+                initialParams={{ communityId: '8UH3Vdfp1hnkhKvAa0MO' }}
+            />
+            <Stack.Screen
+                name='CreateEventScreen'
+                component={CreateEventScreen}
+                options={{
+                    headerShown: true,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='CommunityPostScreen'
+                component={CommunityPostScreen}
+                options={{
+                    headerShown: true,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='TemplateScreen'
+                component={TemplateScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='WorkoutSummaryScreen'
+                component={WorkoutSummaryScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+        </Stack.Navigator>
+    );
+}
 
 
 function MessagesStack() {
@@ -397,22 +460,6 @@ function ExploreScreenStack() {
     );
 }
 
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-    }),
-});
-
-Notifications.addPushTokenListener((newToken) => {
-    const userId = firebase_auth.currentUser?.uid;
-    if (userId) {
-        const userRef = doc(db, `userProfiles/${userId}`);
-        updateDoc(userRef, { notificationToken: newToken.data });
-        console.log("Push Token refreshed:", newToken.data);
-    }
-});
 
 const registerForPushNotificationsAsync = async (userId) => {
     if (!Device.isDevice) {
@@ -463,6 +510,49 @@ function App() {
 
         return unsubscribe;
     }, []);
+
+    useEffect(() => {
+        const foregroundListener = Notifications.addNotificationReceivedListener(notification => {
+            console.log("Notification received in foreground:", notification);
+            Alert.alert(notification.request.content.title, notification.request.content.body);
+        });
+
+        return () => foregroundListener.remove();
+    }, []);
+
+    useEffect(() => {
+        const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+            console.log("User interacted with the notification:", response);
+
+            // Extract any custom data passed with the notification
+            const data = response.notification.request.content.data;
+
+            // Example: Navigate to a specific screen if data contains navigation info
+            if (data && data.screen) {
+                navigation.navigate(data.screen, data.params || {});
+            }
+        });
+
+        return () => responseListener.remove();
+    }, []);
+
+
+    Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+        }),
+    });
+
+    Notifications.addPushTokenListener((newToken) => {
+        const userId = firebase_auth.currentUser?.uid;
+        if (userId) {
+            const userRef = doc(db, `userProfiles/${userId}`);
+            updateDoc(userRef, { notificationToken: newToken.data });
+            console.log("Push Token refreshed:", newToken.data);
+        }
+    });
 
 
 

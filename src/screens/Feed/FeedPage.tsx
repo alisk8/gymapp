@@ -152,7 +152,7 @@ const FeedPage = ({ navigation }) => {
                 return;
             }
 
-            const allHighlightsAndWorkouts = [];
+            const allFeedItems = [];
             let newLastVisible = { ...lastVisible };
 
             if (latestPostTimestamp === null){
@@ -187,7 +187,7 @@ const FeedPage = ({ navigation }) => {
                     highlightsSnapshot.docs.forEach((doc) => {
                         const highlightData = doc.data();
                         console.log('highlight data', highlightData);
-                        allHighlightsAndWorkouts.push({
+                        allFeedItems.push({
                             id: doc.id,
                             ...highlightData,
                             userId,
@@ -201,7 +201,7 @@ const FeedPage = ({ navigation }) => {
                             saved: highlightData.savedBy?.includes(
                                 firebase_auth.currentUser.uid
                             ),
-                            type: "highlight",
+                            postType: "highlight",
                         });
                     });
                 }
@@ -226,7 +226,7 @@ const FeedPage = ({ navigation }) => {
                     workoutsSnapshot.docs.forEach((doc) => {
                         const workoutData = doc.data();
                         console.log('workout data', workoutData);
-                        allHighlightsAndWorkouts.push({
+                        allFeedItems.push({
                             id: doc.id,
                             ...workoutData,
                             userProfileData,
@@ -240,14 +240,48 @@ const FeedPage = ({ navigation }) => {
                             saved: workoutData.savedBy?.includes(
                                 firebase_auth.currentUser.uid
                             ),
-                            type: "workout",
+                            postType: "workout",
+                        });
+                    });
+                }
+
+                // Fetch check-ins
+                const checkInsQuery = query(
+                    collection(db, "userProfiles", userId, "checkIns"),
+                    orderBy("timestamp", "desc"),
+                    ...(latestPostTimestamp ? [startAfter(latestPostTimestamp)] : []),
+                    limit(10)
+                );
+
+                const checkInsSnapshot = await getDocs(checkInsQuery);
+
+                if (checkInsSnapshot.docs.length > 0) {
+                    newLastVisible[userId] = {
+                        ...newLastVisible[userId],
+                        checkIn: checkInsSnapshot.docs[checkInsSnapshot.docs.length - 1],
+                    };
+
+                    checkInsSnapshot.docs.forEach((doc) => {
+                        const checkInData = doc.data();
+                        console.log("Check-in data", checkInData);
+                        allFeedItems.push({
+                            id: doc.id,
+                            ...checkInData,
+                            userId,
+                            userProfileData,
+                            timestamp: checkInData.timestamp?.toDate(),
+                            likes: checkInData.likes?.length || 0,
+                            savedBy: checkInData.savedBy?.length || 0,
+                            liked: checkInData.likes?.includes(firebase_auth.currentUser.uid),
+                            saved: checkInData.savedBy?.includes(firebase_auth.currentUser.uid),
+                            postType: "checkIn",
                         });
                     });
                 }
             }
 
             // Sort both highlights and workouts by timestamp in descending order
-            const sortedData = allHighlightsAndWorkouts.sort(
+            const sortedData = allFeedItems.sort(
                 (a, b) => b.timestamp - a.timestamp
             );
 
@@ -397,7 +431,7 @@ const FeedPage = ({ navigation }) => {
     );
 
     const renderItem = useCallback(({ item }) => {
-        if (item.type === "workout") {
+        if (item.postType === "workout") {
             if (
                 typeof item.totalWorkoutTime === "undefined" ||
                 item.totalWorkoutTime === null
@@ -535,7 +569,7 @@ const FeedPage = ({ navigation }) => {
                             onPress={() =>
                                 item.liked
                                     ? handleUnlike(item.id, item.userId, true)
-                                    : handleLike(item.id, item.userId, false, item.type)
+                                    : handleLike(item.id, item.userId, false, item.postType)
                             }
                         >
                             <Icon
@@ -570,7 +604,48 @@ const FeedPage = ({ navigation }) => {
                     </View>
                 </View>
             );
-        } else {
+        } else if (item.postType == "checkIn"){
+            return (
+                <View style={styles.highlightContainer}>
+                    <View style={styles.userInfoContainer}>
+                        <TouchableOpacity
+                            onPress={() =>
+                                navigation.navigate("UserDetails", { user: item.userProfileData })
+                            }
+                        >
+                            <Image
+                                source={{
+                                    uri: item.userProfileData?.profilePicture || defaultProfilePicture,
+                                }}
+                                style={styles.profilePicture}
+                            />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() =>
+                                navigation.navigate("UserDetails", { user: item.userProfileData })
+                            }
+                        >
+                            <Text style={styles.userNameText}>
+                                {item.userProfileData?.firstName}{" "}
+                                {item.userProfileData?.lastName}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={styles.captionText}>Checked In</Text>
+                    {item.gymName && (
+                        <Text style={styles.locationText}>{`📍${item.gymName}`}</Text>
+                    )}
+                    {item.photoURL && (
+                        <Image source={{ uri: item.photoURL }} style={styles.postImage} />
+                    )}
+                    <Text style={styles.timestampText}>
+                        {item.timestamp?.toLocaleDateString()}
+                    </Text>
+                </View>
+            );
+        }else {
+            console.log('highlight:', item);
+            console.log('type', item.type);
             return (
                 <View style={styles.highlightContainer}>
                     <View style={styles.userInfoContainer}>
@@ -603,9 +678,52 @@ const FeedPage = ({ navigation }) => {
                             </Text>
                         </TouchableOpacity>
                     </View>
+
                     {item.caption && (
                         <Text style={styles.captionText}>{item.caption}</Text>
                     )}
+                    {item.type === "gym" && (
+                        <View style={styles.highlightDetails}>
+                            {item.weightLifted && (
+                                <Text style={styles.metricText}>
+                                    Weight Lifted: {item.weightLifted}
+                                </Text>
+                            )}
+                            {item.reps && (
+                                <Text style={styles.metricText}>
+                                    Reps: {item.reps}
+                                </Text>
+                            )}
+                        </View>
+                    )}
+
+                    {item.type === "meal" && (
+                        <View style={styles.highlightDetails}>
+                            {item.macros && (
+                                <>
+                                    <Text style={styles.metricText}>
+                                        Calories: {item.macros.calories}
+                                    </Text>
+                                    <Text style={styles.metricText}>
+                                        Carbs: {item.macros.carbs}
+                                    </Text>
+                                    <Text style={styles.metricText}>
+                                        Protein: {item.macros.protein}
+                                    </Text>
+                                    <Text style={styles.metricText}>
+                                        Fat: {item.macros.fat}
+                                    </Text>
+                                </>
+                            )}
+                        </View>
+                    )}
+
+                    {item.type === "body" && item.weight && (
+                        <Text style={styles.metricText}>
+                            Bodyweight: {item.weight}
+                        </Text>
+                    )}
+
                     {item.mediaUrls?.length > 0 && (
                         <Swiper style={styles.swiper} showsPagination={true}>
                             {item.mediaUrls.map((mediaUrl, index) => (
@@ -627,7 +745,7 @@ const FeedPage = ({ navigation }) => {
                             onPress={() =>
                                 item.liked
                                     ? handleUnlike(item.id, item.userId, false)
-                                    : handleLike(item.id, item.userId, false, item.type)
+                                    : handleLike(item.id, item.userId, false, item.postType)
                             }
                         >
                             <Icon
@@ -787,6 +905,7 @@ const styles = StyleSheet.create({
         fontFamily: "Rubik-Bold",
         marginVertical: 5,
         color: "#333",
+        fontWeight: "bold"
     },
     userInfoContainer: {
         flexDirection: "row",
@@ -883,6 +1002,17 @@ const styles = StyleSheet.create({
         fontFamily: "Inter-Regular",
         color: "#666",
         marginBottom: 10,
+    },
+    locationText: {
+        fontSize: 15,
+        fontFamily: "Inter-Regular",
+        color: "#666",
+        marginBottom: 10,
+    },
+    highlightDetails: {
+        marginTop: 2,
+        borderRadius: 5,
+
     },
 });
 

@@ -39,8 +39,11 @@ exports.sendWorkoutReminders = functions.pubsub.schedule("every 1 hours").onRun(
                     message: {
                         to: user.notificationToken,
                         title: "Time to Workout!",
-                        body: `Hey ${user.firstName}, get a workout in if you haven't yet today!`,
+                        body: `Hey ${user.firstName}, get a workout in today!`,
                     },
+                    data: {
+                        screen: "TemplateScreen"
+                    }
                 });
             }
         });
