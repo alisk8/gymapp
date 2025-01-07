@@ -54,6 +54,10 @@ const WorkoutSummaryScreen = ({ route }) => {
     };
 
     useEffect(() => {
+        console.log("Im on summary screen");
+    }, []);
+
+    useEffect(() => {
         navigation.setOptions({
             headerShown: false,
         });
@@ -497,7 +501,9 @@ const WorkoutSummaryScreen = ({ route }) => {
                                 <View style={styles.setsContainer}>
                                     {exercise.sets && exercise.sets.map((set, setIndex) => (
                                         <Text key={setIndex} style={styles.setText}>
-                                            {`Set ${setIndex + 1}: ${set.weight} ${exercise.weightUnit} x ${set.reps}`}
+                                            {set.key.includes("dropset") ?
+                                                (` Dropset: ${set.weight} ${exercise.weightUnit} x ${set.reps}`):
+                                                (`Set ${set.key.slice(-1)}: ${set.weight} ${exercise.weightUnit} x ${set.reps}`)}
                                         </Text>
                                     ))}
                                 </View>

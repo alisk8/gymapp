@@ -34,25 +34,34 @@ exports.sendWorkoutReminders = functions.pubsub.schedule("every 1 hours").onRun(
             const currentLocalHour = now.clone().tz(userTimeZone).hour();
 
             if (preferredHour === currentLocalHour) {
-                notifications.push({
-                    expoToken: user.notificationToken, // Expo push token
-                    message: {
+                if (typeof user.notificationToken === "string" && user.notificationToken.startsWith("ExponentPushToken")) {
+                    notifications.push({
                         to: user.notificationToken,
+                        sound: "default",
                         title: "Time to Workout!",
                         body: `Hey ${user.firstName}, get a workout in today!`,
-                    },
-                    data: {
-                        screen: "TemplateScreen"
-                    }
-                });
+                        data: { screen: "TemplateScreen" },
+                    });
+                }
             }
         });
 
-        // Send notifications using Expo's Push Notification API
-        const sendPromises = notifications.map(({ message }) =>
-            axios.post("https://exp.host/--/api/v2/push/send", message)
+        const sendPromises = notifications.map((message) =>
+            axios.post("https://exp.host/--/api/v2/push/send", message, {
+                headers: {
+                    Accept: "application/json",
+                    "Accept-encoding": "gzip, deflate",
+                    "Content-Type": "application/json",
+                },
+            })
         );
-        await Promise.all(sendPromises);
+
+        const results = await Promise.allSettled(sendPromises);
+        results.forEach((result, index) => {
+            if (result.status === "rejected") {
+                console.error(`Failed to send notification to ${notifications[index].to}:`, result.reason);
+            }
+        });
 
         console.log("Notifications sent successfully.");
     } catch (error) {

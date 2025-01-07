@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {StyleSheet, View, TouchableOpacity, ActivityIndicator, Alert} from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -14,6 +14,7 @@ import { WorkoutProvider } from './src/contexts/WorkoutContext';
 import AIFrontPage from './src/screens/AI/AIFrontPage';
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
+import Constants from "expo-constants";
 import 'react-native-get-random-values';
 
 // Import screens
@@ -45,6 +46,7 @@ import ProgressTopTabs from "./src/screens/ProgressLog/ProgressTopTabs";
 import EditTemplateScreen from "./src/screens/ProgressLog/EditTemplateScreen";
 import EditTemplateScreenUpdated from "./src/screens/ProgressLog/EditTemplateScreenUpdated";
 import Comments from './src/screens/Feed/Comments';
+import AskForAdvice from "./src/screens/ProgressLog/RequestFeedback";
 
 import { LogBox } from 'react-native';
 import CustomTabBar from "./src/components/CustomTabBar";
@@ -90,28 +92,6 @@ const screenOptions = ({ navigation, iconType }) => ({
 });
 
 
-function HomeStack() {
-    return (
-        <Stack.Navigator initialRouteName='Home'>
-            <Stack.Screen
-                name="Home"
-                component={Home}
-                options={({ navigation }) => ({
-                    ...screenOptions({ navigation }),
-                    title: "Home"
-                })}
-            />
-            <Stack.Screen name='FeedPage' component={FeedPage} options={{ title: 'Feed Page' }} />
-            <Stack.Screen name='Quickmode' component={WorkoutLogQuickMode} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-            <Stack.Screen name='Notifications' component={Notifications} />
-            <Stack.Screen name="UserDetails" component={UserDetails} options={{ title: "User Details" }} />
-            <Stack.Screen name="PostDetails" component={PostDetails} />
-            <Stack.Screen name='WorkoutLog' component={WorkoutLogScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-            <Stack.Screen name='TemplateScreen' component={TemplateScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-            <Stack.Screen name='WorkoutSummaryScreen' component={WorkoutSummaryScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-        </Stack.Navigator>
-    );
-}
 
 function WorkoutLogStack(){
     return(
@@ -186,6 +166,10 @@ function ProgressStack() {
     return (
         <Stack.Navigator initialRouteName='Progress'>
             <Stack.Screen name='Progress' component={Progress} options={screenOptions} />
+            <Stack.Screen name='AskForAdvice' component={AskForAdvice}
+                          options={{
+                              title: 'Ask for Advice',
+                          }}/>
             <Stack.Screen name="TrackedExercise" component={TrackedExercise} />
             <Stack.Screen
                 name='WorkoutLog'
@@ -249,6 +233,30 @@ function AIStack() {
                     headerShown: "false",
                     presentation: "fullScreenModal",
                 })}
+            />
+            <Stack.Screen
+                name='WorkoutLog'
+                component={WorkoutLogScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='TemplateScreen'
+                component={TemplateScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
+            <Stack.Screen
+                name='WorkoutSummaryScreen'
+                component={WorkoutSummaryScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
             />
         </Stack.Navigator>
     );
@@ -441,25 +449,10 @@ function CommunitiesStack() {
     );
 }
 
-
-function MessagesStack() {
-    return (
-        <Stack.Navigator initialRouteName='Messages'>
-            <Stack.Screen name='Messages' component={Messages} options={screenOptions} />
-            <Stack.Screen name="UserDMs" component={UserDMs} />
-            <Stack.Screen name='UserDetails' component={UserDetails} />
-        </Stack.Navigator>
-    );
+function handleRegistrationError(errorMessage) {
+    alert(errorMessage);
+    throw new Error(errorMessage);
 }
-
-function ExploreScreenStack() {
-    return (
-        <Stack.Navigator initialRouteName='ExploreScreen'>
-            <Stack.Screen name='ExploreScreen' component={ExploreScreen} options={screenOptions} />
-        </Stack.Navigator>
-    );
-}
-
 
 const registerForPushNotificationsAsync = async (userId) => {
     if (!Device.isDevice) {
@@ -481,22 +474,52 @@ const registerForPushNotificationsAsync = async (userId) => {
         return;
     }
 
-    // Get the push token
-    const token = (await Notifications.getExpoPushTokenAsync()).data;
-    console.log("Push Token:", token);
-
-    // Save the push token to Firestore
-    if (userId) {
-        const userRef = doc(db, `userProfiles/${userId}`);
-        await updateDoc(userRef, { notificationToken: token });
-        console.log("Token updated successfully in Firestore.");
+    const projectId =
+        Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+    if (!projectId) {
+        handleRegistrationError('Project ID not found');
     }
+    try {
+        const pushTokenString = (
+            await Notifications.getExpoPushTokenAsync({
+                projectId,
+            })
+        ).data;
+        console.log(pushTokenString);
+
+        // Save the push token to Firestore
+        if (userId) {
+            const userRef = doc(db, `userProfiles/${userId}`);
+            await updateDoc(userRef, { notificationToken: pushTokenString });
+            console.log("Token updated successfully in Firestore.");
+        }
+
+        return pushTokenString;
+    } catch (e) {
+        handleRegistrationError(`${e}`);
+    }
+
 };
+
+
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+    }),
+});
+
 
 function App() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-
+    const [expoPushToken, setExpoPushToken] = useState("");
+    const notificationListener = useRef();
+    const responseListener = useRef();
+    const [notification, setNotification] = useState(
+        undefined
+    );
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(firebase_auth, async (authUser) => {
             setUser(authUser);
@@ -504,56 +527,27 @@ function App() {
 
             if (authUser) {
                 // Register for push notifications and save the token
-                await registerForPushNotificationsAsync(authUser.uid);
+                await registerForPushNotificationsAsync(authUser.uid).then(token => setExpoPushToken(token));
+
+                notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+                    setNotification(notification);
+                });
+
+                responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+                    console.log(response);
+                });
             }
         });
 
-        return unsubscribe;
+        return () => {
+            unsubscribe();
+            notificationListener.current &&
+            Notifications.removeNotificationSubscription(notificationListener.current);
+            responseListener.current &&
+            Notifications.removeNotificationSubscription(responseListener.current);
+        };
+
     }, []);
-
-    useEffect(() => {
-        const foregroundListener = Notifications.addNotificationReceivedListener(notification => {
-            console.log("Notification received in foreground:", notification);
-            Alert.alert(notification.request.content.title, notification.request.content.body);
-        });
-
-        return () => foregroundListener.remove();
-    }, []);
-
-    useEffect(() => {
-        const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-            console.log("User interacted with the notification:", response);
-
-            // Extract any custom data passed with the notification
-            const data = response.notification.request.content.data;
-
-            // Example: Navigate to a specific screen if data contains navigation info
-            if (data && data.screen) {
-                navigation.navigate(data.screen, data.params || {});
-            }
-        });
-
-        return () => responseListener.remove();
-    }, []);
-
-
-    Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-            shouldShowAlert: true,
-            shouldPlaySound: false,
-            shouldSetBadge: false,
-        }),
-    });
-
-    Notifications.addPushTokenListener((newToken) => {
-        const userId = firebase_auth.currentUser?.uid;
-        if (userId) {
-            const userRef = doc(db, `userProfiles/${userId}`);
-            updateDoc(userRef, { notificationToken: newToken.data });
-            console.log("Push Token refreshed:", newToken.data);
-        }
-    });
-
 
 
     if (loading) {

@@ -672,6 +672,7 @@ export default function Account({ navigation }) {
                     {posts.length > 0 ? (
                         posts.map((post, index) => (
                             <View key={index} style={styles.postWrapper}>
+                              {index % 3 === 0 && <View style={styles.infoRow} />}
                               <TouchableOpacity
                                   style={styles.card}
                                   onPress={() => handlePostPress(index)}
@@ -1322,17 +1323,29 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   postsContainer: {
-    width: "100%",
-    paddingTop: 50,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 20,
   },
   postWrapper: {
+    width: "33%",
+    padding: 5,
+  },
+  infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 3,
+    width: '80%',
+    alignSelf:'center'
   },
   card: {
-    flex: 1,
-    marginHorizontal: 5,
+    backgroundColor: "#f9f9f9",
+    padding: 10,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
   imageContainer: {
     position: "relative",

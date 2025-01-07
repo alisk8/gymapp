@@ -143,20 +143,26 @@ const TemplateScreen = ({ route }) => {
 
         setLocation({ latitude, longitude });
 
-        // Query Google Places API for nearby gyms
-        const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=20&type=gym&key=${GOOGLE_PLACES_API_KEY}`;
+        const placeTypes = ["gym", "sports_complex", "fitness_center"];
 
         try {
-            const response = await fetch(url);
-            const data = await response.json();
 
-            if (data.results && data.results.length > 0) {
-                // Find the nearest gym
-                const nearestGym = data.results[0];
-                setGymName(nearestGym.name); // Store gym name
-            } else {
-                setGymName(null); // No gyms nearby
+            for (const type of placeTypes) {
+                const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=50&type=${type}&key=${GOOGLE_PLACES_API_KEY}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.results && data.results.length > 0) {
+                    const nearestPlace = data.results[0];
+                    setGymName(nearestPlace.name); // Store the place name
+                    break; // Exit loop if a place is found
+                }
             }
+
+            if (!gymName){
+                setGymName("");
+            }
+
         } catch (error) {
             console.error('Error fetching nearby gyms:', error);
             Alert.alert('Error', 'Failed to identify nearby gyms.');
@@ -168,8 +174,8 @@ const TemplateScreen = ({ route }) => {
     };
 
     const handleCheckIn = async () => {
-        if (!location) {
-            Alert.alert('Error', 'Location is not available.');
+        if (!photo && !gymName){
+            Alert.alert('Error', 'Please add a picture or visit a gym location.');
             return;
         }
 
@@ -281,7 +287,7 @@ const TemplateScreen = ({ route }) => {
         return (
             <ScrollView style={styles.container}>
                 <Text style={[styles.checkInTitle, {marginTop: 50}]}>Check In</Text>
-                <Text style={{color: '#aaaeb0', textAlign:'center', marginBottom: 10}}>Just showing up is already a win!</Text>
+                <Text style={{color: '#aaaeb0', textAlign:'center', marginBottom: 10}}>The biggest win is just showing up.</Text>
                 <Text style={styles.infoText}>
                     {gymName
                         ? `Gym: ${gymName}`
@@ -306,7 +312,7 @@ const TemplateScreen = ({ route }) => {
                 ):
                     (<Text style={styles.errorText}>Camera access denied.</Text>))}
                 {loading && <ActivityIndicator size="large" color="#0000ff" />}
-                {!loading && <Button title="Check In" color="#016e03" onPress={handleCheckIn} disabled={!gymName} />}
+                {!loading && <Button title="Check In" color="#016e03" onPress={handleCheckIn}/>}
                 {!loading && <Button
                     title="Cancel"
                     color="#CE2029"
@@ -316,6 +322,7 @@ const TemplateScreen = ({ route }) => {
                         navigation.goBack();
                     }}
                 />}
+                <View style={{height: 50}}></View>
             </ScrollView>
         );
     }

@@ -213,7 +213,7 @@ export default function WorkoutLogScreen({route}) {
 
     const resetTimer = () => {
         setTimeRemaining(initialTime);
-        setTimerRunning(false);
+        setTimerRunning(true);
     };
 
     const adjustTime = (amount) => {
@@ -570,7 +570,7 @@ export default function WorkoutLogScreen({route}) {
                                         style={styles.addButton}
                                         onPress={() => addDropSet(exerciseIndex, setIndex)}
                                     >
-                                        <Text style={styles.deleteButtonText}>Add Drop Set</Text>
+                                        <Text style={styles.deleteButtonText}>+ Drop Set</Text>
                                     </TouchableOpacity>
                                 )}
                             >
@@ -735,12 +735,17 @@ export default function WorkoutLogScreen({route}) {
             return;
         }
 
+        if (confirmationModalVisible){
+            console.log("It was a modal problem");
+            return;} // Prevent recursive calls
+
         const incompleteExercises = exercises.some(exercise =>
             exercise.sets.some(set => !set.completed)
         );
 
         if (incompleteExercises && !proceedWithSave) {
             setConfirmationModalVisible(true);
+            console.log("here here");
             return;
         }
 
@@ -766,11 +771,9 @@ export default function WorkoutLogScreen({route}) {
         }
 
         pauseWorkout();
-
         nav.navigate('WorkoutSummaryScreen', {previousScreen});
-
-
     };
+
 
     const camelCase = (str) => {
         return str
@@ -947,6 +950,7 @@ export default function WorkoutLogScreen({route}) {
         }, [])
     );
 
+
     useEffect(() => {
         console.log("Exercises state updated: ", JSON.stringify(exercises, null, 2));
     }, [exercises]);
@@ -1094,9 +1098,9 @@ export default function WorkoutLogScreen({route}) {
                         <Button
                             title="Yes, Proceed"
                             onPress={() => {
-                                setProceedWithSave(true);
                                 setConfirmationModalVisible(false);
-                                saveWorkout(); // Recursively call saveWorkout
+                                setProceedWithSave(true);
+                                saveWorkout(); // Automatically save workout when `proceedWithSave` is true
                             }}
                         />
                         <Button title="No, Go Back" onPress={() => setConfirmationModalVisible(false)} />
@@ -1293,7 +1297,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'red',
         justifyContent: 'center',
         alignItems: 'center',
-        width: 75,
+        width: 60,
         height: '100%',
         borderRadius: 8,
         marginHorizontal: 4,
@@ -1382,7 +1386,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'green',
         justifyContent: 'center',
         alignItems: 'center',
-        width: 100,
+        width: 80,
         height: '100%',
         borderRadius: 8,
         marginHorizontal: 4,

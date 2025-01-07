@@ -416,6 +416,14 @@ const Progress = ({ navigation }) => {
                     </View>
                 </View>
             </Modal>
+            <TouchableOpacity
+                style={styles.createButton}
+                onPress={() => {
+                    navigation.navigate('AskForAdvice');
+                }}
+            >
+                <Text style={styles.createButtonText}>Ask for Advice</Text>
+            </TouchableOpacity>
         </ScrollView>
     );
 };
@@ -546,5 +554,23 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 5,
         marginVertical: 5,
+    },
+    createButton: {
+        backgroundColor: "#016e03", // Green background for the button
+        padding: 15,
+        marginVertical: 8,
+        marginHorizontal: 10,
+        borderRadius: 10,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2, // Adds a subtle shadow on Android
+        alignItems: "center", // Centers the text inside the button
+    },
+    createButtonText: {
+        fontSize: 18,
+        fontWeight: "600",
+        color: "#ffffff", // White text color
     },
 });
